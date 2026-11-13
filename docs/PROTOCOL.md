@@ -115,7 +115,8 @@ what their outputs can do.
 Replay JSON/HTML intentionally contains all player-private information for the human
 spectator. Treat it as privileged. It is not suitable as a participant context source.
 
-The legacy `parallax_relay.demo` command has an older replay format and overwrites
-existing output files. The main launcher rejects existing run directories. See
+The legacy `parallax_relay.demo` command has an older replay format. Both CLIs
+reject existing output paths and choose unique directories under `runs/` when no
+`--out` is supplied. The demo returns exit 2 for output-path/local I/O errors. See
 [Running](RUNNING.md) for operational details and [Architecture](ARCHITECTURE.md)
 for ownership and extension boundaries.

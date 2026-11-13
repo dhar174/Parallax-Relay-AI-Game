@@ -104,5 +104,5 @@ to three roles and one room. No level-loading interface exists yet. Add those
 capabilities only through a separately scoped design and the [roadmap](../ROADMAP.md).
 
 There is no package-install or console-script interface. Run modules from the
-checkout root. No public interface or runtime behavior changed in the documentation
-review.
+checkout root. The legacy demo CLI returns an exit status and uses a unique default output path;
+its `run(out: Path) -> dict` interface still requires an explicit fresh destination.

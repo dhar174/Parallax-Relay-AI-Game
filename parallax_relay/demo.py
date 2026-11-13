@@ -1,6 +1,8 @@
 """Run a scripted complete game and save PNG observations plus JSONL replay.
 
-Usage: python -m parallax_relay.demo --out demo_output
+Usage: python -m parallax_relay.demo [--out NEW_DIRECTORY]
+
+Omitting --out creates a unique directory under runs/. Existing paths are rejected.
 """
 
 from __future__ import annotations
@@ -8,7 +10,10 @@ from __future__ import annotations
 import argparse
 import json
 from dataclasses import asdict
+from datetime import datetime, timezone
 from pathlib import Path
+import sys
+from uuid import uuid4
 from .engine import resolve_turn, score
 from .state import initial_world, public_hud
 from .scripted import PLAN, FIRST_BROADCAST
@@ -16,7 +21,7 @@ from .render import render_png
 
 
 def run(out: Path) -> dict:
-    out.mkdir(parents=True, exist_ok=True)
+    out.mkdir(parents=True, exist_ok=False)
     world = initial_world()
     records = []
     for idx, actions in enumerate(PLAN):
@@ -105,11 +110,23 @@ const e=document.getElementById('events');e.replaceChildren();for(const event of
     (out/"index.html").write_text(html, encoding="utf-8")
 
 
-def main() -> None:
-    p=argparse.ArgumentParser()
-    p.add_argument("--out",default="demo_output")
-    args=p.parse_args()
-    run(Path(args.out))
+def main(argv: list[str] | None = None) -> int:
+    p = argparse.ArgumentParser(description='Run the offline scripted legacy demo.')
+    p.add_argument('--out', type=Path,
+                   help='New output directory; defaults to a unique directory under runs/. Existing paths are rejected.')
+    args = p.parse_args(argv)
+    out = args.out or Path('runs') / (
+        'demo_' + datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ') + '_' + uuid4().hex[:6])
+    try:
+        run(out)
+    except FileExistsError:
+        print('Output path already exists. Choose a new --out path.', file=sys.stderr)
+        return 2
+    except OSError:
+        print('Local file operation failed. Check paths and permissions.', file=sys.stderr)
+        return 2
+    print(f'Replay: {out / "index.html"}')
+    return 0
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

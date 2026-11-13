@@ -85,7 +85,8 @@ Use the actual results in your report; do not copy historical test counts.
   authorization, selected models, local credentials, and bounded limits.
 - Never print or commit keys, populated .env files, or raw provider error bodies.
 - The main launcher rejects existing output directories; omit --out for a fresh run.
-- The legacy demo overwrites matching files. Give it a fresh ignored destination.
+- The legacy demo also rejects existing paths; omit --out for a unique runs/demo_
+  destination, or give it an explicit fresh ignored destination.
 - Preserve committed example_run/ and demo_output/ unless fixture changes are
   part of the requested work; keep their HTML and PNGs together.
 - Keep new runs, caches, and environments out of commits. Review spectator logs

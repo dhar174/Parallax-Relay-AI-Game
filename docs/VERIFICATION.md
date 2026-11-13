@@ -197,3 +197,19 @@ recorded above. Historical reproduction outputs remain baseline evidence.
   regressions cover signed/nonzero fields on every non-MOVE kind, both collectors,
   canonical effects, input purity, teammate controls/order, parser acceptance,
   nine successful attempts without repair, and the unmodified recorded commitment.
+- R05: new direct/CLI tests failed before the fix on overwrite, missing replay-path
+  output, unique defaults, and local error handling. After the fix, all 88 offline
+  tests passed. Empty/populated directories, files, and supported symlinks remain
+  untouched; new/nested destinations retain seven-turn results and 28 valid PNGs;
+  two default runs create distinct folders and preserve old demo_output evidence.
+- Final checks: `pip check` found no broken requirements; compilation and diff
+  whitespace checks passed. Standalone default/fast mock CLIs won in seven turns
+  with 63/42 calls, five energy and all scores 100; the no-argument demo also won
+  and printed its unique replay path. Generated runs are ignored.
+- A fresh code reviewer found no actionable issue and independently ran the full
+  suite: 88 tests passed. No dependency, historical fixture, or provider contract
+  changed; no live requests or new browser verification were performed.
+
+Issues R01/R04/R05 are implemented on the slice 1 branch and await merge; R02/R03
+and the remaining research/validation work remain open. Existing historical logs
+and baseline reproduction outputs above were preserved rather than regenerated.

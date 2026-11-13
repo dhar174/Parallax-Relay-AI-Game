@@ -56,8 +56,9 @@ Changing a provider contract also requires dated source evidence in the API guid
 
 `example_run/` and `demo_output/` are committed historical fixtures with accompanying
 PNGs. Generate new development runs under ignored `runs/` or a temporary directory.
-The legacy demo overwrites files in an existing destination; always give it a fresh
-path, never the committed `demo_output/` directory for routine verification.
+The legacy demo also rejects existing paths. Use `python -m parallax_relay.demo`
+for a unique ignored destination, or supply a fresh `--out` path. Never target the
+committed `demo_output/` directory for routine verification.
 
 Historical milestone plans and red/green logs document earlier work. They are not
 current instructions or fresh verification. Add dated evidence rather than rewriting

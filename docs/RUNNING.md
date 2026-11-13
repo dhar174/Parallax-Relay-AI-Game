@@ -23,15 +23,17 @@ The one-turn example intentionally stops with `turn_limit`, `completed=false`, a
 `scores=null`; it is not an engine defeat.
 
 The original standalone demo bypasses the orchestrator and uses an older replay
-format. To run it, choose a new directory, for example:
+format. Run it without arguments for a fresh directory:
 
 ```bash
-python -m parallax_relay.demo --out runs/legacy-demo-01
+python -m parallax_relay.demo
 ```
 
-Choose another suffix on subsequent runs. Unlike the main launcher, this command
-**overwrites matching files in an existing directory**. Do not use the committed
-`demo_output/` directory for verification.
+It creates `runs/demo_<UTC timestamp>_<six hex characters>/` and prints the replay
+path. An explicit `--out runs/legacy-demo-01` is also supported. Existing destinations
+(including empty directories or files) are rejected with exit 2; matching files are
+never overwritten. Use a new path or omit `--out` on subsequent runs. Keep the
+committed `demo_output/` as historical evidence.
 
 ## Configure providers
 
@@ -174,7 +176,7 @@ controls. There is no live dashboard or built-in resume/recovery command.
 |---|---|
 | 0 | Configuration check, victory, or intentionally bounded nonterminal run |
 | 1 | Engine defeat |
-| 2 | CLI/configuration/local file error handled by the launcher |
+| 2 | CLI/configuration/local file error; also demo output-path/local I/O errors |
 | 3 | Provider, internal-agent, or reliability abort |
 | 4 | Call or estimated-cost budget stop |
 | 130 | Keyboard interruption |
