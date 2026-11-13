@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Disable only the CLI scripted mock's effective dollar cap, preserving call/turn
+  limits and live/programmatic guards; record requested versus effective settings.
+
 - Handle invalid UTF-8 TOML as a safe configuration error with CLI exit 2.
 - Enforce canonical non-MOVE parameters in the engine without model retries.
 - Reject existing legacy-demo destinations, sanitize local CLI I/O errors, and

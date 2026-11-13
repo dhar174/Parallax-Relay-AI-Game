@@ -14,9 +14,18 @@ python -m parallax_relay.play --mock --max-turns 1
 Mock mode uses scripted agents through the normal observation, messaging,
 validation, orchestration, and recording path. It does not load `.env`, resolve
 credentials, or contact a provider. It still loads and validates the TOML file and
-applies its limits. A very small configured dollar estimate cap can currently stop
-even a mock run; see [R02](REVIEW.md#r02-dollar-estimate-guard-can-block-mock-runs).
-Use the default unpriced configuration for the offline quickstart.
+applies its call/turn/retry limits. For these known zero-usage scripted agents, the
+CLI clears only the effective `max_estimated_cost_usd` cap. A valid fully priced
+configuration can therefore be reused for mock runs even with a tiny dollar cap.
+The original configuration is not mutated; validation still requires complete
+pricing when its requested cap is enabled. This override does not apply to live
+runs or direct programmatic `run_match` calls.
+
+Successful mock results report `estimated_cost_usd=0.0` with complete pricing and
+`null` without complete pricing; null means no complete estimate is available,
+not that the scripted fixture made paid requests. Prices and usage accounting are
+retained. The manifest records effective `settings` and mock-only `requested_settings`
+(after CLI overrides, before clearing the dollar cap).
 
 Normal mode uses broadcast, negotiation, and commitment. Fast mode skips negotiation.
 The one-turn example intentionally stops with `turn_limit`, `completed=false`, and
@@ -150,7 +159,7 @@ even if empty. Keep the files together when copying a replay.
 
 | File | Contents |
 |---|---|
-| `manifest.json` | Schema version, mode, model assignments, settings, room, privacy notice |
+| `manifest.json` | Schema version, mode, model assignments, effective settings, room, privacy notice; mock runs also include requested settings |
 | `calls.jsonl` | Attempt statuses, latency, usage, sanitized HTTP metadata |
 | `phases.jsonl` | Completed message batches and sealed commitments after each barrier |
 | `replay.jsonl` | Fully resolved turns, observations, private notes, and world snapshots |
@@ -192,7 +201,8 @@ use 12 turns. No experiment-horizon override is currently sent to the players.
   quota, model support, and current API contracts. Raw provider errors are not saved.
 - **Repeated `incomplete` or validation failures:** check model capabilities and
   output-token requirements; raise limits deliberately rather than removing bounds.
-- **`call_budget`/`spend_budget`:** account for whole-phase retry reservations.
+- **`call_budget`/`spend_budget`:** account for whole-phase retry reservations. The
+  CLI scripted mock disables only the dollar guard; its call budget still applies.
 - **Partial logs without a viewer:** local I/O/setup failures can prevent finalization.
   Preserve the directory for diagnosis; no recovery tool is shipped.
 

@@ -80,6 +80,14 @@ role. Each attempt consumes one call; unused reservations are released. Missing 
 partial token usage retains the cost estimate. Pricing is an estimate, not an
 external billing ceiling. Unknown usage is counted explicitly.
 
+Only the CLI scripted-mock path copies the validated settings and clears the
+effective dollar cap before creating the recorder/driver. Other settings and
+configured rates are retained. Mock manifests add optional `requested_settings`
+after CLI overrides; existing `settings` describe execution. Live and programmatic
+budget behavior is unchanged, including direct calls with scripted agents. With
+known zero usage, complete pricing yields a zero estimate; incomplete pricing
+continues to yield null. No shared budget API or result format changed.
+
 A fatal provider error or a budget stop leaves the world at the last resolved
 turn. Cancellation attempts finalization before propagating. Local recording errors
 can bypass finalization; see [R03](REVIEW.md#r03-recording-errors-can-bypass-finalization).
