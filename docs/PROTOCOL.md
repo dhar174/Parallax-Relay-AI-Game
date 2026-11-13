@@ -76,9 +76,12 @@ The failure streak counts failed **phases**, not rounds. Three consecutive faile
 phases for one role abort by default. Any successful phase resets that role's streak.
 Fatal setup/provider errors abort the unfinished round without resolving its actions.
 Already completed public messages and attempt metadata remain in the partial logs.
-These guarantees cover normal provider/budget stops and handled cancellation. Local
-recording failures may prevent finalization; see
-[R03](REVIEW.md#r03-recording-errors-can-bypass-finalization).
+Recording/progress failures stop the match and trigger bounded best-effort
+finalization. The checkpoint is the last successfully resolved engine turn, including
+its original submitted actions, even if its incremental write failed. Completed
+phases and all started-call evidence are retained in memory and used to rebuild
+JSONL at finalization. A failed write never causes another model call or transition.
+Persistently unwritable storage or process termination can still leave partial output.
 
 A phase reserves the full team's maximum attempts before starting. Unknown token
 usage is recorded as unknown, not zero. A configured dollar guard uses user-supplied
@@ -90,11 +93,13 @@ and should not be represented as a hard external spending cap.
 `victory` and `defeat` are engine-terminal outcomes. `turn_limit` means a shorter
 configured experiment stopped before the engine ended. Other stops include
 `call_budget`, `spend_budget`, `provider_error`, `internal_error`, `unreliable_agent`
-and `cancelled`. Nonterminal stops have `completed=false` and `scores=null`.
+and `cancelled`. Local output/callback failures add `local_error`; engine completion
+and scores still describe the actual world, so output failure after a win can have
+`completed=true`. Nonterminal stops have `completed=false` and `scores=null`.
 
 CLI codes:
 0 for successful execution/config check or intentionally bounded run;
-1 for engine defeat; 2 for configuration/local file errors; 3 for provider/internal/
+1 for engine defeat; 2 for configuration/local output/callback errors; 3 for provider/internal/
 reliability abort; 4 for budget stop; 130 for keyboard interruption.
 
 ## Security scope
@@ -120,3 +125,22 @@ reject existing output paths and choose unique directories under `runs/` when no
 `--out` is supplied. The demo returns exit 2 for output-path/local I/O errors. See
 [Running](RUNNING.md) for operational details and [Architecture](ARCHITECTURE.md)
 for ownership and extension boundaries.
+
+## Programmatic failure contract
+
+`run_match` raises `MatchExecutionError` after recovery for host execution failures.
+It exposes `result`, `operation`, `original_error`, `secondary_errors` (operation/error
+pairs), and `original_stop_reason`. Original error objects are for trusted diagnosis
+only; printing them can disclose sensitive exception text. The wrapper's message,
+repr, and normal formatted traceback suppress that text; persisted data uses only
+safe stop/stage identifiers. Provider/budget stops still return normal results.
+Cancellation still raises `CancelledError`, with partial `result` and
+`secondary_errors` attached; cleanup errors cannot replace it.
+
+`MatchResult.phases` defaults to an empty list for existing constructors. Summary
+fields and schema version remain unchanged. `Recorder.finish` returns normally on
+success and raises sanitized `RecordingFinalizationError` with ordered `failures`
+pairs on failure. The driver makes at most two finalization passes and preserves
+the original failure, even if recovery succeeds.
+Fresh caller cancellation during client shutdown still propagates, retaining an
+earlier host failure diagnostically rather than converting cancellation to exit 2.

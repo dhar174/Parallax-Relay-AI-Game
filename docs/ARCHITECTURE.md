@@ -89,15 +89,23 @@ known zero usage, complete pricing yields a zero estimate; incomplete pricing
 continues to yield null. No shared budget API or result format changed.
 
 A fatal provider error or a budget stop leaves the world at the last resolved
-turn. Cancellation attempts finalization before propagating. Local recording errors
-can bypass finalization; see [R03](REVIEW.md#r03-recording-errors-can-bypass-finalization).
+turn. Resolved world state and its in-memory record are committed together before
+turn persistence. Recording/progress failures drain cooperative phase tasks, then
+attempt finalization and raise `MatchExecutionError` with the partial result.
+Cancellation remains cancellation, even when recording fails during cleanup.
 The launcher closes provider clients in `finally`; programmatic callers own the
-clients they pass to `run_match`.
+clients they pass to `run_match`. CLI-owned client shutdown has a five-second
+cooperative timeout; secondary cleanup failures never mask an active failure.
 
 The main recorder creates a new output directory, appends call/phase/turn JSONL,
-and writes summary JSON through temporary-file replacement. The HTML viewer is
-created at finalization, not streamed during a match. Neither JSONL flushing nor
-summary replacement provides a durable transaction across the whole run directory.
+and keeps authoritative call, completed-phase, and resolved-turn records in memory.
+Finalization independently writes atomic snapshots of the three JSONL logs, result,
+final state, final spectator PNG, and HTML. This repairs partial trailing writes
+without duplicating events. A failed artifact does not prevent the others; the
+driver permits one recovery pass after a failed initial pass. The HTML viewer is
+created at finalization, not streamed. Atomic replacement is per artifact, not a
+durable transaction across the run directory; storage stalls and uncooperative
+in-process code are outside the bounded-attempt/cooperative-cleanup guarantee.
 
 ## Extension points
 

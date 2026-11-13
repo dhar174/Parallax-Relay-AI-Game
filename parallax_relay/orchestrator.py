@@ -6,7 +6,7 @@ barrier: no current-phase output enters another current-phase input.
 from __future__ import annotations
 
 import asyncio
-from dataclasses import asdict, dataclass, replace
+from dataclasses import asdict, dataclass, field, replace
 import json
 from time import perf_counter
 from typing import Callable, Mapping
@@ -18,6 +18,7 @@ from .observations import observe
 from .protocol import (Agent, AgentRequest, BroadcastReply, CommitReply, ChatMessage,
                        ReplyValidationError, ROLES, parse_reply)
 from .providers import ProviderError
+from .recording import RecordingFinalizationError
 from .state import Action, WorldState, initial_world, public_events
 
 
@@ -28,6 +29,7 @@ class MatchResult:
     records: list[dict]
     calls: list[dict]
     budget: dict
+    phases: list[dict] = field(default_factory=list)
 
     def summary(self) -> dict:
         terminal = self.world.win or self.world.loss
@@ -36,6 +38,40 @@ class MatchResult:
                 'stop_reason': self.stop_reason,
                 'scores': score(self.world) if terminal else None,
                 'energy': self.world.energy, 'budget': self.budget}
+
+
+class MatchExecutionError(RuntimeError):
+    """Safe public exception; raw errors are for trusted diagnosis only."""
+    def __init__(self, result, original_error, operation, secondary_errors=(), original_stop_reason=None):
+        self.result = result
+        self.original_error = original_error
+        self.operation = operation
+        self.secondary_errors = tuple(secondary_errors)
+        self.original_stop_reason = original_stop_reason
+        super().__init__(f'Match execution failed during {operation}')
+
+
+class _OutputFailure(Exception):
+    def __init__(self, operation, error):
+        self.operation, self.error = operation, error
+        super().__init__('Local output failed')
+
+
+class _OutputSink:
+    def __init__(self, recorder):
+        self.recorder = recorder
+        self.errors = []
+
+    def emit(self, operation, callback, *args):
+        try:
+            return callback(*args)
+        except Exception as error:
+            self.errors.append((operation, error))
+            raise _OutputFailure(operation, error) from None
+
+    def __getattr__(self, operation):
+        # Only fixed recorder method names supplied by this driver reach here.
+        return lambda *args: self.emit(operation, getattr(self.recorder, operation), *args)
 
 
 @dataclass
@@ -70,7 +106,11 @@ async def _ask(agent: Agent, request: AgentRequest, ticket: Ticket, settings: Ma
                           'attempt': attempt, 'status': 'cancelled', 'usage': None,
                           'latency_seconds': round(perf_counter() - started, 4)}
                 calls.append(record)
-                if recorder: recorder.call(record)
+                if recorder:
+                    try:
+                        recorder.call(record)
+                    except _OutputFailure:
+                        pass  # Keep cancellation primary; the sink retains this failure.
                 raise
             except TimeoutError:
                 error = 'timeout'
@@ -139,16 +179,20 @@ async def run_match(agents: Mapping[str, Agent], settings: MatchSettings | None 
     calls: list[dict] = []
     records: list[dict] = []
     stop = 'turn_limit'
-    cancelled = False
+    cancelled = None
+    primary = None
+    phases = []
+    output = _OutputSink(recorder)
+    recorder = output if recorder is not None else None
     try:
         while world.turn < settings.max_turns and not (world.win or world.loss):
             observations = {r: observe(world, r) for r in ROLES}
             if recorder: recorder.begin_turn(world, observations)
             messages: tuple[ChatMessage, ...] = ()
-            phases = ['broadcast'] + (['negotiate'] if settings.communication_rounds == 2 else []) + ['commit']
+            phase_names = ['broadcast'] + (['negotiate'] if settings.communication_rounds == 2 else []) + ['commit']
             abort = False
             outcomes: dict[str, Outcome] = {}
-            for phase in phases:
+            for phase in phase_names:
                 requests = {r: AgentRequest(
                     observations[r], phase, messages,
                     json.dumps(histories[r], separators=(',', ':')), notes[r],
@@ -174,8 +218,9 @@ async def run_match(agents: Mapping[str, Agent], settings: MatchSettings | None 
                     phase_record['sealed_actions'] = {
                         r: asdict(o.parsed.action.to_engine()) if isinstance(o.parsed, CommitReply)
                         else asdict(Action('WAIT')) for r, o in outcomes.items()}
+                phases.append(phase_record)
                 if recorder: recorder.phase(phase_record)
-                if progress: progress(phase_record)
+                if progress: output.emit('progress', progress, phase_record)
                 if any(o.fatal for o in outcomes.values()):
                     stop = 'internal_error' if any(o.error == 'internal_error' for o in outcomes.values()) else 'provider_error'
                     abort = True
@@ -203,11 +248,13 @@ async def run_match(agents: Mapping[str, Agent], settings: MatchSettings | None 
                 'state_after': after.snapshot(),  # Never used to build player input.
             }
             records.append(record)
+            previous_turn = world.turn
+            world = after  # Commit the resolved world and its record before persistence.
             if recorder: recorder.turn(record)
             for role in ROLES:
                 if settings.history_turns:
                     histories[role].append({
-                        'turn': world.turn, 'your_observation': observations[role].hud,
+                        'turn': previous_turn, 'your_observation': observations[role].hud,
                         'public_messages': [asdict(m) for m in messages],
                         'your_action': asdict(actions[role]),
                         'events': public_events(after.events),
@@ -218,10 +265,37 @@ async def run_match(agents: Mapping[str, Agent], settings: MatchSettings | None 
             stop = 'victory'
         elif world.loss:
             stop = 'defeat'
-    except asyncio.CancelledError:
-        stop, cancelled = 'cancelled', True
-    result = MatchResult(world, stop, records, calls, budget.summary())
-    if recorder: recorder.finish(result)
-    if cancelled:
-        raise asyncio.CancelledError
+    except asyncio.CancelledError as error:
+        stop, cancelled = 'cancelled', error
+    except _OutputFailure as error:
+        stop, primary = 'local_error', (error.operation, error.error)
+    except Exception as error:
+        stop, primary = 'internal_error', ('driver', error)
+    result = MatchResult(world, stop, records, calls, budget.summary(), phases)
+    original_stop_reason = stop
+    secondary = list(output.errors)
+    if primary is not None:
+        secondary = [(op, error) for op, error in secondary if error is not primary[1]]
+    if recorder:
+        for attempt in range(2):
+            try:
+                output.recorder.finish(result)
+                break
+            except Exception as error:
+                failures = (error.failures if isinstance(error, RecordingFinalizationError)
+                            else (('finish', error),))
+                for operation, cause in failures:
+                    if primary is None and cancelled is None:
+                        primary = ('finish:' + operation, cause)
+                        result.stop_reason = 'local_error'
+                    else:
+                        secondary.append((operation, cause))
+    if cancelled is not None:
+        # Preserve the cancellation instance/type, even if cleanup failed.
+        cancelled.result = result
+        cancelled.secondary_errors = tuple(secondary)
+        raise cancelled from None
+    if primary is not None:
+        raise MatchExecutionError(result, primary[1], primary[0], secondary,
+                                  original_stop_reason) from None
     return result
