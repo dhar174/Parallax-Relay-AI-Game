@@ -1,7 +1,8 @@
 import copy
+from itertools import permutations
 import unittest
 from parallax_relay import Action, initial_world, resolve_turn
-from parallax_relay.state import public_hud, ARTIFACT, ENERGY_CELL, EXIT
+from parallax_relay.state import public_hud, public_events, ARTIFACT, ENERGY_CELL, EXIT
 from parallax_relay.engine import score
 from parallax_relay.scripted import PLAN
 from parallax_relay.render import render_png
@@ -13,6 +14,34 @@ def commands(**kwargs):
 
 
 class ParallaxTests(unittest.TestCase):
+    def test_unknown_kind_keeps_its_distinct_engine_diagnostic(self):
+        world = initial_world()
+        after = resolve_turn(world, commands(SPECTRA=Action('FLY', 1, 1)))
+        self.assertEqual(after.events, ["SPECTRA: unknown action 'FLY'; treated as WAIT"])
+        expected = resolve_turn(world, commands()).snapshot()
+        actual = after.snapshot()
+        expected.pop('events'); actual.pop('events')
+        self.assertEqual(actual, expected)
+
+    def test_invalid_parameter_events_are_sorted_and_disclose_no_heat(self):
+        actions = commands(SPECTRA=Action('COLLECT', 42, 99),
+                           PYRA=Action('VENT', 1, 0), FLUX=Action('REROUTE', 0, 1))
+        expected = [
+            'FLUX: invalid REROUTE parameters; treated as WAIT',
+            'PYRA: invalid VENT parameters; treated as WAIT',
+            'SPECTRA: invalid COLLECT parameters; treated as WAIT',
+        ]
+        for heat in (1, 937):
+            for items in permutations(actions.items()):
+                with self.subTest(heat=heat, role_order=[role for role, _ in items]):
+                    world = initial_world()
+                    world.motor_heat = heat
+                    after = resolve_turn(world, dict(items))
+                    self.assertEqual(after.events, expected)
+                    self.assertEqual(public_events(after.events), expected)
+                    for role in world.robots:
+                        self.assertEqual(public_hud(after, role)['recent_events'], expected)
+
     def non_move_cases(self):
         cases = [('WAIT', 'PYRA'), ('VENT', 'PYRA'), ('REROUTE', 'FLUX'),
                  ('COLLECT', 'SPECTRA'), ('COLLECT', 'FLUX'), ('UNLOCK', 'FLUX')]

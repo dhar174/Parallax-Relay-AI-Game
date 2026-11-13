@@ -213,3 +213,22 @@ recorded above. Historical reproduction outputs remain baseline evidence.
 Issues R01/R04/R05 are implemented on the slice 1 branch and await merge; R02/R03
 and the remaining research/validation work remain open. Existing historical logs
 and baseline reproduction outputs above were preserved rather than regenerated.
+
+### PR #27 review follow-up — November 13, 2026
+
+Checked the actual PR branch for every point in comment `6859687556`. The existing
+implementation already preserves unknown-action diagnostics, sorts parameter
+validation by role, creates missing output parents exclusively, and propagates
+CLI exit 2 through `SystemExit(main())`. No production behavior change was needed.
+
+Added three targeted regressions: unknown `FLY` commands with nonzero parameters
+retain their distinct diagnostic; all six action-map permutations emit identical
+public invalid-parameter events under different private heat values; and a real
+subprocess filesystem failure (a parent path is a file) exits 2 without traceback
+or sentinel disclosure. Existing tests cover missing `runs/`, fresh nested paths,
+existing paths, canonical actions, original commitments, and no-retry behavior.
+
+Fresh `python -m unittest discover -s tests -q`: **91 tests passed** on the same
+Linux/Python 3.12 environment. The run emitted asyncio slow-task diagnostics but
+no test failures or errors. `git diff --check` passed. The suite uses unittest;
+pytest is not required. Historical fixtures and dependencies remain unchanged.

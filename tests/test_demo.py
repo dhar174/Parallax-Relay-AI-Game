@@ -152,3 +152,14 @@ class DemoTests(unittest.TestCase):
         self.assertIn('Local file operation failed', stderr.getvalue())
         self.assertNotIn('SECRET_SENTINEL', stderr.getvalue())
         self.assertNotIn('Traceback', stderr.getvalue())
+
+    def test_cli_filesystem_error_exits_2_without_traceback(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            parent = Path(tmp) / 'file-not-directory'
+            parent.write_bytes(b'SECRET_SENTINEL')
+            proc = self.command(tmp, '--out', parent / 'run')
+            self.assertEqual(proc.returncode, 2, proc.stderr)
+            self.assertIn('Local file operation failed', proc.stderr)
+            self.assertNotIn('Traceback', proc.stderr)
+            self.assertNotIn('SECRET_SENTINEL', proc.stdout + proc.stderr)
+            self.assertEqual(parent.read_bytes(), b'SECRET_SENTINEL')
