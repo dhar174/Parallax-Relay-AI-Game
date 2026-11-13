@@ -11,9 +11,9 @@ and dependencies; optional mechanics are not automatically defects.
 
 ## 1. Documented baseline
 
-**Status:** documentation delivered in PR #1. Slice 1 implements R01/R04/R05 on
-its review branch; those issue closures await merge. Other runtime findings and
-validation gates remain open.
+**Status:** documentation delivered in PR #1. Slice 1 delivered R01/R04/R05
+in PR #27. Slice 2 implements the R02 CLI mock override on its review branch, pending
+merge; other runtime findings and validation gates remain open.
 
 Establish reproducible onboarding, explain current contracts and limitations, and
 provide compact coding-agent guidance. Preserve original milestone evidence while

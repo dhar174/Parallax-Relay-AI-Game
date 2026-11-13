@@ -232,3 +232,45 @@ Fresh `python -m unittest discover -s tests -q`: **91 tests passed** on the same
 Linux/Python 3.12 environment. The run emitted asyncio slow-task diagnostics but
 no test failures or errors. `git diff --check` passed. The suite uses unittest;
 pytest is not required. Historical fixtures and dependencies remain unchanged.
+
+## Slice 2 implementation — November 13, 2026
+
+Baseline: merged slice 1 (`a95acc7`). Linux/Python 3.12.14 with the existing
+Pillow 12.3.0, Pydantic 2.14.3, and httpx 0.28.1 environment.
+
+The new CLI regression first reproduced exit 4 / `spend_budget` / zero calls with
+a $0.001 cap and complete test pricing (input 1/output 2 per million for each role).
+After the CLI-only settings copy, the full offline suite passed: **99 tests**.
+
+Verified scenarios include normal/fast priced mock victories (63/42 calls), zero
+reported usage/cost, requested/effective manifest settings after CLI overrides,
+unchanged source configuration, no provider construction or environment-file read,
+turn/call limits, null estimates with absent/partial pricing, and rejection of
+invalid requested configuration. Synthetic live execution and direct scripted or
+arbitrary programmatic agents retain the cap and stop before responding. Partial
+usage retains its estimate and releases the remaining reservations.
+
+`python -m pip check` found no broken requirements; compilation and diff whitespace
+checks passed. Standalone normal/fast mock CLIs also won in seven turns with five
+energy, scores of 100, and 63/42 calls; their unpriced estimates remain null and
+requested/effective settings match. Checked 37 local documentation links/anchors.
+
+A fresh reviewer found no actionable issues and independently passed all seven mock
+CLI tests and six budget tests. Shared budget/orchestrator/config/provider code,
+historical fixtures, and dependencies remain unchanged. No paid provider requests
+or new browser checks were performed. Issue #4 awaits merge; recording recovery
+remains slice 3 work. The old programmatic R02 probe intentionally still stops at
+its configured cap and is not a reproduction of the fixed CLI-only policy.
+
+### PR #28 pre-merge review — November 13, 2026
+
+The review requested confirmation that `--check` never applies the mock override.
+Source inspection confirms it returns before `_run`, where the override lives.
+Added a regression using a valid tiny-cap priced configuration and fake credentials:
+`--check` returns 0, retains the requested cap/configuration, creates no run output,
+constructs no provider, and never starts the match driver. Requested-settings
+metadata is still mock-only; existing live and mock manifest tests cover that rule.
+
+Fresh full unittest discovery: **100 tests passed**. The run emitted asyncio
+slow-task diagnostics but no failures/errors; diff checks passed. No production
+behavior change or live provider request was needed for this review follow-up.

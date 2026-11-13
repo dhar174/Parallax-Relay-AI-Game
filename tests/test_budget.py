@@ -45,3 +45,22 @@ class BudgetTests(unittest.TestCase):
 
     def test_cost_guard_requires_all_prices(self):
         with self.assertRaises(ValueError): Budget(MatchSettings(max_estimated_cost_usd=1),{})
+
+    def test_partial_usage_retains_estimate_and_releases_reservations(self):
+        rates = {r: Rates(input_per_million=1, output_per_million=2) for r in initial_world().robots}
+        for usage in (Usage(100, None), Usage(None, 10)):
+            with self.subTest(usage=usage):
+                budget = Budget(MatchSettings(), rates)
+                tickets = budget.reserve_phase(requests())
+                ticket = tickets['SPECTRA']
+                estimate = ticket.quote
+                ticket.start(); ticket.settle(usage)
+                for reservation in tickets.values():
+                    reservation.release()
+                self.assertEqual(budget.spent, estimate)
+                self.assertGreater(budget.spent, 0)
+                self.assertEqual(budget.summary()['unknown_usage_calls'], 1)
+                self.assertEqual(budget.summary()['reported_input_tokens'], usage.input_tokens or 0)
+                self.assertEqual(budget.summary()['reported_output_tokens'], usage.output_tokens or 0)
+                self.assertEqual(budget.reserved_calls, 0)
+                self.assertEqual(budget.reserved_usd, 0)

@@ -4,7 +4,7 @@ Reviewed **2026-11-13**, against runtime baseline
 [`719c7696c4bfe50934fc936bbccfb62812633164`](https://github.com/dhar174/Parallax-Relay-AI-Game/commit/719c7696c4bfe50934fc936bbccfb62812633164).
 This is a documentation and source review with offline reproductions. Runtime code,
 tests, dependencies, and committed fixtures were not changed during that review.
-Subsequent slice 1 resolutions are annotated below; in those sections the original
+Subsequent slice 1/2 resolutions are annotated below; in those sections the original
 evidence, suggested remedies, and reproductions are historical baseline records.
 
 ## Method and coverage
@@ -41,11 +41,11 @@ review; that is not a security assurance.
 
 | ID | Priority | Classification | Finding | Status |
 |---|---|---|---|---|
-| R01 | P2 | Confirmed defect | Non-UTF-8 TOML bypasses CLI error handling | Fixed in slice 1; pending merge |
-| R02 | P2 | Confirmed defect | Dollar guard blocks no-cost mock runs | Open |
+| R01 | P2 | Confirmed defect | Non-UTF-8 TOML bypasses CLI error handling | Fixed in PR #27 |
+| R02 | P2 | Confirmed defect | Dollar guard blocks no-cost mock runs | Fixed in slice 2; pending merge |
 | R03 | P2 | Confirmed defect | Recording errors bypass finalization | Open |
-| R04 | P3 | Documentation mismatch | Non-MOVE zero fields are requested but unenforced | Fixed in slice 1; pending merge |
-| R05 | P2 | Documentation mismatch | Legacy demo overwrites existing output | Fixed in slice 1; pending merge |
+| R04 | P3 | Documentation mismatch | Non-MOVE zero fields are requested but unenforced | Fixed in PR #27 |
+| R05 | P2 | Documentation mismatch | Legacy demo overwrites existing output | Fixed in PR #27 |
 | R06 | P1 | Unverified assumption | Offline wire tests do not establish live compatibility | Open validation gate |
 | R07 | P1 | Future enhancement | Fixed room cannot establish general cooperative ability | Open research gate |
 | R08 | P2 | Future enhancement | Run artifacts lack full experiment provenance | Open |
@@ -86,6 +86,29 @@ traceback or secret sentinel, and no match directory.
 
 ## R02: Dollar estimate guard can block mock runs
 
+**Slice 2 resolution:** the CLI now runs its known scripted players with a separate
+settings copy whose dollar cap is disabled. Calls/turns/retries, prices, validation,
+and live/programmatic guards are preserved. Mock manifests record requested and
+effective settings; successful complete-pricing estimates remain zero, while
+incomplete pricing remains null. The historical programmatic reproduction below
+intentionally still returns `spend_budget 0`: a direct `run_match` call is not the
+CLI mock path and must retain its guard.
+
+To exercise the fixed CLI path, copy `configs/three_models.toml` to a temporary
+file, set `max_estimated_cost_usd = 0.001` under `[match]`, and add the following
+pricing table for each of SPECTRA, PYRA, and FLUX (numbers are test inputs, not
+provider prices):
+
+```toml
+[players.SPECTRA.pricing]
+input_per_million = 1
+output_per_million = 2
+```
+
+Then run `python -m parallax_relay.play --mock --config <temporary-file>`; expect
+seven-turn victory and 63 calls. Add `--fast` for 42 calls. Automated regressions
+construct all three tables and run without credentials/provider clients.
+
 **Evidence:** `play.py:95–96` forwards configured prices in mock mode, and
 `budget.py:40–55` reserves estimated provider cost before scripted responses can
 report zero usage. With every role priced at input 1/output 2 per million tokens
@@ -107,7 +130,9 @@ asyncio.run(probe())
 # Baseline: spend_budget 0
 ```
 
-The CLI passes the same settings and prices when a valid priced TOML is selected.
+At the reviewed baseline, the CLI passed the same settings and prices when a
+valid priced TOML was selected. The CLI-only resolution above changes the effective
+cap; this original evidence and recommendation are preserved for context.
 **Impact/remedy:** an otherwise valid live configuration can break offline smoke
 runs. Make the CLI's mock cost semantics explicitly zero-cost while retaining call
 and turn limits; do not disable guards for arbitrary programmatic agents.

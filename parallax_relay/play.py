@@ -74,12 +74,20 @@ def parser() -> argparse.ArgumentParser:
 
 
 async def _run(args, cfg, settings, runtime) -> int:
+    requested_settings = settings.model_dump()
+    if args.mock:
+        # Only this CLI path constructs the known zero-usage scripted players.
+        # Keep generic/programmatic and live cost guards intact.
+        settings = settings.model_copy(update={'max_estimated_cost_usd': None})
     out = args.out or Path('runs')/(datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')+'_'+uuid4().hex[:6])
     mode = 'mock' if args.mock else 'live'
     players = ({r: {'provider':'mock','model':'scripted-fixture'} for r in ROLES} if args.mock else
                {r: {'provider':p.provider,'model':p.model} for r,p in runtime.items()})
-    recorder = Recorder(out, {'schema_version':2, 'mode':mode, 'players':players,
-                             'settings':settings.model_dump(), 'room':'The Split Span'})
+    manifest = {'schema_version':2, 'mode':mode, 'players':players,
+                'settings':settings.model_dump(), 'room':'The Split Span'}
+    if args.mock:
+        manifest['requested_settings'] = requested_settings
+    recorder = Recorder(out, manifest)
     agents = {}
     try:
         for role in ROLES:
