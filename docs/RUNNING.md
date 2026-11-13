@@ -23,15 +23,17 @@ The one-turn example intentionally stops with `turn_limit`, `completed=false`, a
 `scores=null`; it is not an engine defeat.
 
 The original standalone demo bypasses the orchestrator and uses an older replay
-format. To run it, choose a new directory, for example:
+format. Run it without arguments for a fresh directory:
 
 ```bash
-python -m parallax_relay.demo --out runs/legacy-demo-01
+python -m parallax_relay.demo
 ```
 
-Choose another suffix on subsequent runs. Unlike the main launcher, this command
-**overwrites matching files in an existing directory**. Do not use the committed
-`demo_output/` directory for verification.
+It creates `runs/demo_<UTC timestamp>_<six hex characters>/` and prints the replay
+path. An explicit `--out runs/legacy-demo-01` is also supported. Existing destinations
+(including empty directories or files) are rejected with exit 2; matching files are
+never overwritten. Use a new path or omit `--out` on subsequent runs. Keep the
+committed `demo_output/` as historical evidence.
 
 ## Configure providers
 
@@ -78,7 +80,8 @@ model capabilities, or service availability.
 The default configuration is
 [`configs/three_models.toml`](../configs/three_models.toml), resolved relative to the
 source checkout. Use `--config path/to/file.toml` for another configuration. Save it
-as UTF-8; malformed encoding currently causes an uncaught error ([R01](REVIEW.md#r01-non-utf-8-toml-escapes-cli-error-handling)).
+as UTF-8. Invalid encoding is reported safely as a configuration error (exit 2),
+without echoing the file contents.
 
 The default role assignments are SPECTRA → OpenAI, PYRA → Anthropic, FLUX → Gemini.
 Each `[players.ROLE]` names a provider and the environment variables containing its
@@ -172,8 +175,8 @@ controls. There is no live dashboard or built-in resume/recovery command.
 | Code | Meaning |
 |---|---|
 | 0 | Configuration check, victory, or intentionally bounded nonterminal run |
-| 1 | Engine defeat; also the current uncaught-error behavior for invalid TOML encoding |
-| 2 | CLI/configuration/local file error handled by the launcher |
+| 1 | Engine defeat |
+| 2 | CLI/configuration/local file error; also demo output-path/local I/O errors |
 | 3 | Provider, internal-agent, or reliability abort |
 | 4 | Call or estimated-cost budget stop |
 | 130 | Keyboard interruption |

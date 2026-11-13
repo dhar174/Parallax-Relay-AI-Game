@@ -3,7 +3,9 @@
 Reviewed **2026-11-13**, against runtime baseline
 [`719c7696c4bfe50934fc936bbccfb62812633164`](https://github.com/dhar174/Parallax-Relay-AI-Game/commit/719c7696c4bfe50934fc936bbccfb62812633164).
 This is a documentation and source review with offline reproductions. Runtime code,
-tests, dependencies, and committed fixtures were not changed.
+tests, dependencies, and committed fixtures were not changed during that review.
+Subsequent slice 1 resolutions are annotated below; in those sections the original
+evidence, suggested remedies, and reproductions are historical baseline records.
 
 ## Method and coverage
 
@@ -39,11 +41,11 @@ review; that is not a security assurance.
 
 | ID | Priority | Classification | Finding | Status |
 |---|---|---|---|---|
-| R01 | P2 | Confirmed defect | Non-UTF-8 TOML bypasses CLI error handling | Open |
+| R01 | P2 | Confirmed defect | Non-UTF-8 TOML bypasses CLI error handling | Fixed in slice 1; pending merge |
 | R02 | P2 | Confirmed defect | Dollar guard blocks no-cost mock runs | Open |
 | R03 | P2 | Confirmed defect | Recording errors bypass finalization | Open |
-| R04 | P3 | Documentation mismatch | Non-MOVE zero fields are requested but unenforced | Documented; contract decision open |
-| R05 | P2 | Documentation mismatch | Legacy demo overwrites existing output | Documentation corrected; behavior unchanged |
+| R04 | P3 | Documentation mismatch | Non-MOVE zero fields are requested but unenforced | Fixed in slice 1; pending merge |
+| R05 | P2 | Documentation mismatch | Legacy demo overwrites existing output | Fixed in slice 1; pending merge |
 | R06 | P1 | Unverified assumption | Offline wire tests do not establish live compatibility | Open validation gate |
 | R07 | P1 | Future enhancement | Fixed room cannot establish general cooperative ability | Open research gate |
 | R08 | P2 | Future enhancement | Run artifacts lack full experiment provenance | Open |
@@ -51,6 +53,10 @@ review; that is not a security assurance.
 | R10 | P3 | Test gap / future enhancement | Replay browser coverage and partial-run inspection | Open |
 
 ## R01: Non-UTF-8 TOML escapes CLI error handling
+
+**Slice 1 resolution:** decoding errors now become a sanitized ConfigError. Direct
+loader and CLI regressions verify exit 2, no traceback/secret disclosure, and no
+output directory. The evidence and reproduction below describe the original baseline.
 
 **Evidence:** `config.py:94–103` catches TOML parse errors, validation errors, and
 OSError, but not UnicodeDecodeError from `tomllib.load`. `play.py:132–143` does not
@@ -151,6 +157,11 @@ a secondary write error must not hide the original failure or expose raw secrets
 
 ## R04: Non-MOVE zero fields are not enforced
 
+**Slice 1 resolution:** the engine now rejects nonzero direction/steps on all five
+non-MOVE kinds, consumes the turn without retry, and emits an invalid-action event.
+Original commitments remain recorded. Tests cover both collection roles, canonical
+actions, input immutability, and valid teammates. Evidence below is historical.
+
 **Evidence:** `protocol.py:99–106` accepts arbitrary integer direction/steps, and
 `engine.py:42–56` ignores them for VENT. Passing a parsed VENT with direction 42 and
 steps 99 lowers initial heat from 4 to 1, just like the canonical zeros. The prompt
@@ -159,13 +170,20 @@ enforcement gap. By contrast, invalid MOVE parameters are rejected by the engine
 
 **Impact/remedy:** different agents can submit noncanonical actions with identical
 outcomes, complicating contract interpretation and evaluation. The protocol now
-states current behavior. Prefer enforcing non-MOVE zeros as engine legality, so an
-invalid action consumes a turn instead of receiving a strategic retry.
+documented the original behavior. The recommended remedy was engine enforcement
+so an invalid action consumes a turn instead of receiving a strategic retry.
 **Acceptance:** a regression distinguishes canonical VENT from nonzero-parameter
 VENT; invalid actions have explicit events and no effect; protocol and schema
-policy agree. No behavior was changed in this review.
+policy agree. The documentation review changed no runtime behavior; the subsequent
+implementation is described in the resolution above.
 
 ## R05: Legacy demo overwrites output
+
+**Slice 1 resolution:** direct demo calls now reject existing paths before writing.
+The CLI returns 2 without a traceback for existing destinations/local I/O failures,
+and defaults to a unique ignored run directory while printing its replay path.
+Tests cover empty/populated directories, files, symlinks, no-argument invocations,
+and the complete scripted replay. The evidence below describes the baseline.
 
 **Evidence:** `demo.py:18–20` uses `mkdir(exist_ok=True)` and subsequent writes replace
 files. Creating `result.json` containing `SENTINEL` in a temporary directory, then
@@ -178,7 +196,8 @@ README, contributor, running, and verification instructions now use fresh paths 
 explain the distinction. For a future code change, make the legacy demo reject
 existing output like the main launcher.
 **Acceptance:** an existing destination and sentinel remain unchanged with a clear
-error; a new directory still produces the seven-turn demo. Runtime remains open.
+error; a new directory still produces the seven-turn demo. These criteria are now
+covered by the slice 1 resolution above, pending merge.
 
 ## R06: Live provider compatibility is unverified
 

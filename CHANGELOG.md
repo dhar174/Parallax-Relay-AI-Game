@@ -2,10 +2,14 @@
 
 ## Unreleased
 
+- Handle invalid UTF-8 TOML as a safe configuration error with CLI exit 2.
+- Enforce canonical non-MOVE parameters in the engine without model retries.
+- Reject existing legacy-demo destinations, sanitize local CLI I/O errors, and
+  create a unique ignored run directory when --out is omitted.
 - Reworked onboarding and added running, architecture, contributor, and coding-agent guides.
 - Added a research-oriented roadmap and an evidence-backed repository review.
 - Clarified provider verification limits, non-MOVE parameters, and legacy output behavior.
-- Preserved historical milestone evidence; no runtime behavior changed in this documentation pass.
+- Preserved historical milestone evidence alongside dated implementation checks.
 
 ## Milestone 2
 

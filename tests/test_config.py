@@ -5,6 +5,28 @@ from parallax_relay.config import load_config, ConfigError, MatchSettings
 
 
 class ConfigTests(unittest.TestCase):
+    def test_non_utf8_toml_is_a_safe_configuration_error(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / 'invalid.toml'
+            path.write_bytes(b'# SECRET_SENTINEL\xff')
+            with self.assertRaises(ConfigError) as ctx:
+                load_config(path)
+            self.assertEqual(str(ctx.exception), 'Configuration file must use UTF-8 encoding')
+            self.assertNotIn('SECRET_SENTINEL', str(ctx.exception))
+
+    def test_malformed_toml_and_invalid_fields_remain_safe(self):
+        original = Path('configs/three_models.toml').read_text()
+        cases = ('SECRET_SENTINEL = [',
+                 original.replace('max_turns = 12', 'max_turns = "SECRET_SENTINEL"'))
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / 'invalid.toml'
+            for text in cases:
+                with self.subTest(text=text):
+                    path.write_text(text, encoding='utf-8')
+                    with self.assertRaises(ConfigError) as ctx:
+                        load_config(path)
+                    self.assertNotIn('SECRET_SENTINEL', str(ctx.exception))
+
     def test_default_example_has_main_three(self):
         cfg=load_config(Path('configs/three_models.toml'))
         self.assertEqual({v.provider for v in cfg.players.values()},{'openai','anthropic','gemini'})

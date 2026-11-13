@@ -182,3 +182,53 @@ A fresh documentation reviewer checked the guides and source-backed findings, fo
 no blocking issue, and requested reconciliation of this verification record. That
 reconciliation is included here. This was a documentation review, not an independent
 security audit or provider compatibility test.
+
+## Slice 1 implementation — November 13, 2026
+
+Linux/Python 3.12.14, using the existing virtual environment and dependency versions
+recorded above. Historical reproduction outputs remain baseline evidence.
+
+- R01: the loader and subprocess encoding regressions failed before the fix
+  (UnicodeDecodeError / exit 1), then the full offline suite passed: 75 tests.
+  Invalid syntax/fields remain sanitized; invalid UTF-8 now exits 2 without creating
+  output or exposing the test sentinel.
+- R04: engine subcases and a one-turn orchestration regression failed before the
+  guard (invalid VENT still cooled the motor), then all 80 tests passed. The
+  regressions cover signed/nonzero fields on every non-MOVE kind, both collectors,
+  canonical effects, input purity, teammate controls/order, parser acceptance,
+  nine successful attempts without repair, and the unmodified recorded commitment.
+- R05: new direct/CLI tests failed before the fix on overwrite, missing replay-path
+  output, unique defaults, and local error handling. After the fix, all 88 offline
+  tests passed. Empty/populated directories, files, and supported symlinks remain
+  untouched; new/nested destinations retain seven-turn results and 28 valid PNGs;
+  two default runs create distinct folders and preserve old demo_output evidence.
+- Final checks: `pip check` found no broken requirements; compilation and diff
+  whitespace checks passed. Standalone default/fast mock CLIs won in seven turns
+  with 63/42 calls, five energy and all scores 100; the no-argument demo also won
+  and printed its unique replay path. Generated runs are ignored.
+- A fresh code reviewer found no actionable issue and independently ran the full
+  suite: 88 tests passed. No dependency, historical fixture, or provider contract
+  changed; no live requests or new browser verification were performed.
+
+Issues R01/R04/R05 are implemented on the slice 1 branch and await merge; R02/R03
+and the remaining research/validation work remain open. Existing historical logs
+and baseline reproduction outputs above were preserved rather than regenerated.
+
+### PR #27 review follow-up — November 13, 2026
+
+Checked the actual PR branch for every point in comment `6859687556`. The existing
+implementation already preserves unknown-action diagnostics, sorts parameter
+validation by role, creates missing output parents exclusively, and propagates
+CLI exit 2 through `SystemExit(main())`. No production behavior change was needed.
+
+Added three targeted regressions: unknown `FLY` commands with nonzero parameters
+retain their distinct diagnostic; all six action-map permutations emit identical
+public invalid-parameter events under different private heat values; and a real
+subprocess filesystem failure (a parent path is a file) exits 2 without traceback
+or sentinel disclosure. Existing tests cover missing `runs/`, fresh nested paths,
+existing paths, canonical actions, original commitments, and no-retry behavior.
+
+Fresh `python -m unittest discover -s tests -q`: **91 tests passed** on the same
+Linux/Python 3.12 environment. The run emitted asyncio slow-task diagnostics but
+no test failures or errors. `git diff --check` passed. The suite uses unittest;
+pytest is not required. Historical fixtures and dependencies remain unchanged.

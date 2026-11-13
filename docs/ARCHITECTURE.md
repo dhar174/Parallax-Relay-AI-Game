@@ -50,7 +50,7 @@ then victory or defeat. The input world is copied before mutation.
 
 Model JSON shape failures may retry. Schema-valid illegal moves consume the turn;
 they are not repaired into better moves. See [Protocol](PROTOCOL.md) for the exact
-contract and current non-MOVE parameter limitation.
+contract, including engine enforcement of zero parameters for non-MOVE actions.
 
 ## Trust boundaries
 
@@ -104,5 +104,5 @@ to three roles and one room. No level-loading interface exists yet. Add those
 capabilities only through a separately scoped design and the [roadmap](../ROADMAP.md).
 
 There is no package-install or console-script interface. Run modules from the
-checkout root. No public interface or runtime behavior changed in the documentation
-review.
+checkout root. The legacy demo CLI returns an exit status and uses a unique default output path;
+its `run(out: Path) -> dict` interface still requires an explicit fresh destination.

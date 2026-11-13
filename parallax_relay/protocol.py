@@ -150,7 +150,8 @@ def response_schema(phase: Phase) -> dict:
     """Small common subset of the three providers' JSON Schema support.
 
     Length constraints are enforced locally; some providers do not support
-    these schema keywords. All keys are required, including zero MOVE fields.
+    these schema keywords. All keys are required, including direction/steps.
+    Non-MOVE zeros are enforced as engine legality, not schema validation.
     """
     if phase not in ('broadcast', 'negotiate', 'commit'):
         raise ValueError('Unknown phase')

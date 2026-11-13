@@ -95,6 +95,8 @@ def load_config(path: Path) -> GameConfig:
     try:
         with path.open('rb') as handle:
             return GameConfig.model_validate(tomllib.load(handle))
+    except UnicodeDecodeError:
+        raise ConfigError('Configuration file must use UTF-8 encoding') from None
     except (OSError, tomllib.TOMLDecodeError, ValidationError) as exc:
         # ValidationError often embeds original input values. Do not echo them.
         if isinstance(exc, ValidationError):

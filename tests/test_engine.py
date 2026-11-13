@@ -1,7 +1,8 @@
 import copy
+from itertools import permutations
 import unittest
 from parallax_relay import Action, initial_world, resolve_turn
-from parallax_relay.state import public_hud
+from parallax_relay.state import public_hud, public_events, ARTIFACT, ENERGY_CELL, EXIT
 from parallax_relay.engine import score
 from parallax_relay.scripted import PLAN
 from parallax_relay.render import render_png
@@ -13,6 +14,96 @@ def commands(**kwargs):
 
 
 class ParallaxTests(unittest.TestCase):
+    def test_unknown_kind_keeps_its_distinct_engine_diagnostic(self):
+        world = initial_world()
+        after = resolve_turn(world, commands(SPECTRA=Action('FLY', 1, 1)))
+        self.assertEqual(after.events, ["SPECTRA: unknown action 'FLY'; treated as WAIT"])
+        expected = resolve_turn(world, commands()).snapshot()
+        actual = after.snapshot()
+        expected.pop('events'); actual.pop('events')
+        self.assertEqual(actual, expected)
+
+    def test_invalid_parameter_events_are_sorted_and_disclose_no_heat(self):
+        actions = commands(SPECTRA=Action('COLLECT', 42, 99),
+                           PYRA=Action('VENT', 1, 0), FLUX=Action('REROUTE', 0, 1))
+        expected = [
+            'FLUX: invalid REROUTE parameters; treated as WAIT',
+            'PYRA: invalid VENT parameters; treated as WAIT',
+            'SPECTRA: invalid COLLECT parameters; treated as WAIT',
+        ]
+        for heat in (1, 937):
+            for items in permutations(actions.items()):
+                with self.subTest(heat=heat, role_order=[role for role, _ in items]):
+                    world = initial_world()
+                    world.motor_heat = heat
+                    after = resolve_turn(world, dict(items))
+                    self.assertEqual(after.events, expected)
+                    self.assertEqual(public_events(after.events), expected)
+                    for role in world.robots:
+                        self.assertEqual(public_hud(after, role)['recent_events'], expected)
+
+    def non_move_cases(self):
+        cases = [('WAIT', 'PYRA'), ('VENT', 'PYRA'), ('REROUTE', 'FLUX'),
+                 ('COLLECT', 'SPECTRA'), ('COLLECT', 'FLUX'), ('UNLOCK', 'FLUX')]
+        for kind, role in cases:
+            world = initial_world()
+            world.motor_heat = 2  # A canonical REROUTE can safely succeed.
+            if kind == 'COLLECT':
+                world.robots[role].x = ARTIFACT if role == 'SPECTRA' else ENERGY_CELL
+            elif kind == 'UNLOCK':
+                world.robots[role].x = EXIT
+            yield kind, role, world
+
+    def test_non_move_parameters_are_engine_illegal_without_mutating_inputs(self):
+        for kind, role, world in self.non_move_cases():
+            for direction, steps in [(1, 0), (-1, 0), (0, 1), (0, -1), (42, 99)]:
+                with self.subTest(kind=kind, role=role, direction=direction, steps=steps):
+                    actions = commands(**{role: Action(kind, direction, steps)})
+                    original_world, original_actions = world.snapshot(), dict(actions)
+                    after = resolve_turn(world, actions)
+                    expected = resolve_turn(world, commands()).snapshot()
+                    actual = after.snapshot()
+                    actual.pop('events'); expected.pop('events')
+                    self.assertEqual(actual, expected)
+                    self.assertIn(f'{role}: invalid {kind} parameters; treated as WAIT', after.events)
+                    self.assertEqual(after.turn, 1)
+                    self.assertEqual(world.snapshot(), original_world)
+                    self.assertEqual(actions, original_actions)
+
+    def test_canonical_non_move_actions_keep_their_effects(self):
+        for kind, role, world in self.non_move_cases():
+            with self.subTest(kind=kind, role=role):
+                after = resolve_turn(world, commands(**{role: Action(kind)}))
+                if kind == 'VENT':
+                    self.assertEqual((after.motor_heat, after.coolant), (0, 1))
+                elif kind == 'REROUTE':
+                    self.assertTrue(after.bridge_extended)
+                    self.assertEqual((after.energy, after.motor_heat), (4, 4))
+                elif kind == 'COLLECT' and role == 'SPECTRA':
+                    self.assertTrue(after.shard_collected)
+                elif kind == 'COLLECT':
+                    self.assertTrue(after.cell_collected)
+                    self.assertEqual(after.energy, 8)
+                elif kind == 'UNLOCK':
+                    self.assertTrue(after.exit_unlocked)
+                    self.assertEqual(after.energy, 5)
+                else:
+                    self.assertEqual((after.energy, after.coolant, after.motor_heat), (6, 2, 2))
+                self.assertFalse(any('invalid' in event for event in after.events))
+
+    def test_invalid_control_does_not_suppress_other_roles_or_change_ordering(self):
+        actions = commands(PYRA=Action('VENT'), FLUX=Action('REROUTE', 1, 0))
+        after = resolve_turn(initial_world(), actions)
+        self.assertEqual((after.motor_heat, after.coolant, after.energy), (1, 1, 6))
+        self.assertFalse(after.bridge_extended)
+        self.assertEqual(after.snapshot(), resolve_turn(
+            initial_world(), dict(reversed(list(actions.items())))).snapshot())
+        # Invalid venting must not protect the team from a valid, unsafe reroute.
+        after = resolve_turn(initial_world(), commands(
+            PYRA=Action('VENT', 42, 99), FLUX=Action('REROUTE')))
+        self.assertEqual((after.motor_heat, after.coolant, after.energy), (6, 2, 4))
+        self.assertGreater(after.robots['FLUX'].damage, 0)
+
     def test_scripted_game_wins_and_fulfills_all_objectives(self):
         w = initial_world()
         for action in PLAN:
