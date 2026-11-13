@@ -1,0 +1,29 @@
+test_bridge_requires_vent_for_safe_activation (test_engine.ParallaxTests.test_bridge_requires_vent_for_safe_activation) ... ok
+test_gap_is_impassable_without_bridge (test_engine.ParallaxTests.test_gap_is_impassable_without_bridge) ... ok
+test_private_goals_do_not_leak_into_other_hud (test_engine.ParallaxTests.test_private_goals_do_not_leak_into_other_hud) ... ok
+test_render_distinct_valid_pngs (test_engine.ParallaxTests.test_render_distinct_valid_pngs) ... ok
+test_scripted_game_wins_and_fulfills_all_objectives (test_engine.ParallaxTests.test_scripted_game_wins_and_fulfills_all_objectives) ... ok
+test_simultaneous_resolution_is_action_dict_order_invariant (test_engine.ParallaxTests.test_simultaneous_resolution_is_action_dict_order_invariant) ... ok
+test_broadcast_parsing (test_protocol.ProtocolTests.test_broadcast_parsing) ... ok
+test_commit_parsing (test_protocol.ProtocolTests.test_commit_parsing) ... ok
+test_illegal_move_is_not_a_schema_repair (test_protocol.ProtocolTests.test_illegal_move_is_not_a_schema_repair) ... ok
+test_message_length_bound (test_protocol.ProtocolTests.test_message_length_bound) ... ok
+test_messages_are_data_not_system_instructions (test_protocol.ProtocolTests.test_messages_are_data_not_system_instructions) ... ok
+test_observation_is_detached_from_engine_and_frozen (test_protocol.ProtocolTests.test_observation_is_detached_from_engine_and_frozen) ... ok
+test_player_payload_never_serializes_another_objective (test_protocol.ProtocolTests.test_player_payload_never_serializes_another_objective) ... ok
+test_rejects_bool_as_integer (test_protocol.ProtocolTests.test_rejects_bool_as_integer) ... ok
+test_rejects_extra_identity_field (test_protocol.ProtocolTests.test_rejects_extra_identity_field) ... ok
+test_rejects_markdown_and_duplicate_keys (test_protocol.ProtocolTests.test_rejects_markdown_and_duplicate_keys) ... ok
+test_rejects_wrong_turn (test_protocol.ProtocolTests.test_rejects_wrong_turn) ... ok
+test_reply_size_bound (test_protocol.ProtocolTests.test_reply_size_bound) ... ok
+test_schema_has_no_unbounded_extra_fields (test_protocol.ProtocolTests.test_schema_has_no_unbounded_extra_fields) ... ok
+test_action_contract_does_not_reveal_hidden_item_locations (test_visibility.VisibilityTests.test_action_contract_does_not_reveal_hidden_item_locations) ... ok
+test_cell_changes_only_electromagnetic_and_spectator_pixels (test_visibility.VisibilityTests.test_cell_changes_only_electromagnetic_and_spectator_pixels) ... ok
+test_exact_heat_does_not_leak_through_events (test_visibility.VisibilityTests.test_exact_heat_does_not_leak_through_events) ... ok
+test_heat_changes_only_thermal_and_spectator_pixels (test_visibility.VisibilityTests.test_heat_changes_only_thermal_and_spectator_pixels) ... ok
+test_shard_changes_only_optical_and_spectator_pixels (test_visibility.VisibilityTests.test_shard_changes_only_optical_and_spectator_pixels) ... ok
+
+----------------------------------------------------------------------
+Ran 24 tests in 0.249s
+
+OK

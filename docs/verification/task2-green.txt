@@ -1,0 +1,46 @@
+test_default_example_has_main_three (test_config.ConfigTests.test_default_example_has_main_three) ... ok
+test_invalid_bounds (test_config.ConfigTests.test_invalid_bounds) ... ok
+test_missing_credentials_fail_before_calls (test_config.ConfigTests.test_missing_credentials_fail_before_calls) ... ok
+test_resolved_config_repr_does_not_show_key (test_config.ConfigTests.test_resolved_config_repr_does_not_show_key) ... ok
+test_unknown_settings_do_not_silently_pass (test_config.ConfigTests.test_unknown_settings_do_not_silently_pass) ... ok
+test_bridge_requires_vent_for_safe_activation (test_engine.ParallaxTests.test_bridge_requires_vent_for_safe_activation) ... ok
+test_gap_is_impassable_without_bridge (test_engine.ParallaxTests.test_gap_is_impassable_without_bridge) ... ok
+test_private_goals_do_not_leak_into_other_hud (test_engine.ParallaxTests.test_private_goals_do_not_leak_into_other_hud) ... ok
+test_render_distinct_valid_pngs (test_engine.ParallaxTests.test_render_distinct_valid_pngs) ... ok
+test_scripted_game_wins_and_fulfills_all_objectives (test_engine.ParallaxTests.test_scripted_game_wins_and_fulfills_all_objectives) ... ok
+test_simultaneous_resolution_is_action_dict_order_invariant (test_engine.ParallaxTests.test_simultaneous_resolution_is_action_dict_order_invariant) ... ok
+test_broadcast_parsing (test_protocol.ProtocolTests.test_broadcast_parsing) ... ok
+test_commit_parsing (test_protocol.ProtocolTests.test_commit_parsing) ... ok
+test_illegal_move_is_not_a_schema_repair (test_protocol.ProtocolTests.test_illegal_move_is_not_a_schema_repair) ... ok
+test_message_length_bound (test_protocol.ProtocolTests.test_message_length_bound) ... ok
+test_messages_are_data_not_system_instructions (test_protocol.ProtocolTests.test_messages_are_data_not_system_instructions) ... ok
+test_observation_is_detached_from_engine_and_frozen (test_protocol.ProtocolTests.test_observation_is_detached_from_engine_and_frozen) ... ok
+test_player_payload_never_serializes_another_objective (test_protocol.ProtocolTests.test_player_payload_never_serializes_another_objective) ... ok
+test_rejects_bool_as_integer (test_protocol.ProtocolTests.test_rejects_bool_as_integer) ... ok
+test_rejects_extra_identity_field (test_protocol.ProtocolTests.test_rejects_extra_identity_field) ... ok
+test_rejects_markdown_and_duplicate_keys (test_protocol.ProtocolTests.test_rejects_markdown_and_duplicate_keys) ... ok
+test_rejects_wrong_turn (test_protocol.ProtocolTests.test_rejects_wrong_turn) ... ok
+test_reply_size_bound (test_protocol.ProtocolTests.test_reply_size_bound) ... ok
+test_schema_has_no_unbounded_extra_fields (test_protocol.ProtocolTests.test_schema_has_no_unbounded_extra_fields) ... ok
+test_anthropic_request_contains_schema_and_image (test_providers.ProviderTests.test_anthropic_request_contains_schema_and_image) ... ok
+test_commit_is_structured_on_every_provider (test_providers.ProviderTests.test_commit_is_structured_on_every_provider) ... ok
+test_gemini_request_and_thinking_usage (test_providers.ProviderTests.test_gemini_request_and_thinking_usage) ... ok
+test_http_errors_are_sanitized_and_classified (test_providers.ProviderTests.test_http_errors_are_sanitized_and_classified) ... ok
+test_incomplete_is_not_a_valid_action (test_providers.ProviderTests.test_incomplete_is_not_a_valid_action) ... ok
+test_insufficient_quota_is_not_retried (test_providers.ProviderTests.test_insufficient_quota_is_not_retried) ... ok
+test_missing_usage_remains_unknown (test_providers.ProviderTests.test_missing_usage_remains_unknown) ... ok
+test_openai_request_contains_png_schema_and_no_server_history (test_providers.ProviderTests.test_openai_request_contains_png_schema_and_no_server_history) ... ok
+test_redirect_does_not_resend_secret (test_providers.ProviderTests.test_redirect_does_not_resend_secret) ... ok
+test_refusal_keeps_usage (test_providers.ProviderTests.test_refusal_keeps_usage) ... ok
+test_thought_blocks_are_not_public_text (test_providers.ProviderTests.test_thought_blocks_are_not_public_text) ... ok
+test_unknown_provider_and_model_path_rejected (test_providers.ProviderTests.test_unknown_provider_and_model_path_rejected) ... ok
+test_action_contract_does_not_reveal_hidden_item_locations (test_visibility.VisibilityTests.test_action_contract_does_not_reveal_hidden_item_locations) ... ok
+test_cell_changes_only_electromagnetic_and_spectator_pixels (test_visibility.VisibilityTests.test_cell_changes_only_electromagnetic_and_spectator_pixels) ... ok
+test_exact_heat_does_not_leak_through_events (test_visibility.VisibilityTests.test_exact_heat_does_not_leak_through_events) ... ok
+test_heat_changes_only_thermal_and_spectator_pixels (test_visibility.VisibilityTests.test_heat_changes_only_thermal_and_spectator_pixels) ... ok
+test_shard_changes_only_optical_and_spectator_pixels (test_visibility.VisibilityTests.test_shard_changes_only_optical_and_spectator_pixels) ... ok
+
+----------------------------------------------------------------------
+Ran 41 tests in 0.490s
+
+OK

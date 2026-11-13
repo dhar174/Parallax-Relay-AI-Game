@@ -1,0 +1,10 @@
+{
+  "win": true,
+  "turns": 7,
+  "scores": {
+    "SPECTRA": 100,
+    "PYRA": 100,
+    "FLUX": 100
+  },
+  "energy": 5
+}

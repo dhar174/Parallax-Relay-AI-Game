@@ -1,0 +1,42 @@
+test_orchestrator (unittest.loader._FailedTest.test_orchestrator) ... ERROR
+
+======================================================================
+ERROR: test_orchestrator (unittest.loader._FailedTest.test_orchestrator)
+----------------------------------------------------------------------
+ImportError: Failed to import test module: test_orchestrator
+Traceback (most recent call last):
+  File "/usr/lib/python3.13/unittest/loader.py", line 396, in _find_test_path
+    module = self._get_module_from_name(name)
+  File "/usr/lib/python3.13/unittest/loader.py", line 339, in _get_module_from_name
+    __import__(name)
+    ~~~~~~~~~~^^^^^^
+  File "/mnt/data/parallax-relay-milestone2/tests/test_orchestrator.py", line 5, in <module>
+    from parallax_relay.orchestrator import run_match
+ModuleNotFoundError: No module named 'parallax_relay.orchestrator'
+
+
+----------------------------------------------------------------------
+Ran 1 test in 0.000s
+
+FAILED (errors=1)
+test_budget (unittest.loader._FailedTest.test_budget) ... ERROR
+
+======================================================================
+ERROR: test_budget (unittest.loader._FailedTest.test_budget)
+----------------------------------------------------------------------
+ImportError: Failed to import test module: test_budget
+Traceback (most recent call last):
+  File "/usr/lib/python3.13/unittest/loader.py", line 396, in _find_test_path
+    module = self._get_module_from_name(name)
+  File "/usr/lib/python3.13/unittest/loader.py", line 339, in _get_module_from_name
+    __import__(name)
+    ~~~~~~~~~~^^^^^^
+  File "/mnt/data/parallax-relay-milestone2/tests/test_budget.py", line 2, in <module>
+    from parallax_relay.budget import Budget, BudgetExceeded
+ModuleNotFoundError: No module named 'parallax_relay.budget'
+
+
+----------------------------------------------------------------------
+Ran 1 test in 0.000s
+
+FAILED (errors=1)

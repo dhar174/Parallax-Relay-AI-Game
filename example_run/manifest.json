@@ -1,0 +1,33 @@
+{
+  "schema_version": 2,
+  "mode": "mock",
+  "players": {
+    "SPECTRA": {
+      "provider": "mock",
+      "model": "scripted-fixture"
+    },
+    "PYRA": {
+      "provider": "mock",
+      "model": "scripted-fixture"
+    },
+    "FLUX": {
+      "provider": "mock",
+      "model": "scripted-fixture"
+    }
+  },
+  "settings": {
+    "communication_rounds": 2,
+    "max_turns": 12,
+    "max_calls": 216,
+    "max_attempts": 2,
+    "timeout_seconds": 60.0,
+    "max_output_tokens": 2048,
+    "history_turns": 4,
+    "retry_delay_seconds": 0.5,
+    "max_consecutive_failures": 3,
+    "max_estimated_cost_usd": null,
+    "image_token_reserve": 8192
+  },
+  "room": "The Split Span",
+  "privacy": "Privileged spectator files: all goals, views and notes. Never send to a player."
+}

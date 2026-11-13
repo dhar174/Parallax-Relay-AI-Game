@@ -1,0 +1,25 @@
+test_check_does_not_call_providers (test_cli.CLITests.test_check_does_not_call_providers) ... ok
+test_env_error_does_not_echo_value (test_cli.CLITests.test_env_error_does_not_echo_value) ... ok
+test_env_file_is_data_only_and_does_not_override (test_cli.CLITests.test_env_file_is_data_only_and_does_not_override) ... ok
+test_existing_output_directory_never_overwritten (test_cli.CLITests.test_existing_output_directory_never_overwritten) ... ok
+test_live_missing_config_is_no_network_and_no_output_directory (test_cli.CLITests.test_live_missing_config_is_no_network_and_no_output_directory) ... ok
+test_mock_cli_no_keys_and_saves_replay (test_cli.CLITests.test_mock_cli_no_keys_and_saves_replay) ... ok
+test_mode_required (test_cli.CLITests.test_mode_required) ... ok
+test_non_utf8_environment_file_is_safe_configuration_error (test_cli.CLITests.test_non_utf8_environment_file_is_safe_configuration_error) ... FAIL
+test_cancelled_calls_leave_partial_result (test_cli.RecordingTests.test_cancelled_calls_leave_partial_result) ... ok
+test_partial_run_is_preserved (test_cli.RecordingTests.test_partial_run_is_preserved) ... ok
+test_replay_escapes_model_html (test_cli.RecordingTests.test_replay_escapes_model_html) ... ok
+
+======================================================================
+FAIL: test_non_utf8_environment_file_is_safe_configuration_error (test_cli.CLITests.test_non_utf8_environment_file_is_safe_configuration_error)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/parallax-relay-milestone2/tests/test_cli.py", line 72, in test_non_utf8_environment_file_is_safe_configuration_error
+    self.assertEqual(proc.returncode,2)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 2
+
+----------------------------------------------------------------------
+Ran 11 tests in 5.608s
+
+FAILED (failures=1)

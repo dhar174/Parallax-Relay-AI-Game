@@ -1,0 +1,5 @@
+# Direct dependency versions present during offline verification on Python 3.13.5.
+# This is not a full transitive lockfile.
+Pillow==12.3.0
+pydantic==2.13.5
+httpx==0.28.1

@@ -1,0 +1,20 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+.env.*
+!.env.example
+runs/
+*.tmp
+.pytest_cache/
+.coverage
+htmlcov/
+.superpowers/
+
+# Local build and editor artifacts
+build/
+dist/
+*.egg-info/
+.DS_Store
+Thumbs.db

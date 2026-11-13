@@ -1,0 +1,23 @@
+{
+  "schema_version": 2,
+  "win": true,
+  "loss": false,
+  "completed": true,
+  "turns": 7,
+  "stop_reason": "victory",
+  "scores": {
+    "SPECTRA": 100,
+    "PYRA": 100,
+    "FLUX": 100
+  },
+  "energy": 5,
+  "budget": {
+    "calls_started": 63,
+    "max_calls": 216,
+    "reported_input_tokens": 0,
+    "reported_output_tokens": 0,
+    "unknown_usage_calls": 0,
+    "estimated_cost_usd": null,
+    "cost_is_estimate_not_billing_guarantee": true
+  }
+}

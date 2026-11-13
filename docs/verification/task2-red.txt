@@ -1,0 +1,42 @@
+test_providers (unittest.loader._FailedTest.test_providers) ... ERROR
+
+======================================================================
+ERROR: test_providers (unittest.loader._FailedTest.test_providers)
+----------------------------------------------------------------------
+ImportError: Failed to import test module: test_providers
+Traceback (most recent call last):
+  File "/usr/lib/python3.13/unittest/loader.py", line 396, in _find_test_path
+    module = self._get_module_from_name(name)
+  File "/usr/lib/python3.13/unittest/loader.py", line 339, in _get_module_from_name
+    __import__(name)
+    ~~~~~~~~~~^^^^^^
+  File "/mnt/data/parallax-relay-milestone2/tests/test_providers.py", line 8, in <module>
+    from parallax_relay.providers import HTTPAgent, ProviderError
+ModuleNotFoundError: No module named 'parallax_relay.providers'
+
+
+----------------------------------------------------------------------
+Ran 1 test in 0.000s
+
+FAILED (errors=1)
+test_config (unittest.loader._FailedTest.test_config) ... ERROR
+
+======================================================================
+ERROR: test_config (unittest.loader._FailedTest.test_config)
+----------------------------------------------------------------------
+ImportError: Failed to import test module: test_config
+Traceback (most recent call last):
+  File "/usr/lib/python3.13/unittest/loader.py", line 396, in _find_test_path
+    module = self._get_module_from_name(name)
+  File "/usr/lib/python3.13/unittest/loader.py", line 339, in _get_module_from_name
+    __import__(name)
+    ~~~~~~~~~~^^^^^^
+  File "/mnt/data/parallax-relay-milestone2/tests/test_config.py", line 4, in <module>
+    from parallax_relay.config import load_config, ConfigError, MatchSettings
+ModuleNotFoundError: No module named 'parallax_relay.config'
+
+
+----------------------------------------------------------------------
+Ran 1 test in 0.000s
+
+FAILED (errors=1)

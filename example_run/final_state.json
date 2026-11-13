@@ -1,0 +1,34 @@
+{
+  "turn": 7,
+  "robots": {
+    "SPECTRA": {
+      "role": "SPECTRA",
+      "x": 12,
+      "damage": 0
+    },
+    "PYRA": {
+      "role": "PYRA",
+      "x": 12,
+      "damage": 0
+    },
+    "FLUX": {
+      "role": "FLUX",
+      "x": 12,
+      "damage": 0
+    }
+  },
+  "energy": 5,
+  "coolant": 1,
+  "motor_heat": 3,
+  "bridge_extended": true,
+  "exit_unlocked": true,
+  "shard_collected": true,
+  "cell_collected": true,
+  "win": true,
+  "loss": false,
+  "events": [
+    "SPECTRA: moved to x=12",
+    "FLUX: extraction hatch unlocked",
+    "TEAM SUCCESS: all three robots extracted"
+  ]
+}

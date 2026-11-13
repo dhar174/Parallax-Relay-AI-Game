@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Parallax Relay | Match Replay</title>
+<style>
+[hidden]{display:none!important}
+:root{color-scheme:dark;font-family:system-ui,Segoe UI,sans-serif;background:#0b121c;color:#edf3f9}
+*{box-sizing:border-box}body{margin:0 auto;padding:26px;max-width:1500px}h1{font-size:30px;letter-spacing:.04em;margin:0}h2{font-size:15px;margin:0 0 12px}p{line-height:1.5;color:#adbed1;margin:8px 0 0}
+header{display:flex;justify-content:space-between;align-items:center;gap:20px;flex-wrap:wrap;margin-bottom:20px}.eyebrow{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:#7fc7d3;margin-bottom:6px}.badge{border:1px solid #405c74;background:#1a2b3b;padding:7px 12px;border-radius:30px;font-size:12px}
+.summary{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:20px 0}.metric,.panel,.log{border:1px solid #2b3f52;background:#132030;border-radius:12px;padding:16px}.metric strong{display:block;font-size:24px;margin-top:6px}.metric span{color:#a7bbce;font-size:12px}.toolbar{display:flex;gap:14px;align-items:center;margin:18px 0;flex-wrap:wrap}button{font:inherit;border:1px solid #486078;background:#1b3043;color:#e7f1fa;border-radius:7px;padding:7px 12px;cursor:pointer}button:hover{background:#2a455b}button:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid #9ddbdf;outline-offset:3px}input{flex:1;min-width:150px;accent-color:#83c5da}#roundLabel{min-width:170px;font-size:13px;color:#b8d0e2}
+.sensors,.logs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.panel img{width:100%;height:auto;display:block;border-radius:6px;background:#101925}.panel h2 span{font-weight:400;color:#93b2cd;font-size:12px}.logs{margin-top:14px}.entry{padding:9px 0;border-bottom:1px solid #293b4c;font-size:13px;line-height:1.55;white-space:pre-wrap;overflow-wrap:anywhere}.entry:last-child{border-bottom:0}.entry b{color:#9cdbde}.subhead{font-size:11px;color:#d6c18c;letter-spacing:.08em;text-transform:uppercase;margin-top:14px}.note{color:#aebecb;font-size:12px;line-height:1.5}.warning{color:#e6c987;font-size:12px}details{margin-top:14px}summary{cursor:pointer;color:#bbcfdf;font-size:13px}.empty{padding:24px;border:1px dashed #486078;border-radius:12px;margin:20px 0}footer{font-size:12px;color:#8fa7bc;margin-top:24px;line-height:1.6}#failure{color:#f3bc95}
+@media(max-width:850px){body{padding:16px}.summary{grid-template-columns:repeat(2,1fr)}.sensors,.logs{grid-template-columns:1fr}h1{font-size:24px}.panel,.log{padding:12px}}
+</style></head><body>
+<header><div><div class="eyebrow">Multimodal multi-agent test chamber</div><h1>PARALLAX RELAY</h1><p>The Split Span · Milestone 2 · recorded match</p></div><div class="badge" id="mode"></div></header>
+<p id="roster"></p><p class="warning">Spectator access: every sensor feed and private objective is visible here. This page is never sent to a player.</p>
+<section class="summary" aria-label="Match summary"><div class="metric"><span>Outcome</span><strong id="outcome"></strong></div><div class="metric"><span>Resolved turns</span><strong id="turnCount"></strong></div><div class="metric"><span>Model call attempts</span><strong id="calls"></strong></div><div class="metric"><span>Team energy remaining</span><strong id="energy"></strong></div></section>
+<div id="empty" class="empty" hidden>No turn was fully resolved. The final image shows the unchanged state. Inspect <code>calls.jsonl</code> and <code>phases.jsonl</code> for the partial turn.</div>
+<div class="toolbar" id="controls"><button id="prev" type="button" aria-label="Previous round">←</button><label id="roundLabel" for="round"></label><input id="round" type="range" min="0" max="0" value="0" aria-label="Recorded round"><button id="next" type="button" aria-label="Next round">→</button></div>
+<div class="sensors"><section class="panel"><h2>SPECTRA <span>Optical</span></h2><img id="SPECTRA" alt="SPECTRA optical observation before this round's actions"></section><section class="panel"><h2>PYRA <span>Thermal</span></h2><img id="PYRA" alt="PYRA thermal observation before this round's actions"></section><section class="panel"><h2>FLUX <span>Electromagnetic</span></h2><img id="FLUX" alt="FLUX electromagnetic observation before this round's actions"></section><section class="panel"><h2>SPECTATOR <span>Privileged, omniscient view</span></h2><img id="SPECTATOR" alt="Omniscient spectator observation"></section></div>
+<div class="logs"><section class="log"><h2>Public communications</h2><div id="chat"></div></section><section class="log"><h2>Sealed actions and engine results</h2><div id="actions"></div><div id="events"></div><div id="failure" class="note"></div></section></div>
+<details class="log"><summary>Private objectives, factual notes and final scores (spectator only)</summary><div id="private"></div></details>
+<details class="log"><summary>Call diagnostics for this round</summary><div id="diagnostics"></div></details>
+<footer>Images show observations before the selected round. Events describe its resolved outcome. Communication phases publish only after all agents finish; action commitments are sealed until the action phase closes.<br>Model outputs are displayed as text, never HTML. Offline replay only; no external scripts or network requests.</footer>
+<script>
+'use strict';
+const DATA=__REPLAY_DATA__;
+const $=id=>document.getElementById(id),records=DATA.records,result=DATA.result;
+$('mode').textContent=DATA.manifest.mode==='mock'?'MOCK · SCRIPTED FIXTURE':'LIVE API RUN';
+$('outcome').textContent=result.stop_reason.replaceAll('_',' ');
+$('turnCount').textContent=result.turns;$('calls').textContent=result.budget.calls_started;$('energy').textContent=result.energy;
+$('roster').textContent=Object.entries(DATA.manifest.players||{}).map(([role,p])=>role+': '+p.provider+' / '+p.model).join('  ·  ');
+const slider=$('round');slider.max=Math.max(0,records.length-1);
+function line(parent,label,value){const el=document.createElement('div');el.className='entry';const key=document.createElement('b');key.textContent=label+' ';el.append(key,document.createTextNode(String(value)));parent.append(el)}
+function heading(parent,label){const el=document.createElement('div');el.className='subhead';el.textContent=label;parent.append(el)}
+function draw(){
+ const i=Number(slider.value),r=records[i];
+ for(const id of ['chat','actions','events','private','diagnostics'])$(id).replaceChildren();
+ if(!r){$('empty').hidden=false;$('controls').hidden=true;for(const role of ['SPECTRA','PYRA','FLUX'])$(role).closest('.panel').hidden=true;$('SPECTATOR').src='final_spectator.png';return}
+ $('roundLabel').textContent='Round '+r.turn+' / '+records.length+' · before actions';
+ for(const role of ['SPECTRA','PYRA','FLUX'])$(role).src=r.observations[role].image;
+ $('SPECTATOR').src='turn_'+String(r.turn-1).padStart(2,'0')+'_spectator.png';
+ for(const phase of ['broadcast','negotiate']){const rows=r.communications.filter(m=>m.phase===phase);if(rows.length){heading($('chat'),phase);for(const m of rows)line($('chat'),m.role+':',m.fallback?'[No valid message received]':m.text||'[Silent]')}}
+ for(const [role,a]of Object.entries(r.sealed_actions))line($('actions'),role+':',a.kind+(a.kind==='MOVE'?' '+(a.direction>0?'+':'')+a.direction+' × '+a.steps:'')+(r.fallbacks[role]?' [fallback: '+r.fallbacks[role]+']':''));
+ heading($('events'),'After resolution');for(const event of r.events)line($('events'),'•',event);
+ $('failure').textContent=Object.keys(r.fallbacks).length?'Fallback commands were submitted for failed player calls.':'';
+ for(const role of ['SPECTRA','PYRA','FLUX']){line($('private'),role+' goal:',r.observations[role].hud.your_private_goal);line($('private'),role+' notes:',r.private_notes[role]||'[Empty]');if(result.scores)line($('private'),role+' final score:',result.scores[role])}
+ for(const call of DATA.calls.filter(c=>c.turn===r.turn-1))line($('diagnostics'),call.role+' / '+call.phase+':',call.status+' · attempt '+call.attempt+' · '+call.latency_seconds+'s'+(call.usage?' · input '+(call.usage.input_tokens??'?')+' / output '+(call.usage.output_tokens??'?')+' tokens':''));
+ $('prev').disabled=i===0;$('next').disabled=i===records.length-1;
+}
+function step(n){slider.value=Math.min(Number(slider.max),Math.max(0,Number(slider.value)+n));draw()}
+slider.addEventListener('input',draw);$('prev').addEventListener('click',()=>step(-1));$('next').addEventListener('click',()=>step(1));draw();
+</script></body></html>

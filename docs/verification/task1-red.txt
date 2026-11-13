@@ -1,0 +1,49 @@
+test_action_contract_does_not_reveal_hidden_item_locations (test_visibility.VisibilityTests.test_action_contract_does_not_reveal_hidden_item_locations) ... FAIL
+test_cell_changes_only_electromagnetic_and_spectator_pixels (test_visibility.VisibilityTests.test_cell_changes_only_electromagnetic_and_spectator_pixels) ... ok
+test_exact_heat_does_not_leak_through_events (test_visibility.VisibilityTests.test_exact_heat_does_not_leak_through_events) ... FAIL
+test_heat_changes_only_thermal_and_spectator_pixels (test_visibility.VisibilityTests.test_heat_changes_only_thermal_and_spectator_pixels) ... ok
+test_shard_changes_only_optical_and_spectator_pixels (test_visibility.VisibilityTests.test_shard_changes_only_optical_and_spectator_pixels) ... ok
+
+======================================================================
+FAIL: test_action_contract_does_not_reveal_hidden_item_locations (test_visibility.VisibilityTests.test_action_contract_does_not_reveal_hidden_item_locations)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/parallax-relay-milestone2/tests/test_visibility.py", line 17, in test_action_contract_does_not_reveal_hidden_item_locations
+    self.assertNotIn('x=9', contract)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+AssertionError: 'x=9' unexpectedly found in "{'MOVE': 'direction must be -1 or 1; steps must be 1 or 2', 'VENT': 'PYRA only, if adjacent to motor x=4; costs 1 coolant', 'REROUTE': 'FLUX only, if adjacent to console x=4; costs 2 energy', 'COLLECT': 'SPECTRA at x=9 for shard or FLUX at x=10 for energy cell', 'UNLOCK': 'FLUX at x=12; costs 1 energy', 'WAIT': 'Do nothing'}"
+
+======================================================================
+FAIL: test_exact_heat_does_not_leak_through_events (test_visibility.VisibilityTests.test_exact_heat_does_not_leak_through_events)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/parallax-relay-milestone2/tests/test_visibility.py", line 12, in test_exact_heat_does_not_leak_through_events
+    self.assertNotIn('937', str(public_hud(world, role)))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: '937' unexpectedly found in "{'turn': 0, 'max_turns': 12, 'shared_energy': 6, 'shared_coolant': 2, 'your_role': 'SPECTRA', 'your_x': 2, 'teammate_positions': {'PYRA': 3, 'FLUX': 4}, 'your_private_goal': 'Recover the memory shard before team extraction.', 'shared_goal': 'Unlock exit at x=12 and extract all three robots before turn 12.', 'action_contract': {'MOVE': 'direction must be -1 or 1; steps must be 1 or 2', 'VENT': 'PYRA only, if adjacent to motor x=4; costs 1 coolant', 'REROUTE': 'FLUX only, if adjacent to console x=4; costs 2 energy', 'COLLECT': 'SPECTRA at x=9 for shard or FLUX at x=10 for energy cell', 'UNLOCK': 'FLUX at x=12; costs 1 energy', 'WAIT': 'Do nothing'}, 'recent_events': ['PYRA: vented motor; heat now 937']}"
+
+----------------------------------------------------------------------
+Ran 5 tests in 0.176s
+
+FAILED (failures=2)
+test_protocol (unittest.loader._FailedTest.test_protocol) ... ERROR
+
+======================================================================
+ERROR: test_protocol (unittest.loader._FailedTest.test_protocol)
+----------------------------------------------------------------------
+ImportError: Failed to import test module: test_protocol
+Traceback (most recent call last):
+  File "/usr/lib/python3.13/unittest/loader.py", line 396, in _find_test_path
+    module = self._get_module_from_name(name)
+  File "/usr/lib/python3.13/unittest/loader.py", line 339, in _get_module_from_name
+    __import__(name)
+    ~~~~~~~~~~^^^^^^
+  File "/mnt/data/parallax-relay-milestone2/tests/test_protocol.py", line 4, in <module>
+    from parallax_relay.protocol import AgentRequest, ChatMessage, parse_reply, ReplyValidationError, response_schema
+ModuleNotFoundError: No module named 'parallax_relay.protocol'
+
+
+----------------------------------------------------------------------
+Ran 1 test in 0.000s
+
+FAILED (errors=1)
