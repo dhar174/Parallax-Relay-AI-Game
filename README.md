@@ -1,20 +1,18 @@
-# Parallax Relay: Milestone 2
+# Parallax Relay
 
-**Three independent multimodal players, public negotiation, sealed actions.**
+A cooperative puzzle game for three independent multimodal AI players. Each robot
+sees a different sensor image, exchanges public messages, and commits one action
+without seeing its teammates' current actions. A deterministic Python engine
+resolves the turn.
 
-This builds on the supplied starter rather than replacing its game engine. It adds
-an asynchronous orchestrator and direct REST adapters for OpenAI, Anthropic Claude,
-and Google Gemini, plus a command-line launcher and recorded-match viewer.
+**Status:** Milestone 2 is an offline-tested coordination prototype. It includes
+OpenAI, Anthropic, and Gemini REST adapters, but no credentialed provider match has
+been verified for this repository. The bundled victories use scripted players that
+already know the solution; they are not evidence of model reasoning or cooperation.
 
-**Validation status:** 72 offline tests pass, including intercepted HTTP integration
-through all three adapters. Scripted players complete the room in seven turns.
-**No credentialed provider call or real-model match has been run for this release.**
-The included `example_run/` is explicitly a scripted fixture, not evidence of AI ability.
+## Try it without API keys
 
-## 1. Run it without keys
-
-Use Python **3.11 or later**. The verification environment was Python 3.13.5 on Linux.
-Clone the repository and run from its root directory:
+Use Python **3.11 or later**. Run from the repository root:
 
 ```bash
 git clone https://github.com/dhar174/Parallax-Relay-AI-Game.git
@@ -22,223 +20,93 @@ cd Parallax-Relay-AI-Game
 python -m venv .venv
 ```
 
-Activate on Windows PowerShell:
-
-```powershell
-.\.venv\Scripts\Activate.ps1
-```
-
-Or on WSL, Linux, or macOS:
+Activate the environment:
 
 ```bash
+# Linux, macOS, or WSL
 source .venv/bin/activate
 ```
 
-Then:
+```powershell
+# Windows PowerShell
+.\.venv\Scripts\Activate.ps1
+```
+
+Install dependencies, run the offline tests, and play the scripted fixture:
 
 ```bash
 python -m pip install -r requirements.txt
 python -m unittest discover -s tests -v
-python -m parallax_relay.play --mock --out runs/mock-01
+python -m parallax_relay.play --mock
 ```
 
-Open `runs/mock-01/index.html`. The ready-made `example_run/index.html` also works
-without running Python. Keep its accompanying PNGs beside it. A run directory must
-be new; existing directories are never overwritten. Omit `--out` for a unique
-UTC-timestamped directory.
+Open the `index.html` path printed by the launcher. Each invocation creates a new
+folder under `runs/`. A normal mock match wins in seven turns with 63 scripted
+calls, five energy remaining, and a score of 100 for each role. No provider calls
+are made. Add `--fast` for one communication pass and 42 scripted calls.
 
-The mock mode runs the same observation, messaging, validation, orchestration and
-recording path as live mode, but uses explicitly scripted agents and makes no
-network calls. It does not read `.env` or require credentials.
+For a ready-made replay, download or clone the repository and open
+[`example_run/index.html`](example_run/index.html) locally, keeping its PNGs beside
+it. GitHub's file view displays source rather than running the viewer.
 
-## 2. Configure real players locally
+## How the game works
 
-The default mapping is SPECTRA -> OpenAI, PYRA -> Anthropic, FLUX -> Gemini.
-Roles are not coupled to providers: edit `configs/three_models.toml` to rotate them.
+The current room, **The Split Span**, is a single horizontal lane. SPECTRA sees
+optical details and a shard; PYRA sees motor heat; FLUX sees circuits and an energy
+cell. Their abilities must be coordinated to extend a bridge and unlock the exit.
+All three must escape within 12 turns, while each pursues a private objective.
 
-Copy `.env.example` to `.env` with your editor. It contains these six variable names:
+Each turn follows this sequence:
 
-```text
-OPENAI_API_KEY
-ANTHROPIC_API_KEY
-GEMINI_API_KEY
-OPENAI_MODEL
-ANTHROPIC_MODEL
-GEMINI_MODEL
-```
+1. Render each role's sensor image and private HUD.
+2. Collect concurrent broadcasts, then publish the complete batch.
+3. Collect and publish negotiation replies, unless `--fast` is enabled.
+4. Collect sealed action commitments from all three roles.
+5. Resolve controls, movement, interactions, and victory in the engine.
 
-Enter your credentials and chosen model IDs **only on your own machine**. For the
-OpenAI credential, use the secure OpenAI Platform setup flow supplied alongside the
-project when needed. Existing local credentials can be reused. Do not paste keys
-into chat, source files, screenshots, or replay files.
+The replay is an offline spectator view containing all roles' private information.
+It must not be used as a participant's context.
 
-Select a model available to your account that supports **both PNG image inputs
-and the provider's JSON-schema structured output mode**. No default model IDs or
-prices are guessed. IDs are bare names, not `models/...`, URLs, or `provider/model`
-routing strings. OpenRouter, Ollama, other providers, hosted enterprise gateways,
-and custom base URLs are not implemented in this milestone.
+## Run real models
 
-The small `.env` reader accepts literal `NAME=value`, optional surrounding quotes,
-and whole-line comments. It does not execute shell text, interpolate variables, or
-support multiline values or inline comments. Existing process environment values
-win over the file. The file must be UTF-8. `.env` is git-ignored.
-
-Check the local configuration without contacting a provider:
+Read the [running guide](docs/RUNNING.md) before using live mode. Configure explicit
+model IDs and credentials locally, then validate local settings:
 
 ```bash
 python -m parallax_relay.play --check --env-file .env
 ```
 
-A successful check confirms local settings only. It does not verify keys, remote
-access, model capabilities, or billing availability.
+`--check` makes no provider requests and cannot verify remote access or model
+capabilities. `--live` explicitly enables potentially billable requests. Model IDs
+and prices are not supplied by default. Current validation limits and open issues
+are documented in the [review](docs/REVIEW.md).
 
-## 3. Start with a one-round live smoke test
+## Current limits and direction
 
-```bash
-python -m parallax_relay.play --live --env-file .env --max-turns 1 --max-calls 18 --out runs/live-smoke-01
-```
+This release has one fixed room, three active roles, compatible objectives, and a
+known scripted solution. It has no platformer physics, procedural rooms, playable
+ECHO role, live dashboard, experiment runner, or validated benchmark results.
 
-This explicitly enables billable API calls. Normally the round uses nine requests:
-three broadcasts, three negotiation messages, then three commitments. Eighteen
-allows the default one retry per request. At most one game round is resolved.
-A healthy bounded smoke run ends with `stop_reason: "turn_limit"`, `completed: false`,
-and no final score. That is **not a defeat** and is not meant to finish the room.
+The [roadmap](ROADMAP.md) prioritizes reliable execution and reproducible evaluation
+before expanding the cooperative puzzles. The [verification record](docs/VERIFICATION.md)
+separates original milestone evidence from subsequent checks.
 
-Inspect `calls.jsonl` for request statuses and `phases.jsonl` for the messages and
-commitments. Then run a full game:
+## Documentation
 
-```bash
-python -m parallax_relay.play --live --env-file .env --out runs/live-01
-```
-
-For one communication pass instead of two:
-
-```bash
-python -m parallax_relay.play --live --env-file .env --fast --out runs/live-fast-01
-```
-
-If responses repeatedly end `incomplete`, review the selected model's output
-requirements and increase `max_output_tokens` within the configuration limit.
-Unsupported models or schemas, authentication errors, and quota exhaustion stop
-the run rather than silently switching models or output modes.
-
-## What a turn does
-
-1. Render each player's own sensor PNG and allowlisted HUD. Give it its own private
-   objective, recent local history and optional saved factual notes.
-2. Request all three broadcasts concurrently, then publish them together.
-3. Optionally request all three negotiation replies concurrently, then publish them.
-4. Request all three action commitments concurrently. No player sees another's
-   committed action until every commitment has completed.
-5. Validate outputs, apply exactly one deterministic engine transition, save the
-   spectator record, and advance the turn.
-
-A faster provider gets no same-phase information advantage. Each request is
-self-contained; server-side conversations are not used. Notes are short factual
-memory, not hidden reasoning transcripts. Messages from teammates remain untrusted
-game data. There are no shell, browsing, filesystem, or external action tools.
-
-## Boundaries and safeguards
-
-| Setting | Default |
-|---|---:|
-| Active robots | 3 |
-| Game limit | 12 rounds |
-| Communication passes per round | 2 |
-| Total request attempts | 216 maximum |
-| Attempts per request | 2, including initial attempt |
-| Timeout per attempt | 60 seconds |
-| Output-token limit per request | 2,048 |
-| Public message length | 400 characters |
-| Private notes | 1,000 characters |
-| Recent role-local history | 4 turns |
-| Consecutive failed phases for one player | Stop after 3 |
-
-Every retry counts against the request limit. A whole phase reserves enough budget
-for all players and their retry allowances before anybody starts. This means a
-phase can stop with some unused request capacity rather than unfairly starting only
-part of the team.
-
-Malformed output and retryable failures get bounded retries, then a silent message
-or `WAIT`. A valid JSON command that violates game rules consumes the turn; it is
-not repaired into a better move. Fatal provider errors abort before resolving the
-incomplete round. Cancellation preserves completed and partial logs when possible.
-
-**A dollar cap is optional and disabled by default.** Set
-`match.max_estimated_cost_usd` and explicit per-model input/output pricing for all
-three players to enable a local estimate guard. The TOML shows the required shape.
-Unknown usage retains its reserved estimate rather than counting as free.
-Estimates are **not a provider-enforced billing ceiling**: token estimation, image
-accounting, cached tokens, prices and already in-flight requests can differ from
-actual billing. Configure provider-side controls separately as appropriate.
-
-## Replay and logs
-
-| File | Contents |
+| Document | Use it for |
 |---|---|
-| `index.html` | Offline viewer, sensor panels, chat, actions, outcomes, diagnostics |
-| `manifest.json` | Mode, model assignments, settings, privacy notice |
-| `calls.jsonl` | Attempt status, latency, normalized usage; no raw errors or keys |
-| `phases.jsonl` | Published chat and actions after their phase barriers |
-| `replay.jsonl` | Fully resolved turns, observations, private notes and state snapshots |
-| `result.json` | Stop reason, score when terminal, request/token accounting |
-| `final_state.json` | Privileged final engine state |
-| `turn_*.png`, `final_spectator.png` | Role-specific observations and spectator images |
+| [Running guide](docs/RUNNING.md) | Configuration, limits, troubleshooting, and replay files |
+| [Architecture](docs/ARCHITECTURE.md) | Modules, data flow, and extension boundaries |
+| [Protocol](docs/PROTOCOL.md) | Player inputs, reply contracts, phases, and outcomes |
+| [Provider references](docs/API_SOURCES.md) | API assumptions and external sources |
+| [Review](docs/REVIEW.md) | Prioritized defects, evidence, and improvement opportunities |
+| [Roadmap](ROADMAP.md) | Future milestones and completion gates |
+| [Contributing](CONTRIBUTING.md) | Development and verification workflow |
+| [Agent instructions](AGENTS.md) | Repository-specific instructions for coding agents |
+| [Changelog](CHANGELOG.md) | Delivered changes |
 
-**These are privileged spectator files.** They include every player's objectives,
-notes and observations. Never feed them wholesale to a participant. Raw malformed
-model text and raw HTTP error bodies are intentionally not persisted. Model text
-is escaped and rendered with `textContent` in the viewer.
+Source is in `parallax_relay/`, tests in `tests/`, and default configuration in
+`configs/three_models.toml`. `example_run/` and `demo_output/` are committed scripted
+fixtures. New runs and local environments are ignored by Git.
 
-## The current room and its limits
-
-The Split Span remains one horizontal lane with three roles. PYRA cools the motor,
-FLUX powers the bridge and exit and can recover a cell, and SPECTRA can recover a
-shard. All robots must escape together. Each has a private personal objective.
-The known script satisfies all three objectives in seven turns with five energy left.
-
-This is a **coordination infrastructure slice**, not yet a difficult strategy game or
-validated benchmark. Goals are compatible in this room; more mutually competing
-routes and scarce-resource tradeoffs still need level design. There is no automatic
-reheating, gravity, jumping, 2/4-player scaling, playable ECHO, procedural generation,
-private side channels, persistent relationships, or live web dashboard. The browser
-page is a post-match replay, not a live control panel. The original demo remains:
-
-```bash
-python -m parallax_relay.demo --out demo_output
-```
-
-The engine is deterministic given actions. Real model outputs and concurrent call
-completion times need not be deterministic.
-
-## Project map
-
-```text
-parallax_relay/
-  state.py, engine.py, render.py   Original simulation and sensor rendering
-  observations.py                 Only authorized player observation builder
-  protocol.py                     Immutable inputs and strict JSON reply contracts
-  prompts.py                      Public rules and untrusted-input boundaries
-  config.py                       Model/env mappings and runtime limits
-  providers.py                    OpenAI, Anthropic, Gemini REST adapters
-  budget.py                       Request reservations and optional cost estimates
-  orchestrator.py                  Concurrent phase barriers and local memory
-  recording.py                    Incremental logs and safe replay generation
-  replay_template.html            Offline viewer
-  play.py                         Mock/live/check CLI
-  agents.py, scripted.py          Explicit offline fixture
-  demo.py                         Original standalone demo
-configs/three_models.toml          Three-player configuration
-.env.example                      Local environment template, no keys
-example_run/                      Ready-to-open scripted match
-demo_output/                      Original standalone demo recording
-tests/                            Offline unit and integration tests
-docs/                             Protocol, API references and milestone records
-requirements.txt                  Supported dependency ranges
-requirements-tested.txt           Versions used for original milestone verification
-LICENSE                           MIT license
-```
-
-See `docs/PROTOCOL.md`, `docs/API_SOURCES.md` and `docs/VERIFICATION.md` for exact
-contracts, official API references and validation limitations. This release was
-self-reviewed, not reviewed by an independent agent.
+Licensed under the [MIT License](LICENSE).

@@ -1,5 +1,9 @@
 # Milestone 2: independent multimodal players
 
+> Historical archive-build record (November 12, 2026). Delivery constraints and
+> instructions below describe that completed milestone, not current repository
+> policy. See [AGENTS.md](../../../AGENTS.md) and [ROADMAP.md](../../../ROADMAP.md).
+
 This implements the continuation Charles requested after approving the Parallax Relay
 starter and its three-model orchestrator. The supplied ZIP is the baseline; no repository,
 account, external deployment, or user Library is changed.

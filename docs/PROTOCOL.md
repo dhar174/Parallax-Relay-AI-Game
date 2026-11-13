@@ -40,7 +40,10 @@ maximum is 400 characters; notes maximum is 1000. Notes are brief facts, uncerta
 and intent, not a request for a chain of thought. An empty string is legal.
 
 Action kinds: `MOVE`, `WAIT`, `VENT`, `REROUTE`, `COLLECT`, `UNLOCK`.
-MOVE uses direction -1 or +1 and steps 1 or 2. Other actions use zeros. The host
+MOVE uses direction -1 or +1 and steps 1 or 2. Other actions should use zeros.
+Current limitation: the parser accepts arbitrary integers for non-MOVE fields and
+the engine ignores them; zeros are requested by the prompt but not enforced. See
+[R04](REVIEW.md#r04-non-move-zero-fields-are-not-enforced). The host
 assigns role; a response cannot select another player. The schema permits integer
 values so that gameplay-invalid moves are handled by the engine, not retried for
 better strategy. Shape/type errors are transport-contract failures and may retry.
@@ -72,6 +75,9 @@ The failure streak counts failed **phases**, not rounds. Three consecutive faile
 phases for one role abort by default. Any successful phase resets that role's streak.
 Fatal setup/provider errors abort the unfinished round without resolving its actions.
 Already completed public messages and attempt metadata remain in the partial logs.
+These guarantees cover normal provider/budget stops and handled cancellation. Local
+recording failures may prevent finalization; see
+[R03](REVIEW.md#r03-recording-errors-can-bypass-finalization).
 
 A phase reserves the full team's maximum attempts before starting. Unknown token
 usage is recorded as unknown, not zero. A configured dollar guard uses user-supplied
@@ -85,7 +91,8 @@ configured experiment stopped before the engine ended. Other stops include
 `call_budget`, `spend_budget`, `provider_error`, `internal_error`, `unreliable_agent`
 and `cancelled`. Nonterminal stops have `completed=false` and `scores=null`.
 
-CLI codes: 0 for successful execution/config check or intentionally bounded run;
+CLI codes (handled paths; see [known configuration exception](REVIEW.md#r01-non-utf-8-toml-escapes-cli-error-handling)):
+0 for successful execution/config check or intentionally bounded run;
 1 for engine defeat; 2 for configuration/local file errors; 3 for provider/internal/
 reliability abort; 4 for budget stop; 130 for keyboard interruption.
 
@@ -106,3 +113,8 @@ what their outputs can do.
 
 Replay JSON/HTML intentionally contains all player-private information for the human
 spectator. Treat it as privileged. It is not suitable as a participant context source.
+
+The legacy `parallax_relay.demo` command has an older replay format and overwrites
+existing output files. The main launcher rejects existing run directories. See
+[Running](RUNNING.md) for operational details and [Architecture](ARCHITECTURE.md)
+for ownership and extension boundaries.
