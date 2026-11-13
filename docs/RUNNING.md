@@ -177,7 +177,8 @@ Open `index.html` locally. The round slider and arrow buttons select resolved tu
 Images show the state **before** that round; events describe its result. Calls and
 phases from an unfinished round may only be visible in JSONL, not in the viewer.
 For a zero-turn run, the viewer uses the final spectator image and hides round
-controls. There is no live dashboard or built-in resume/recovery command.
+controls. There is no live dashboard or built-in resume command. Finalization automatically
+attempts recovery for the active run only; it does not resume gameplay.
 
 ## Exit codes and troubleshooting
 
@@ -185,7 +186,7 @@ controls. There is no live dashboard or built-in resume/recovery command.
 |---|---|
 | 0 | Configuration check, victory, or intentionally bounded nonterminal run |
 | 1 | Engine defeat |
-| 2 | CLI/configuration/local file error; also demo output-path/local I/O errors |
+| 2 | CLI/configuration/local output or callback error; also demo output-path/local I/O errors |
 | 3 | Provider, internal-agent, or reliability abort |
 | 4 | Call or estimated-cost budget stop |
 | 130 | Keyboard interruption |
@@ -203,7 +204,17 @@ use 12 turns. No experiment-horizon override is currently sent to the players.
   output-token requirements; raise limits deliberately rather than removing bounds.
 - **`call_budget`/`spend_budget`:** account for whole-phase retry reservations. The
   CLI scripted mock disables only the dollar guard; its call budget still applies.
-- **Partial logs without a viewer:** local I/O/setup failures can prevent finalization.
-  Preserve the directory for diagnosis; no recovery tool is shipped.
+- **`local_error` / partial output:** the driver stopped at its last resolved turn
+  and attempted up to two finalization passes, independently saving each artifact.
+  Started calls, completed phases, and resolved turns rebuild the JSONL logs. The
+  CLI prints a partial summary and only announces a replay if the current viewer
+  was produced. Earlier setup errors, persistent write failures, process termination,
+  or stalled storage can still prevent usable output. Preserve the directory for
+  diagnosis; no standalone recovery/resume command is shipped.
+- **Failure after victory:** `local_error` can coexist with `win=true` and terminal
+  scores; the game finished, but recording failed. Exit 2 reports the output failure.
+- **Provider cleanup incomplete:** shutdown failed or exceeded its five-second
+  cooperative timeout. An earlier match failure remains primary; cleanup diagnostics
+  never include raw exceptions.
 
 For current defects and their proposed acceptance tests, see [Review](REVIEW.md).

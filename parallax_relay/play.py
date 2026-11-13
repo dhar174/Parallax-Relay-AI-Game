@@ -14,12 +14,13 @@ from pydantic import ValidationError
 
 from .agents import ScriptedAgent
 from .config import ConfigError, MatchSettings, load_config
-from .orchestrator import run_match
+from .orchestrator import MatchExecutionError, run_match
 from .protocol import ROLES
 from .providers import HTTPAgent
 from .recording import Recorder
 
 ROOT = Path(__file__).resolve().parent.parent
+CLEANUP_TIMEOUT_SECONDS = 5
 
 
 def load_env_file(path: Path, environ: dict | None = None) -> None:
@@ -89,6 +90,7 @@ async def _run(args, cfg, settings, runtime) -> int:
         manifest['requested_settings'] = requested_settings
     recorder = Recorder(out, manifest)
     agents = {}
+    failure = None
     try:
         for role in ROLES:
             if args.mock:
@@ -109,8 +111,39 @@ async def _run(args, cfg, settings, runtime) -> int:
         if result.stop_reason in {'call_budget','spend_budget'}:
             return 4
         return 1 if result.world.loss else 0
+    except MatchExecutionError as error:
+        failure = error
+        print(json.dumps(error.result.summary(), indent=2))
+        print(f'Match stopped: {error.result.stop_reason} during {error.operation}.', file=sys.stderr)
+        if recorder.viewer_ready:
+            print(f'Replay: {out / "index.html"}')
+        else:
+            print(f'Partial output: {out}; replay recovery incomplete.', file=sys.stderr)
+        return 2 if error.result.stop_reason == 'local_error' else 3
+    except BaseException as error:
+        failure = error
+        raise
     finally:
-        await asyncio.gather(*(a.close() for a in agents.values()), return_exceptions=True)
+        cleanup_errors = []
+        try:
+            closed = await asyncio.wait_for(
+                asyncio.gather(*(a.close() for a in agents.values()), return_exceptions=True),
+                timeout=CLEANUP_TIMEOUT_SECONDS)
+            cleanup_errors = [('client_close', e) for e in closed if isinstance(e, BaseException)]
+        except asyncio.CancelledError as error:
+            # A fresh caller cancellation takes precedence over an earlier failure.
+            # Individual close() cancellations are returned by gather instead.
+            if failure is not None:
+                if hasattr(failure, 'result'):
+                    error.result = failure.result
+                error.secondary_errors = (('prior_execution', failure),)
+            raise
+        except Exception as error:
+            cleanup_errors.append(('client_close', error))
+        if cleanup_errors:
+            if isinstance(failure, (MatchExecutionError, asyncio.CancelledError)):
+                failure.secondary_errors = (*getattr(failure, 'secondary_errors', ()), *cleanup_errors)
+            print('Provider cleanup incomplete.', file=sys.stderr)
 
 
 def main(argv: list[str] | None = None) -> int:

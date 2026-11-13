@@ -274,3 +274,32 @@ metadata is still mock-only; existing live and mock manifest tests cover that ru
 Fresh full unittest discovery: **100 tests passed**. The run emitted asyncio
 slow-task diagnostics but no failures/errors; diff checks passed. No production
 behavior change or live provider request was needed for this review follow-up.
+
+## Slice 3 implementation — November 13, 2026
+
+Baseline: merged slice 2 (`e6c3576`), Linux/Python 3.12.14 and the existing dependency
+environment. The first regression reproduced raw OSError escaping after a phase
+write; the old path produced no final summary/viewer. Recovery now raises sanitized
+MatchExecutionError with a partial result and original exception for trusted callers.
+
+Fresh full suite after implementation and review corrections: **111 tests passed**.
+Fault-injection cases cover call/phase/turn/observation writes before, after, and
+partway through persistence; progress and unexpected driver errors; each of seven
+final artifacts; persistent/secondary failures; a transient finalization failure
+after victory; cancellation with failed logging/finalization; sibling draining and
+released reservations; CLI status/privacy/current-viewer reporting; client-close
+timeout; and fresh cancellation during failed-match client cleanup. The last case
+was found in independent review, reproduced red, fixed to propagate cancellation,
+then verified with the green full suite. No other actionable review finding remained.
+
+Finalization is capped at two passes, each independently attempting seven atomic
+artifacts. The resolved world, in-memory records, recovered JSONL, summary, final
+state and embedded replay agree. Cancellation-resistant Python code and blocking
+filesystem calls remain outside the cooperative/bounded-attempt guarantee.
+
+`pip check`, compilation, diff checks, and 35 local documentation links passed.
+Standalone normal/fast mocks retained seven-turn wins, 63/42 calls, five energy,
+and scores of 100. Existing provider-stop, cancellation, privacy, budget and mock
+cost-policy tests passed. Some tests emitted asyncio slow-task diagnostics without
+failures/errors. Historical fixtures and dependency files remain unchanged. No
+paid requests, replay UI expansion, or browser verification were included.

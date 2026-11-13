@@ -4,7 +4,7 @@ Reviewed **2026-11-13**, against runtime baseline
 [`719c7696c4bfe50934fc936bbccfb62812633164`](https://github.com/dhar174/Parallax-Relay-AI-Game/commit/719c7696c4bfe50934fc936bbccfb62812633164).
 This is a documentation and source review with offline reproductions. Runtime code,
 tests, dependencies, and committed fixtures were not changed during that review.
-Subsequent slice 1/2 resolutions are annotated below; in those sections the original
+Subsequent slice 1/2/3 resolutions are annotated below; in those sections the original
 evidence, suggested remedies, and reproductions are historical baseline records.
 
 ## Method and coverage
@@ -42,8 +42,8 @@ review; that is not a security assurance.
 | ID | Priority | Classification | Finding | Status |
 |---|---|---|---|---|
 | R01 | P2 | Confirmed defect | Non-UTF-8 TOML bypasses CLI error handling | Fixed in PR #27 |
-| R02 | P2 | Confirmed defect | Dollar guard blocks no-cost mock runs | Fixed in slice 2; pending merge |
-| R03 | P2 | Confirmed defect | Recording errors bypass finalization | Open |
+| R02 | P2 | Confirmed defect | Dollar guard blocks no-cost mock runs | Fixed in PR #28 |
+| R03 | P2 | Confirmed defect | Recording errors bypass finalization | Fixed in slice 3; pending merge |
 | R04 | P3 | Documentation mismatch | Non-MOVE zero fields are requested but unenforced | Fixed in PR #27 |
 | R05 | P2 | Documentation mismatch | Legacy demo overwrites existing output | Fixed in PR #27 |
 | R06 | P1 | Unverified assumption | Offline wire tests do not establish live compatibility | Open validation gate |
@@ -141,6 +141,14 @@ network traffic; live/synthetic paid-agent cost guards still stop before overspe
 Keep requested versus effective settings clear in the manifest if they differ.
 
 ## R03: Recording errors can bypass finalization
+
+**Slice 3 resolution:** host output failures now raise sanitized MatchExecutionError
+with a consistent partial result and the original error available to trusted callers.
+The resolved world/record checkpoint precedes persistence; finalization independently
+rebuilds logs and final artifacts with atomic replacement and at most two passes.
+Secondary errors cannot replace the primary error or cancellation. CLI local errors
+exit 2 and advertise a replay only when the current viewer was produced. Original
+baseline evidence below is preserved; the old probe now raises the new wrapper.
 
 **Evidence:** `orchestrator.py:143–224` finalizes after its try block, which catches
 only cancellation. Recorder and progress callback exceptions can escape first.

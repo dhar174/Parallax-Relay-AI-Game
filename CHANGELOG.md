@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Preserve the last resolved checkpoint on recording/callback failure; recover
+  independent atomic artifacts before raising a sanitized partial-result exception.
+- Bound finalization to two passes and CLI client shutdown to a five-second
+  cooperative timeout; preserve primary failures and cancellation.
+
 - Disable only the CLI scripted mock's effective dollar cap, preserving call/turn
   limits and live/programmatic guards; record requested versus effective settings.
 
