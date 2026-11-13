@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Handle invalid UTF-8 TOML as a safe configuration error with CLI exit 2.
+
 - Reworked onboarding and added running, architecture, contributor, and coding-agent guides.
 - Added a research-oriented roadmap and an evidence-backed repository review.
 - Clarified provider verification limits, non-MOVE parameters, and legacy output behavior.

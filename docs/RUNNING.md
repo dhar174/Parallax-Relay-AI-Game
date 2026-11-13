@@ -78,7 +78,8 @@ model capabilities, or service availability.
 The default configuration is
 [`configs/three_models.toml`](../configs/three_models.toml), resolved relative to the
 source checkout. Use `--config path/to/file.toml` for another configuration. Save it
-as UTF-8; malformed encoding currently causes an uncaught error ([R01](REVIEW.md#r01-non-utf-8-toml-escapes-cli-error-handling)).
+as UTF-8. Invalid encoding is reported safely as a configuration error (exit 2),
+without echoing the file contents.
 
 The default role assignments are SPECTRA → OpenAI, PYRA → Anthropic, FLUX → Gemini.
 Each `[players.ROLE]` names a provider and the environment variables containing its
@@ -172,7 +173,7 @@ controls. There is no live dashboard or built-in resume/recovery command.
 | Code | Meaning |
 |---|---|
 | 0 | Configuration check, victory, or intentionally bounded nonterminal run |
-| 1 | Engine defeat; also the current uncaught-error behavior for invalid TOML encoding |
+| 1 | Engine defeat |
 | 2 | CLI/configuration/local file error handled by the launcher |
 | 3 | Provider, internal-agent, or reliability abort |
 | 4 | Call or estimated-cost budget stop |

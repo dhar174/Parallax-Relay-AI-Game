@@ -16,6 +16,18 @@ from parallax_relay.providers import ProviderError
 
 
 class CLITests(unittest.TestCase):
+    def test_non_utf8_toml_exits_safely_before_creating_output(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            config = Path(tmp) / 'invalid.toml'
+            config.write_bytes(b'# SECRET_SENTINEL\xff')
+            out = Path(tmp) / 'not-created'
+            proc = self.command('--mock', '--config', config, '--out', out)
+            self.assertEqual(proc.returncode, 2, proc.stderr)
+            self.assertIn('UTF-8', proc.stderr)
+            self.assertNotIn('SECRET_SENTINEL', proc.stdout + proc.stderr)
+            self.assertNotIn('Traceback', proc.stderr)
+            self.assertFalse(out.exists())
+
     def command(self,*args):
         env=os.environ.copy()
         for name in ('OPENAI_API_KEY','ANTHROPIC_API_KEY','GEMINI_API_KEY','OPENAI_MODEL','ANTHROPIC_MODEL','GEMINI_MODEL'):

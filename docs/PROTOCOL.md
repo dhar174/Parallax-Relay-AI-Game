@@ -91,7 +91,7 @@ configured experiment stopped before the engine ended. Other stops include
 `call_budget`, `spend_budget`, `provider_error`, `internal_error`, `unreliable_agent`
 and `cancelled`. Nonterminal stops have `completed=false` and `scores=null`.
 
-CLI codes (handled paths; see [known configuration exception](REVIEW.md#r01-non-utf-8-toml-escapes-cli-error-handling)):
+CLI codes:
 0 for successful execution/config check or intentionally bounded run;
 1 for engine defeat; 2 for configuration/local file errors; 3 for provider/internal/
 reliability abort; 4 for budget stop; 130 for keyboard interruption.

@@ -182,3 +182,13 @@ A fresh documentation reviewer checked the guides and source-backed findings, fo
 no blocking issue, and requested reconciliation of this verification record. That
 reconciliation is included here. This was a documentation review, not an independent
 security audit or provider compatibility test.
+
+## Slice 1 implementation — November 13, 2026
+
+Linux/Python 3.12.14, using the existing virtual environment and dependency versions
+recorded above. Historical reproduction outputs remain baseline evidence.
+
+- R01: the loader and subprocess encoding regressions failed before the fix
+  (UnicodeDecodeError / exit 1), then the full offline suite passed: 75 tests.
+  Invalid syntax/fields remain sanitized; invalid UTF-8 now exits 2 without creating
+  output or exposing the test sentinel.

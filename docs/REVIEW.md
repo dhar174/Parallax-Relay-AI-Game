@@ -39,7 +39,7 @@ review; that is not a security assurance.
 
 | ID | Priority | Classification | Finding | Status |
 |---|---|---|---|---|
-| R01 | P2 | Confirmed defect | Non-UTF-8 TOML bypasses CLI error handling | Open |
+| R01 | P2 | Confirmed defect | Non-UTF-8 TOML bypasses CLI error handling | Fixed in slice 1; pending merge |
 | R02 | P2 | Confirmed defect | Dollar guard blocks no-cost mock runs | Open |
 | R03 | P2 | Confirmed defect | Recording errors bypass finalization | Open |
 | R04 | P3 | Documentation mismatch | Non-MOVE zero fields are requested but unenforced | Documented; contract decision open |
@@ -51,6 +51,10 @@ review; that is not a security assurance.
 | R10 | P3 | Test gap / future enhancement | Replay browser coverage and partial-run inspection | Open |
 
 ## R01: Non-UTF-8 TOML escapes CLI error handling
+
+**Slice 1 resolution:** decoding errors now become a sanitized ConfigError. Direct
+loader and CLI regressions verify exit 2, no traceback/secret disclosure, and no
+output directory. The evidence and reproduction below describe the original baseline.
 
 **Evidence:** `config.py:94–103` catches TOML parse errors, validation errors, and
 OSError, but not UnicodeDecodeError from `tomllib.load`. `play.py:132–143` does not
