@@ -42,7 +42,7 @@ review; that is not a security assurance.
 | R01 | P2 | Confirmed defect | Non-UTF-8 TOML bypasses CLI error handling | Fixed in slice 1; pending merge |
 | R02 | P2 | Confirmed defect | Dollar guard blocks no-cost mock runs | Open |
 | R03 | P2 | Confirmed defect | Recording errors bypass finalization | Open |
-| R04 | P3 | Documentation mismatch | Non-MOVE zero fields are requested but unenforced | Documented; contract decision open |
+| R04 | P3 | Documentation mismatch | Non-MOVE zero fields are requested but unenforced | Fixed in slice 1; pending merge |
 | R05 | P2 | Documentation mismatch | Legacy demo overwrites existing output | Documentation corrected; behavior unchanged |
 | R06 | P1 | Unverified assumption | Offline wire tests do not establish live compatibility | Open validation gate |
 | R07 | P1 | Future enhancement | Fixed room cannot establish general cooperative ability | Open research gate |
@@ -154,6 +154,11 @@ retained evidence, consistent state, bounded cleanup, and documented exit behavi
 a secondary write error must not hide the original failure or expose raw secrets.
 
 ## R04: Non-MOVE zero fields are not enforced
+
+**Slice 1 resolution:** the engine now rejects nonzero direction/steps on all five
+non-MOVE kinds, consumes the turn without retry, and emits an invalid-action event.
+Original commitments remain recorded. Tests cover both collection roles, canonical
+actions, input immutability, and valid teammates. Evidence below is historical.
 
 **Evidence:** `protocol.py:99–106` accepts arbitrary integer direction/steps, and
 `engine.py:42–56` ignores them for VENT. Passing a parsed VENT with direction 42 and

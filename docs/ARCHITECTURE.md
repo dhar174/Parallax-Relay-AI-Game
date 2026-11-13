@@ -50,7 +50,7 @@ then victory or defeat. The input world is copied before mutation.
 
 Model JSON shape failures may retry. Schema-valid illegal moves consume the turn;
 they are not repaired into better moves. See [Protocol](PROTOCOL.md) for the exact
-contract and current non-MOVE parameter limitation.
+contract, including engine enforcement of zero parameters for non-MOVE actions.
 
 ## Trust boundaries
 

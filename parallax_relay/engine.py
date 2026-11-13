@@ -38,6 +38,16 @@ def resolve_turn(world: WorldState, actions: dict[str, Action]) -> WorldState:
     w = deepcopy(world)
     events: list[str] = []
 
+    # Parameters are game legality, not a reason to retry a model response.
+    # Keep caller-owned commitments intact for histories and spectator records.
+    actions = dict(actions)
+    for role, act in sorted(actions.items()):
+        if act.kind in {'WAIT', 'VENT', 'REROUTE', 'COLLECT', 'UNLOCK'} and (
+            act.direction != 0 or act.steps != 0
+        ):
+            events.append(f'{role}: invalid {act.kind} parameters; treated as WAIT')
+            actions[role] = Action('WAIT')
+
     # 1. Controls: VENT precedes REROUTE, independent of agent order.
     for role, act in sorted(actions.items()):
         if act.kind != "VENT":

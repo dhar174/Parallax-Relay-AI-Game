@@ -19,6 +19,10 @@ class ProtocolTests(unittest.TestCase):
         reply = parse_reply('{"turn":0,"action":{"kind":"MOVE","direction":0,"steps":99},"notes":""}', 'commit', 0)
         self.assertEqual(reply.action.steps, 99)
 
+    def test_noncanonical_non_move_integers_reach_engine_validation(self):
+        parsed = parse_reply('{"turn":0,"action":{"kind":"VENT","direction":42,"steps":99},"notes":""}', 'commit', 0)
+        self.assertEqual((parsed.action.to_engine().direction, parsed.action.steps), (42, 99))
+
     def test_rejects_wrong_turn(self):
         with self.assertRaises(ReplyValidationError):
             parse_reply('{"turn":1,"message":"hi"}', 'broadcast', 0)

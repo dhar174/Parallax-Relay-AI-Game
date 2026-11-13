@@ -26,6 +26,24 @@ class Spy:
 
 
 class OrchestrationTests(unittest.IsolatedAsyncioTestCase):
+    async def test_noncanonical_vent_consumes_turn_without_retry_or_record_rewrite(self):
+        async def fn(req):
+            if req.phase == 'commit' and req.role == 'PYRA':
+                return ModelReply(json.dumps({'turn': req.turn, 'action': {
+                    'kind': 'VENT', 'direction': 42, 'steps': 99}, 'notes': ''}), Usage(20, 10))
+            return reply(req)
+        agents = {r: Spy(fn) for r in ROLES}
+        result = await run_match(agents, MatchSettings(max_turns=1))
+        self.assertEqual(result.world.turn, 1)
+        self.assertEqual((result.world.motor_heat, result.world.coolant), (4, 2))
+        self.assertEqual(result.budget['calls_started'], 9)
+        self.assertTrue(all(len(a.requests) == 3 for a in agents.values()))
+        self.assertTrue(all(not req.repair for a in agents.values() for req in a.requests))
+        self.assertTrue(all(c['status'] == 'ok' for c in result.calls))
+        self.assertIn('PYRA: invalid VENT parameters; treated as WAIT', result.world.events)
+        self.assertEqual(result.records[0]['sealed_actions']['PYRA'],
+                         {'kind': 'VENT', 'direction': 42, 'steps': 99})
+
     async def test_scripted_agent_wins_through_real_driver(self):
         result=await run_match({r:ScriptedAgent(r) for r in ROLES})
         self.assertEqual(result.stop_reason,'victory')

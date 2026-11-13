@@ -192,3 +192,8 @@ recorded above. Historical reproduction outputs remain baseline evidence.
   (UnicodeDecodeError / exit 1), then the full offline suite passed: 75 tests.
   Invalid syntax/fields remain sanitized; invalid UTF-8 now exits 2 without creating
   output or exposing the test sentinel.
+- R04: engine subcases and a one-turn orchestration regression failed before the
+  guard (invalid VENT still cooled the motor), then all 80 tests passed. The
+  regressions cover signed/nonzero fields on every non-MOVE kind, both collectors,
+  canonical effects, input purity, teammate controls/order, parser acceptance,
+  nine successful attempts without repair, and the unmodified recorded commitment.

@@ -40,10 +40,11 @@ maximum is 400 characters; notes maximum is 1000. Notes are brief facts, uncerta
 and intent, not a request for a chain of thought. An empty string is legal.
 
 Action kinds: `MOVE`, `WAIT`, `VENT`, `REROUTE`, `COLLECT`, `UNLOCK`.
-MOVE uses direction -1 or +1 and steps 1 or 2. Other actions should use zeros.
-Current limitation: the parser accepts arbitrary integers for non-MOVE fields and
-the engine ignores them; zeros are requested by the prompt but not enforced. See
-[R04](REVIEW.md#r04-non-move-zero-fields-are-not-enforced). The host
+MOVE uses direction -1 or +1 and steps 1 or 2. Other actions require both fields
+to be zero. The parser accepts integer values, but the engine treats noncanonical
+non-MOVE parameters as an illegal action: no action effect, one turn consumed, and
+an explicit `{role}: invalid {kind} parameters; treated as WAIT` event. No schema
+repair/provider retry is granted; the submitted action remains in the record. The host
 assigns role; a response cannot select another player. The schema permits integer
 values so that gameplay-invalid moves are handled by the engine, not retried for
 better strategy. Shape/type errors are transport-contract failures and may retry.
