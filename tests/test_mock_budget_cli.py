@@ -168,6 +168,31 @@ class MockBudgetCLITests(unittest.TestCase):
         self.assertNotIn('requested_settings', manifest)
         self.assertNotIn('KEY_SENTINEL', (out / 'manifest.json').read_text())
 
+    def test_check_leaves_priced_config_intact_without_starting_a_match(self):
+        config = self.config()
+        cfg = load_config(config)
+        original = cfg.model_dump()
+        values = {f'{provider}_{suffix}': 'test-model' if suffix == 'MODEL' else 'KEY_SENTINEL'
+                  for provider in ('OPENAI', 'ANTHROPIC', 'GEMINI')
+                  for suffix in ('MODEL', 'API_KEY')}
+        env_file = self.root / 'check.env'
+        env_file.write_text('\n'.join(f'{k}={v}' for k, v in values.items()), encoding='utf-8')
+        out = self.root / 'check-must-not-create'
+        stdout = io.StringIO()
+        with patch.dict(os.environ, values), \
+             patch('parallax_relay.play.load_config', return_value=cfg), \
+             patch('parallax_relay.play._run', side_effect=AssertionError('No match in check mode')), \
+             patch('parallax_relay.play.HTTPAgent', side_effect=AssertionError('No provider in check mode')), \
+             contextlib.redirect_stdout(stdout):
+            code = main(['--check', '--config', str(config), '--out', str(out),
+                         '--env-file', str(env_file)])
+        self.assertEqual(code, 0)
+        self.assertEqual(cfg.model_dump(), original)
+        self.assertEqual(cfg.match.max_estimated_cost_usd, 0.001)
+        self.assertFalse(out.exists())
+        self.assertIn('Configuration valid; no API requests made.', stdout.getvalue())
+        self.assertNotIn('KEY_SENTINEL', stdout.getvalue())
+
     def test_programmatic_agents_including_scripted_keep_the_spending_guard(self):
         cfg = load_config(self.config())
         for agent_type in (ScriptedAgent, NoResponseAgent):

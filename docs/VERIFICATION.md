@@ -261,3 +261,16 @@ historical fixtures, and dependencies remain unchanged. No paid provider request
 or new browser checks were performed. Issue #4 awaits merge; recording recovery
 remains slice 3 work. The old programmatic R02 probe intentionally still stops at
 its configured cap and is not a reproduction of the fixed CLI-only policy.
+
+### PR #28 pre-merge review — November 13, 2026
+
+The review requested confirmation that `--check` never applies the mock override.
+Source inspection confirms it returns before `_run`, where the override lives.
+Added a regression using a valid tiny-cap priced configuration and fake credentials:
+`--check` returns 0, retains the requested cap/configuration, creates no run output,
+constructs no provider, and never starts the match driver. Requested-settings
+metadata is still mock-only; existing live and mock manifest tests cover that rule.
+
+Fresh full unittest discovery: **100 tests passed**. The run emitted asyncio
+slow-task diagnostics but no failures/errors; diff checks passed. No production
+behavior change or live provider request was needed for this review follow-up.
