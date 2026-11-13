@@ -13,6 +13,41 @@ from parallax_relay.recording import Recorder
 
 
 class RecordingFailureTests(unittest.IsolatedAsyncioTestCase):
+    async def test_partial_temp_writes_preserve_final_png_and_viewer(self):
+        import traceback
+        from parallax_relay.config import MatchSettings
+        from parallax_relay.recording import RecordingFinalizationError
+        result = await driver.run_match({r: ScriptedAgent(r) for r in ROLES},
+                                        MatchSettings(max_turns=1))
+        for filename in ('final_spectator.png', 'index.html'):
+            with self.subTest(filename=filename), tempfile.TemporaryDirectory() as tmp:
+                out = Path(tmp) / 'run'
+                recorder = Recorder(out, {'mode': 'mock'})
+                recorder.finish(result)
+                target = out / filename
+                original_bytes = target.read_bytes()
+                original = OSError('SECRET_SENTINEL')
+                real_write = Path.write_bytes
+
+                def partial_write(path, data):
+                    if path == target.with_suffix(target.suffix + '.tmp'):
+                        real_write(path, data[:len(data) // 2])
+                        raise original
+                    return real_write(path, data)
+
+                result.stop_reason = 'local_error'
+                with patch.object(Path, 'write_bytes', partial_write):
+                    with self.assertRaises(RecordingFinalizationError) as ctx:
+                        recorder.finish(result)
+                self.assertEqual(ctx.exception.failures, ((filename, original),))
+                self.assertEqual(target.read_bytes(), original_bytes)
+                self.assertEqual(recorder.viewer_ready, filename != 'index.html')
+                self.assertNotIn('SECRET_SENTINEL', repr(ctx.exception))
+                self.assertNotIn('SECRET_SENTINEL', ''.join(traceback.format_exception(ctx.exception)))
+                for artifact in out.iterdir():
+                    if artifact.suffix in ('.json', '.jsonl', '.html'):
+                        self.assertNotIn('SECRET_SENTINEL', artifact.read_text())
+
     async def test_phase_failure_recovers_zero_turn_result(self):
         with tempfile.TemporaryDirectory() as tmp:
             out = Path(tmp) / 'run'

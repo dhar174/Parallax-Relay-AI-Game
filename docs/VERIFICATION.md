@@ -303,3 +303,17 @@ and scores of 100. Existing provider-stop, cancellation, privacy, budget and moc
 cost-policy tests passed. Some tests emitted asyncio slow-task diagnostics without
 failures/errors. Historical fixtures and dependency files remain unchanged. No
 paid requests, replay UI expansion, or browser verification were included.
+
+### PR #29 pre-merge review — November 13, 2026
+
+Checked the review's atomic final-artifact, error-hygiene, and bounded-shutdown
+concerns against the current source. PNG and HTML finalization both use the shared
+temporary-file/replace helper. Added a regression that interrupts each temporary
+write halfway: existing final bytes remain unchanged, failed HTML is not marked
+current, the aggregated public exception is sanitized, and persisted metadata
+contains no exception sentinel. Existing CLI fault and shutdown-timeout tests
+verify that local failure status survives slow teardown and raw errors stay private.
+
+Fresh full unittest discovery: **112 tests passed**, with an asyncio slow-task
+diagnostic and no failures/errors. Diff checks passed. The review required no
+production behavior correction; this follow-up adds explicit atomicity evidence.
