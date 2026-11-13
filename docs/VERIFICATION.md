@@ -1,8 +1,12 @@
-# Milestone 2 verification
+# Verification record
 
-Release date: November 12, 2026.
+Original milestone release date: November 12, 2026.
 
-## Evidence summary
+The original evidence below is historical. See the dated repository import and
+documentation-review sections for subsequent checks. A passed offline suite does
+not establish live model compatibility or browser behavior in a new environment.
+
+## Original milestone evidence summary
 
 | Check | Result |
 |---|---|
@@ -96,12 +100,13 @@ python -m unittest discover -s tests -v
 python -m compileall -q parallax_relay tests
 python -m parallax_relay.play --mock --out runs/verification-normal
 python -m parallax_relay.play --mock --fast --out runs/verification-fast
-python -m parallax_relay.demo --out demo_output
+python -m parallax_relay.demo --out runs/verification-legacy-01
 ```
 
 Use new output directories. Historical red/green test logs are in `docs/verification/`.
 They record the test-first implementation sequence and are not the final test status.
-The final fresh test output is `docs/verification/final-tests.txt`.
+The original milestone's final test output is `docs/verification/final-tests.txt`.
+It is not a log of the later repository review.
 
 ## Repository import verification — November 13, 2026
 
@@ -124,3 +129,56 @@ httpx 0.28.1 (installed from `requirements.txt`):
 The virtual environment and newly generated runs are ignored. Browser checks and
 credentialed provider calls were not rerun for this import; the earlier browser
 results above describe the supplied milestone's verification.
+
+## Documentation review — November 13, 2026
+
+Runtime baseline: `719c7696c4bfe50934fc936bbccfb62812633164`. Linux/Python 3.12.14;
+Pillow 12.3.0, Pydantic 2.14.3, httpx 0.28.1. Existing virtual-environment dependencies
+were used without changing requirement files. All new run output is ignored.
+
+| Check | Fresh result |
+|---|---|
+| Full unittest discovery | 72 tests passed |
+| `python -m pip check` | No broken requirements |
+| `python -m compileall -q parallax_relay tests` | Passed |
+| Default mock | Victory, 7 turns, 63 calls, all scores 100, energy 5 |
+| Fast mock | Victory, 7 turns, 42 calls, all scores 100, energy 5 |
+| One-turn mock | `turn_limit`, 1 turn, 9 calls, no terminal score |
+| Legacy demo in fresh directory | Victory, 7 turns, all scores 100, energy 5 |
+| Local configuration check with fake values | Exit 0; no credential sentinel in output |
+| Zero-turn call-budget stop | Exit 4, no calls, final PNG and HTML present |
+| Published review reproduction snippets | Matched recorded results for R01, R02, R03 |
+| Retry-sleep cancellation probe | `cancelled`, three logged calls, final result preserved |
+| Partial usage reservation probe | Quote retained; unknown count 1; reservations released |
+| Malformed Gemini envelope probe | Retryable `invalid_provider_response` |
+| Existing/generated replay static checks | PNG references present and valid; no external script sources |
+| Markdown local links and anchors | Passed |
+
+The mock commands used fresh destinations under `runs/docs-review-*`; omit `--out`
+for repeatable verification without directory collisions. No committed example was
+regenerated. The review's Python snippets are standalone reproductions, not passing
+regressions for fixes; the defects remain present.
+
+### Limits and tools
+
+The source/doc review used Plugin Management discovery, execution/debugging/
+verification guidance, and prose editing. Context7 retrieved excerpts from official
+provider documentation and the Anthropic SDK for independent contract checks.
+[API sources](API_SOURCES.md) records the specific evidence and its limits.
+
+A standard Codex Security scan was attempted at setup, but its required preflight
+reference could not be retrieved and no scan host tool was available. No scanner
+preflight completed and no scanner report was produced. Security observations in
+[Review](REVIEW.md) are source-review observations, not a substitute certification.
+Browser skill discovery found no browser-control or cloud-browser tool. Therefore
+no new browser navigation, mobile layout, visual inspection, or accessibility
+result is claimed. Static checks and historical browser results are distinct.
+
+Credentialed provider calls, live model quality, billing reconciliation, cross-OS
+execution, and a dependency vulnerability audit remain untested. Documentation
+changes do not fix the runtime findings listed in Review.
+
+A fresh documentation reviewer checked the guides and source-backed findings, found
+no blocking issue, and requested reconciliation of this verification record. That
+reconciliation is included here. This was a documentation review, not an independent
+security audit or provider compatibility test.

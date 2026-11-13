@@ -1,4 +1,13 @@
-# Milestone 2
+# Changelog
+
+## Unreleased
+
+- Reworked onboarding and added running, architecture, contributor, and coding-agent guides.
+- Added a research-oriented roadmap and an evidence-backed repository review.
+- Clarified provider verification limits, non-MOVE parameters, and legacy output behavior.
+- Preserved historical milestone evidence; no runtime behavior changed in this documentation pass.
+
+## Milestone 2
 
 - Added concurrent public broadcasts, optional negotiation and sealed commitments.
 - Added OpenAI Responses, Claude Messages and Gemini generateContent REST adapters.
