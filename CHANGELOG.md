@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Add a complete hashed development dependency lock, retaining compatibility
+  ranges and historical pins, with a documented refresh procedure.
+
 - Preserve the last resolved checkpoint on recording/callback failure; recover
   independent atomic artifacts before raising a sanitized partial-result exception.
 - Bound finalization to two passes and CLI client shutdown to a five-second

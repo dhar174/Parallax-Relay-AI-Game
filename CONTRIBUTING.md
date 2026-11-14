@@ -7,12 +7,39 @@ solvability, not model intelligence.
 
 ## Environment
 
-Use Python 3.11+ and a local virtual environment as shown in the README. Install
-`requirements.txt`; it expresses supported direct-dependency ranges.
-`requirements-tested.txt` records the original milestone's three direct versions,
-not a complete dependency lockfile. The [verification record](docs/VERIFICATION.md)
-lists environments actually exercised. Do not imply all Python versions or operating
-systems have been tested.
+Use Python 3.12 by default (minimum 3.11) and a fresh local virtual environment as
+shown in the README. Bootstrap pip 26.3, then install with:
+
+```bash
+python -m pip install --require-hashes --only-binary=:all: -r requirements-dev.lock -r requirements.txt
+```
+
+`requirements-dev.lock` is a complete, hashed verification set, including transitive
+runtime dependencies. It uses universal resolution from Python 3.11 upward; its
+portability is established only for environments actually exercised. Both files
+are supplied to installation so incompatible ranges or missing pins fail rather
+than silently resolving a different environment. Binary wheels are required.
+`requirements.txt` retains direct compatibility ranges. `requirements-tested.txt`
+preserves the original milestone's three direct versions and is not a lockfile.
+The [verification record](docs/VERIFICATION.md) records actual environments.
+
+### Updating the lock
+
+Use uv **0.13.6** as a development-only generator, installed in a separate tooling
+environment (for example `python -m pip install uv==0.13.6` there). uv is not needed
+to install the lock or run the game. From the checkout root:
+
+```bash
+uv pip compile requirements.txt --universal --generate-hashes --python-version 3.11 --no-header --no-annotate --upgrade --output-file requirements-dev.lock
+```
+
+Use `--upgrade` to refresh an existing lock; omit it for the initial generation.
+Review every version/marker/hash change and confirm direct versions stay within
+the compatibility ranges. Install in fresh environments with pip 26.3 and run all
+checks below before accepting the change. Record the generator version, exact
+installed inventory, Python/OS, commands, results, and limitations in a dated
+verification entry. Preserve the historical direct-version file. Coordinate audit
+findings with the exact locked versions; generation alone is not a security audit.
 
 Run commands from the repository root with the environment activated:
 

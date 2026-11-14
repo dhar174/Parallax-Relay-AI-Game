@@ -2,6 +2,10 @@
 
 Install dependencies and activate the virtual environment using the
 [README](../README.md). Run commands from the checkout root.
+The default installation uses the hashed development lock plus the compatibility
+ranges. See [Contributing](../CONTRIBUTING.md#environment) for applicability,
+fresh-environment setup, and lock updates. The historical direct-version file is
+not a complete lockfile.
 
 ## Offline modes
 

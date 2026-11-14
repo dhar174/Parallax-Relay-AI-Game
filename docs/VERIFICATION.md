@@ -317,3 +317,41 @@ verify that local failure status survives slow teardown and raw errors stay priv
 Fresh full unittest discovery: **112 tests passed**, with an asyncio slow-task
 diagnostic and no failures/errors. Diff checks passed. The review required no
 production behavior correction; this follow-up adds explicit atomicity evidence.
+
+## Slice 4 dependency checkpoint — November 14, 2026
+
+Baseline: merged slice 3 (`cda9220`). Fresh Linux x86_64/glibc 2.41 environments
+used Python **3.11.18** and **3.12.14**, with pip **26.3**. uv **0.13.6** generated
+the universal Python-3.11-minimum lock, with 12 pinned distributions and 247 SHA-256
+entries. No compatibility ranges or historical direct pins were changed.
+
+Both installations used `--require-hashes --only-binary=:all:` with
+`-r requirements-dev.lock -r requirements.txt`. Their installed inventories matched
+all 12 pins (apart from the separately pinned pip bootstrap):
+
+```text
+annotated-types==0.8.0
+anyio==4.16.0
+certifi==2026.10.23
+h11==0.16.0
+httpcore==1.0.9
+httpx==0.28.1
+idna==3.20
+pillow==12.3.0
+pydantic==2.14.3
+pydantic-core==2.50.4
+typing-extensions==4.16.0
+typing-inspection==0.4.5
+```
+
+At this dependency checkpoint both interpreters passed the existing **112 tests**,
+`pip check`, and compilation. Normal/fast mock results were checked for exit 0,
+victory in seven turns, 63/42 calls, five energy, and every score 100. A dry-run
+installation with conflicting httpx requirements failed with `ResolutionImpossible`;
+removing the httpx lock entry failed the hash-mode exact-pin requirement. Both
+negative cases returned exit 1 as required. An initial diagnostic assertion expected
+the missing-pin rejection to mention missing hashes; it was corrected to check
+pip's actual exact-pin rejection and both checks were rerun successfully.
+
+Hosted matrix evidence and the completed smoke-checker suite follow separately.
+This checkpoint does not establish Windows/macOS support or complete R09's audits.

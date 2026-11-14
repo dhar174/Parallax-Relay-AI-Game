@@ -15,17 +15,20 @@
 
 ## Environment and commands
 
-Use Python 3.11+ from the repository root. On Linux/macOS/WSL:
+Use Python 3.12 by default (minimum 3.11) from the repository root. On Linux/macOS/WSL:
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate
-python -m pip install -r requirements.txt
+python -m pip install pip==26.3
+python -m pip install --require-hashes --only-binary=:all: -r requirements-dev.lock -r requirements.txt
 ```
 
 Windows PowerShell activation: `.\.venv\Scripts\Activate.ps1`.
-Do not install dependencies globally. requirements-tested.txt records original
-milestone direct versions; it is not a transitive lockfile.
+Do not install dependencies globally. requirements-dev.lock pins runtime and
+transitive dependencies with hashes; requirements.txt retains compatibility ranges.
+requirements-tested.txt records original milestone direct versions, not a lockfile.
+Follow CONTRIBUTING.md for lock updates and tested-environment coverage.
 
 Verification commands:
 

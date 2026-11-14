@@ -12,7 +12,9 @@ already know the solution; they are not evidence of model reasoning or cooperati
 
 ## Try it without API keys
 
-Use Python **3.11 or later**. Run from the repository root:
+Use Python **3.12** for the usual development environment; the minimum is 3.11.
+See [Contributing](CONTRIBUTING.md#environment) for dependency reproducibility and
+tested-environment coverage. Run from the repository root:
 
 ```bash
 git clone https://github.com/dhar174/Parallax-Relay-AI-Game.git
@@ -35,7 +37,8 @@ source .venv/bin/activate
 Install dependencies, run the offline tests, and play the scripted fixture:
 
 ```bash
-python -m pip install -r requirements.txt
+python -m pip install pip==26.3
+python -m pip install --require-hashes --only-binary=:all: -r requirements-dev.lock -r requirements.txt
 python -m unittest discover -s tests -v
 python -m parallax_relay.play --mock
 ```
