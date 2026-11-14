@@ -1,0 +1,45 @@
+# Parallax Relay workbench
+
+The [private workbench](https://parallax-relay-lab.dhar174.chatgpt.site) is the browser interface for the Split Span experiment. Build it from the same checkout as the engine so that its configuration form, offline runner and replay viewer track repository changes. There are three active roles in Milestone 2. See [the player protocol](PROTOCOL.md) and [the running guide](RUNNING.md) for the game and CLI contracts.
+
+## Build and run locally
+
+Activate the repository's Python environment using [the dependency setup](../CONTRIBUTING.md#environment). From the repository root, run:
+
+```bash
+python site/build_workbench.py
+python site/relay_workbench.py
+```
+
+Open the `http://127.0.0.1:<port>` URL printed by the companion. The port is assigned for each launch. On Windows or WSL, open that URL in your browser while the Python process is running. Select **Offline execution → Run offline through Python** to invoke the real `parallax_relay.play --mock` CLI. Use **Load repository fixture** to view the committed seven-turn recording. The smoke preset runs one turn, which should end with `turn_limit` and no terminal scores.
+
+The build regenerates the ignored `build/workbench/dist/` directory. It contains the static Site, native example replay and `relay-workbench.zip`. The ZIP is the portable companion offered on the hosted Site. Extract it and run its `relay_workbench.py` by absolute path from the game checkout root. The companion compares a fingerprint of the package's Python/HTML files and default TOML to those used at build time. Documentation-only commits can use the same companion. Rebuild after runtime changes. The build shows the Git HEAD as source provenance, so publish from a clean, committed revision.
+
+Generated runs use temporary storage. Download **Export complete JSON** from Evaluation to keep the record, including images. To keep the native files separately, export the workbench TOML and invoke the CLI as described in the running guide. Import its output folder with **Evaluation → Import run folder**.
+
+## Source and contract map
+
+| Project source | Workbench surface | What to review when it changes |
+| --- | --- | --- |
+| [config.py](../parallax_relay/config.py) and [three_models.toml](../configs/three_models.toml) | Generated `contract.json`, form validation and TOML export | Field types, bounds, defaults, model and key variable names, provider choices and pricing |
+| [state.py](../parallax_relay/state.py), [protocol.py](../parallax_relay/protocol.py) and [observations.py](../parallax_relay/observations.py) | Scenario summary, private objectives and spectator views | Roster, rules, HUD, images and private/public data boundaries. The browser does not construct provider prompts. |
+| [play.py](../parallax_relay/play.py), [budget.py](../parallax_relay/budget.py) and [orchestrator.py](../parallax_relay/orchestrator.py) | Offline runner, smoke preset and live preparation | CLI flags, retry reservation, request caps, cost semantics and stop conditions |
+| [recording.py](../parallax_relay/recording.py) and [example_run/](../example_run/) | Run import, observations, evaluation and fixture playback | Schema versions, names, record fields, terminal versus partial runs and old replay compatibility |
+| [site/web/](../site/web/) | Static UI, form checks, native run import | Copy, layout, accessibility and controls |
+| [site/build_workbench.py](../site/build_workbench.py) and [site/relay_workbench.py](../site/relay_workbench.py) | Build artifacts and loopback adapter | Packaging and integration against the actual CLI |
+
+The builder derives the Pydantic schema, TOML defaults and private goals directly from Python. Form hints, phase summaries and role-specific UI still need review when game semantics change. The fixed roster and player observations come from the engine. A total-token cap, arbitrary rooms, uploaded observations and extra players are beyond the current runtime contract.
+
+The loopback adapter revalidates TOML settings with the project's Pydantic model, then runs the offline CLI in a temporary directory. Its API accepts a browser session token and listens only on loopback. The hosted Site uses static assets and loads imported recordings in the browser. Treat exported spectator records as private because they include all roles' HUDs, objectives and notes. Evaluation shows the engine's composite scores and transport outcomes. Review phase dialogue and engine events for communication quality and gameplay compliance.
+
+Live preparation exports a local configuration after the user reviews the spending guard and enters all per-role rates. The guard uses the runtime estimate. Provider billing can differ from this estimate. Set actual model IDs and keys in the local environment, use `--check` to validate configuration, and explicitly approve any paid execution before running `--live`. Both browser entry points leave execution to the local CLI.
+
+## Review and release alongside engine changes
+
+1. Update the workbench in the same PR when a change touches the contract map above. Regenerate the build and inspect the relevant settings or replay. If changing recording schema, review compatibility against the committed fixture as well as a newly generated run.
+2. Run `python -m unittest discover -s tests -v`. The workbench smoke test checks generated settings and a native one-turn offline run. Verify the actual UI when changing frontend behavior. Check configuration export, a full or smoke offline run, a native replay import and the live-plan gate, as applicable.
+3. After merge, build from the clean merged revision with the repository's locked dependencies. Check the revision shown in the UI and retain the generated static directory and companion ZIP together.
+4. Publish over the **existing** private Parallax Relay Site. Its deployment source repository is separate from this game repository. In the authorized Sites workspace, keep that repository's existing `.openai/hosting.json`, copy the generated output into its configured static directory (`dist/`), commit and push the updated Site source, then save and deploy that version privately. Keep the Site's access settings and project identity. The hosted URL does not need to change.
+5. Confirm the deployment succeeded, then load the Site as its owner. Check the displayed source revision, native fixture and companion download. Record the Git revision and the Sites version or deployment link in the release notes. To roll back, republish the previous known-good saved Sites version and verify the revision and fixture again.
+
+There is no automatic deployment on merge. The game repository contains the source and build procedure. It does not contain Sites credentials or provider secrets.

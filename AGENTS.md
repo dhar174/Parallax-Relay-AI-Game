@@ -67,6 +67,9 @@ Use the actual results in your report; do not copy historical test counts.
 - recording.py and replay_template.html own the main spectator output.
 - agents.py and scripted.py are explicit offline fixtures.
 - demo.py is a separate legacy driver with an older replay format.
+- site/ holds the experiment workbench. Review docs/WORKBENCH.md when changing
+  the configuration, CLI, roles, observations, budget semantics, or run records.
+  Update affected UI and contract checks in the same PR.
 
 ## Preserve these boundaries
 
