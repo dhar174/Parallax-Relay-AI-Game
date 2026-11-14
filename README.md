@@ -105,6 +105,7 @@ separates original milestone evidence from subsequent checks.
 | [Running guide](docs/RUNNING.md) | Configuration, limits, troubleshooting, and replay files |
 | [Architecture](docs/ARCHITECTURE.md) | Modules, data flow, and extension boundaries |
 | [Protocol](docs/PROTOCOL.md) | Player inputs, reply contracts, phases, and outcomes |
+| [Run provenance](docs/PROVENANCE.md) | Source, effective configuration, identities, timing, and compatibility |
 | [Provider references](docs/API_SOURCES.md) | API assumptions and external sources |
 | [Review](docs/REVIEW.md) | Prioritized defects, evidence, and improvement opportunities |
 | [Roadmap](ROADMAP.md) | Future milestones and completion gates |

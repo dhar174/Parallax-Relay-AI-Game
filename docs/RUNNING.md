@@ -124,6 +124,11 @@ settings require TOML edits. Unknown configuration fields are rejected.
 `--quiet` suppresses the banner and phase progress, but still prints the result and
 replay path. Select exactly one of `--mock`, `--check`, or `--live`.
 
+`--experiment-id UUID` and `--trial-id UUID` optionally group recorded runs. They
+are metadata, not campaign scheduling, deduplication, random seeds, or resume
+controls. Invalid values exit 2 before output is created without echoing them.
+`--check` creates no run. See [Run provenance](PROVENANCE.md#cli-and-programmatic-use).
+
 Every retry counts as an attempt. Before a phase starts, the budget must accommodate
 all three roles' maximum attempts. For example, with two attempts per role, five
 remaining calls cannot start a phase even if all roles might succeed on their first
@@ -167,7 +172,7 @@ even if empty. Keep the files together when copying a replay.
 
 | File | Contents |
 |---|---|
-| `manifest.json` | Schema version, mode, model assignments, effective settings, room, privacy notice; mock runs also include requested settings |
+| `manifest.json` | Schema 2; mode, assignments, settings, room, privacy notice, plus independently versioned provenance; mock runs retain requested settings |
 | `calls.jsonl` | Attempt statuses, latency, usage, sanitized HTTP metadata |
 | `phases.jsonl` | Completed message batches and sealed commitments after each barrier |
 | `replay.jsonl` | Fully resolved turns, observations, private notes, and world snapshots |
@@ -178,8 +183,11 @@ even if empty. Keep the files together when copying a replay.
 
 All these files are spectator artifacts. They may include every role's private
 information and model-generated content. Review them before sharing; do not feed
-whole replay records to a participant. They do not provide complete experiment
-provenance; see [R08](REVIEW.md#r08-run-manifests-lack-reproducibility-metadata).
+whole replay records to a participant. [Run provenance](PROVENANCE.md) records
+effective settings/prices, source/environment availability, prompt/schema/room
+identities, UUIDs and execution timing. Unknown provider revisions/default sampling
+and dirty or unavailable source still limit reconstruction. Historical fixtures
+remain readable without provenance; missing identity is unknown.
 
 Open `index.html` locally. The round slider and arrow buttons select resolved turns.
 Images show the state **before** that round; events describe its result. Calls and
@@ -219,6 +227,9 @@ use 12 turns. No experiment-horizon override is currently sent to the players.
 - **`local_error` / partial output:** the driver stopped at its last resolved turn
   and attempted up to two finalization passes, independently saving each artifact.
   Started calls, completed phases, and resolved turns rebuild the JSONL logs. The
+  manifest is one of eight independently replaced final artifacts; failed storage
+  can leave it stale even if another summary or viewer was saved. Execution end
+  timing precedes finalization and remains stable across its recovery pass. The
   CLI prints a partial summary and only announces a replay if the current viewer
   was produced. Earlier setup errors, persistent write failures, process termination,
   or stalled storage can still prevent usable output. Preserve the directory for

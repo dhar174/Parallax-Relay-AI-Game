@@ -48,7 +48,7 @@ review; that is not a security assurance.
 | R05 | P2 | Documentation mismatch | Legacy demo overwrites existing output | Fixed in PR #27 |
 | R06 | P1 | Unverified assumption | Offline wire tests do not establish live compatibility | Open validation gate |
 | R07 | P1 | Future enhancement | Fixed room cannot establish general cooperative ability | Open research gate |
-| R08 | P2 | Future enhancement | Run artifacts lack full experiment provenance | Open |
+| R08 | P2 | Future enhancement | Run artifacts lack full experiment provenance | Run provenance implemented (#10); runner #19 pending |
 | R09 | P2 | Test gap | CI, reproducibility, and missing audit coverage | Partially addressed; audits open |
 | R10 | P3 | Test gap / future enhancement | Replay browser coverage and partial-run inspection | Open |
 
@@ -269,6 +269,17 @@ This is a planned research capability, not a malfunction of the current demo.
 conditions, report all trial outcomes and assignments, and test held-out variants.
 
 ## R08: Run manifests lack reproducibility metadata
+
+**Slice 5 resolution (#10), November 14, 2026:** new main-recorder manifests carry
+version-1 provenance inside schema 2. CLI and programmatic paths record actual
+driver settings/prices, source and environment availability, canonical input
+identities, safe declared model/API identity, optional grouping UUIDs, and UTC plus
+monotonic execution timing. Bounded recovery includes the manifest and preserves
+original timing/outcome. Legacy fixtures stay unchanged and readable. Unknown
+backend revisions, provider-default sampling, dirty source and unavailable metadata
+remain explicit limits. See [provenance](PROVENANCE.md) and dated verification.
+The campaign runner/aggregation requirement remains open under #19; #10 does not
+close the whole research gate. The baseline evidence below is historical.
 
 **Evidence:** `play.py:81–82` records mode, assignments, settings, room, and schema
 version. `recording.py:20–28` adds privacy metadata. The manifest has no source

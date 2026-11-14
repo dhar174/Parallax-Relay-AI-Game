@@ -9,7 +9,7 @@ import os
 from pathlib import Path
 import re
 import sys
-from uuid import uuid4
+from uuid import UUID, uuid4
 from pydantic import ValidationError
 
 from .agents import ScriptedAgent
@@ -18,6 +18,7 @@ from .orchestrator import MatchExecutionError, run_match
 from .protocol import ROLES
 from .providers import HTTPAgent
 from .recording import Recorder
+from .provenance import PlayerIdentity, ProvenanceContext
 
 ROOT = Path(__file__).resolve().parent.parent
 CLEANUP_TIMEOUT_SECONDS = 5
@@ -58,6 +59,13 @@ def load_env_file(path: Path, environ: dict | None = None) -> None:
         env.setdefault(key, value)
 
 
+def _uuid(value: str) -> UUID:
+    try:
+        return UUID(value)
+    except (ValueError, AttributeError):
+        raise argparse.ArgumentTypeError('Use a UUID identifier') from None
+
+
 def parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description='Run three independent Parallax Relay players.')
     modes = p.add_mutually_exclusive_group(required=True)
@@ -71,6 +79,8 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument('--max-calls', type=int)
     p.add_argument('--fast', action='store_true', help='One communication pass instead of two.')
     p.add_argument('--quiet', action='store_true', help='Only print the result and replay path.')
+    p.add_argument('--experiment-id', type=_uuid, help='Optional experiment UUID; does not start a campaign.')
+    p.add_argument('--trial-id', type=_uuid, help='Optional trial UUID; does not resume a match.')
     return p
 
 
@@ -88,8 +98,11 @@ async def _run(args, cfg, settings, runtime) -> int:
                 'settings':settings.model_dump(), 'room':'The Split Span'}
     if args.mock:
         manifest['requested_settings'] = requested_settings
+    context = ProvenanceContext(mode=mode, experiment_id=args.experiment_id, trial_id=args.trial_id,
+                                players={r: PlayerIdentity(**p) for r, p in players.items()},
+                                requested_settings=MatchSettings.model_validate(requested_settings))
     try:
-        recorder = Recorder(out, manifest)
+        recorder = Recorder(out, manifest, context=context)
     except FileExistsError:
         # Windows also uses EEXIST for a nonexistent path below a regular file.
         try:

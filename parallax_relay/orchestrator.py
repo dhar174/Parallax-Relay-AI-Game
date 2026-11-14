@@ -18,7 +18,7 @@ from .observations import observe
 from .protocol import (Agent, AgentRequest, BroadcastReply, CommitReply, ChatMessage,
                        ReplyValidationError, ROLES, parse_reply)
 from .providers import ProviderError
-from .recording import RecordingFinalizationError
+from .recording import Recorder, RecordingFinalizationError
 from .state import Action, WorldState, initial_world, public_events
 
 
@@ -170,6 +170,9 @@ async def run_match(agents: Mapping[str, Agent], settings: MatchSettings | None 
     """
     if set(agents) != set(ROLES):
         raise ValueError('This slice requires exactly SPECTRA, PYRA and FLUX')
+    if isinstance(recorder, Recorder) and recorder.match_started:
+        # Reject reuse before recovery can overwrite the preceding match's files.
+        raise ValueError('Recorder already bound to a match')
     settings = settings or MatchSettings()
     world = initial_world()
     budget = Budget(settings, rates or {})
@@ -185,6 +188,8 @@ async def run_match(agents: Mapping[str, Agent], settings: MatchSettings | None 
     output = _OutputSink(recorder)
     recorder = output if recorder is not None else None
     try:
+        if isinstance(output.recorder, Recorder):
+            recorder.begin_match(settings, rates or {}, world.snapshot())
         while world.turn < settings.max_turns and not (world.win or world.loss):
             observations = {r: observe(world, r) for r in ROLES}
             if recorder: recorder.begin_turn(world, observations)
@@ -276,6 +281,15 @@ async def run_match(agents: Mapping[str, Agent], settings: MatchSettings | None 
     secondary = list(output.errors)
     if primary is not None:
         secondary = [(op, error) for op, error in secondary if error is not primary[1]]
+    if isinstance(output.recorder, Recorder):
+        try:
+            output.recorder.end_match(result)
+        except Exception as error:
+            if primary is None and cancelled is None:
+                primary = ('end_match', error)
+                result.stop_reason = 'local_error'
+            else:
+                secondary.append(('end_match', error))
     if recorder:
         for attempt in range(2):
             try:

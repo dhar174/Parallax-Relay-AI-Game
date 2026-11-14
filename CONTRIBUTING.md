@@ -140,6 +140,10 @@ Preserve the engine's deterministic action resolution and player information
 boundaries. When changing schemas, defaults, stop reasons, CLI behavior, or output
 formats, update the relevant protocol/running documentation and affected tests.
 Changing a provider contract also requires dated source evidence in the API guide.
+Manifest changes must preserve [provenance compatibility](docs/PROVENANCE.md),
+effective driver settings/prices, and truthful unknown metadata. Keep secret-bearing
+config/environment text and Git patches out of fingerprints and output. Check both
+disk and embedded replay manifests through failure recovery.
 
 ## Fixtures and review evidence
 

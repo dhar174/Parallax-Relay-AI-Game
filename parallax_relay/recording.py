@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from .render import render_png
+from .provenance import ProvenanceContext, RunProvenance
 
 
 def _safe_metadata(value):
@@ -23,16 +24,34 @@ class RecordingFinalizationError(RuntimeError):
 
 
 class Recorder:
-    def __init__(self, out: Path, manifest: dict):
+    def __init__(self, out: Path, manifest: dict, *, context: ProvenanceContext | None = None):
         self.out = out
+        # Capture source state before newly generated output can make it dirty.
+        self._provenance = RunProvenance(context)
         # An existing directory is never silently overwritten, even if empty.
         out.mkdir(parents=True, exist_ok=False)
         self.viewer_ready = False
         self.manifest = _safe_metadata(manifest)
+        self.manifest['schema_version'] = 2
+        self.manifest['provenance'] = self._provenance.snapshot()
         self.manifest['privacy'] = 'Privileged spectator files: all goals, views and notes. Never send to a player.'
         self._json('manifest.json', self.manifest)
         for filename in ('calls.jsonl', 'phases.jsonl', 'replay.jsonl'):
             (out / filename).touch()
+
+    @property
+    def match_started(self):
+        return self._provenance.bound
+
+    def begin_match(self, settings, rates, initial_snapshot):
+        self._provenance.begin(settings, rates, initial_snapshot)
+        self.manifest['settings'] = settings.model_dump()
+        self.manifest['provenance'] = self._provenance.snapshot()
+        self._json('manifest.json', self.manifest)
+
+    def end_match(self, result):
+        self._provenance.end(result)
+        self.manifest['provenance'] = self._provenance.snapshot()
 
     def _json(self, filename: str, data) -> None:
         self._bytes(filename, json.dumps(data, indent=2, ensure_ascii=True).encode('utf-8'))
@@ -71,10 +90,15 @@ class Recorder:
 
     def finish(self, result) -> None:
         self.viewer_ready = False
+        if not self.match_started:
+            self._provenance.end(result)  # External result: no invented execution times.
+        self._provenance.refresh(result)
+        self.manifest['provenance'] = self._provenance.snapshot()
         failures = []
         def snapshot(rows):
             return ''.join(json.dumps(row, ensure_ascii=True) + '\n' for row in rows).encode('utf-8')
         artifacts = [
+            ('manifest.json', lambda: self._json('manifest.json', self.manifest)),
             ('calls.jsonl', lambda: self._bytes('calls.jsonl', snapshot(result.calls))),
             ('phases.jsonl', lambda: self._bytes('phases.jsonl', snapshot(result.phases))),
             ('replay.jsonl', lambda: self._bytes('replay.jsonl', snapshot(result.records))),

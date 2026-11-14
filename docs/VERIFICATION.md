@@ -1,5 +1,38 @@
 # Verification record
 
+## Slice 5 provenance checkpoint — November 14, 2026
+
+Implemented #10 from merged `origin/main` revision `08c5048` on
+`feat/slice-5-provenance-protocol`. Provenance version 1 is additive to manifest
+schema 2; result summaries and historical fixtures retain their formats. Source
+identity includes clean/dirty/unavailable status; effective identity binds actual
+settings/prices, role declarations and input fingerprints without raw config,
+credentials, Git patches or installation URLs. Programmatic identity may remain
+unknown; declarations do not attest model use or remote revisions.
+
+The new tests were observed failing before their corresponding implementation:
+missing provenance module, recorder hooks/metadata, UUID flags, and structural
+reader validation. After implementation, all 21 provenance tests passed. They cover
+canonical inputs and mutation, Git/archive availability, safe inventory collection,
+legacy/invalid readers, monotonic timing under wall-clock rollback, real normal/fast
+CLI runs with custom destinations and UUIDs, requested/effective tiny-cap settings,
+synthetic live launchers with changed secret/comment/path values, programmatic
+settings/prices, cancellation, hook failures, recorder reuse and manifest recovery.
+Embedded viewer and disk metadata are checked; the eight-artifact/two-pass bounds
+and primary failure/cancellation precedence retain coverage.
+
+Fresh local Python 3.12.14 verification with the hash-installed development lock:
+all **150 tests passed**, with no skips (22.991 seconds). The same full suite passed
+under Linux/Python 3.11.18 (150 tests, no skips, 21.890 seconds). Dependency
+consistency, compilation, both real mock CLI outcomes (63/42 calls, seven turns,
+five energy, scores 100), and working-diff whitespace checks passed locally.
+No provider requests or
+paid experiments were performed. Cross-platform CI evidence and final review are
+recorded below after delivery verification; this checkpoint alone claims local
+Linux coverage. Dependencies, committed `example_run/` and `demo_output/` remain
+unchanged. The evaluation protocol and its future controls/runner/room dependencies
+are documented separately; passing fixtures establish no experimental outcome.
+
 Original milestone release date: November 12, 2026.
 
 The original evidence below is historical. See the dated repository import and

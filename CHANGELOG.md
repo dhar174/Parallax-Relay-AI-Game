@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Add versioned run provenance with source/environment availability, canonical
+  effective settings/pricing and input identities, optional UUID grouping, and
+  execution timing preserved through bounded finalization recovery.
+- Preserve legacy manifests and custom recorders; bind built-in recorder identity
+  to actual programmatic driver inputs and reject reuse across matches.
 - Check committed CI diffs, isolate caches/cancellation, and hash-check pip bootstrap
   wheels in runner temporary environments without persisting checkout credentials.
 - Harden mock-checker encoding, environment isolation, strict result/artifact checks,

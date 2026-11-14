@@ -26,7 +26,7 @@ Browser and security-scan limitations must remain explicit, not implied successe
 
 **Status:** partially implemented. Slice 1 delivered R01/R04/R05 in PR #27,
 slice 2 delivered R02 in PR #28, and slice 3 delivered R03 in PR #29. Slice 4's
-CI/lock work (#21/#22) is implemented and verified in open PR #30. Provider
+CI/lock work (#21/#22) was delivered in merged PR #30. Provider
 validation (R06) and source/privacy and dependency/license audits (#23/#24) remain
 open. See the verification guide for actual hosted results.
 
@@ -48,13 +48,15 @@ Document remaining limitations rather than silently switching models or contract
 
 ## 3. Reproducible evaluation
 
-**Status:** proposed. Depends on reliable execution.
+**Status:** partly implemented. Slice 5 adds versioned run provenance (#10);
+the experiment runner (#19) and controlled campaigns remain future work.
 
-Add run provenance and an experiment runner (R08), recording source/configuration,
+Run provenance (R08) now records source/configuration,
 prompt/schema/room versions, dependency environment, model identifiers, trial IDs,
 and sampling settings where supported. Store no credentials. A seed may describe
 room generation or a supported provider option; it cannot promise deterministic
-model output.
+model output. See [Run provenance](docs/PROVENANCE.md). The experiment runner must
+still schedule/aggregate trials and preserve setup failures and missing artifacts.
 
 Define evaluation protocols before making comparative claims (R07): repeated trials,
 provider-to-role rotations, scripted and simple policy baselines, communication
