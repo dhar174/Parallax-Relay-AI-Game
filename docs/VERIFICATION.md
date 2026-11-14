@@ -450,3 +450,9 @@ passed. Historical fixtures, compatibility ranges, and milestone pins are intact
 Inspect the final-head PR checks for hosted verification; earlier hosted runs
 above apply only to their recorded revisions. Security/dependency audits, paid
 provider testing, and merging remain outside this review follow-up.
+
+The first follow-up run passed five jobs; Windows exposed four assertions in the
+new symlink cases because `readlink()` supplies a `\\?\` extended-path prefix.
+Those tests now snapshot the original link target before invoking the launcher
+and require exact equality afterward, alongside untouched-target checks. This
+verifies preservation without assuming the operating system's path spelling.

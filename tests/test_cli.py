@@ -73,11 +73,12 @@ class CLITests(unittest.TestCase):
                     link.symlink_to(target)
                 except (OSError, NotImplementedError):
                     self.skipTest('Symlink creation is unavailable')
+                original_target = link.readlink()
                 proc = self.command('--mock', '--quiet', '--out', link)
                 self.assertEqual(proc.returncode, 2, proc.stderr)
                 self.assertIn('Output directory already exists', proc.stderr)
                 self.assertTrue(link.is_symlink())
-                self.assertEqual(link.readlink(), target)
+                self.assertEqual(link.readlink(), original_target)
                 if kind == 'file': self.assertEqual(target.read_bytes(), b'SENTINEL')
                 else: self.assertFalse(target.exists())
 
