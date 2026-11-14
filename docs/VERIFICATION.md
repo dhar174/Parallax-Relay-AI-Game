@@ -389,5 +389,29 @@ creates a fresh virtual environment and bootstraps pip 26.3 into it. The exact
 workflow bootstrap was exercised locally and produced only pip before project
 installation. An additional fresh Linux/Python 3.12 range installation passed
 115 tests, compilation, and both asserted mocks before the portability correction.
-Hosted verification of the revised jobs is pending. Historical fixtures and their
-PNGs remain unchanged; no private run artifacts are published.
+
+### Verified hosted matrix
+
+The [revised run](https://github.com/dhar174/Parallax-Relay-AI-Game/actions/runs/43563739314)
+at `055bc7f` passed all six jobs. Each log was inspected for the fresh `.venv`
+interpreter, pip 26.3, the exact 12 project pins listed above, **116 passing tests
+with no skips**, dependency consistency, compilation, both asserted mock victories,
+and the diff check. The independent range resolution selected the same versions
+on this date, without using lock constraints.
+
+| Environment | Python | Architecture | Dependencies | Result |
+|---|---|---|---|---|
+| Ubuntu 24.04 | 3.11.18 | x86_64 | Locked | Passed |
+| Ubuntu 24.04 | 3.12.16 | x86_64 | Locked | Passed |
+| Ubuntu 24.04 | 3.13.18 | x86_64 | Locked | Passed |
+| Windows Server 2022 (10.0.20348) | 3.12.10 | AMD64 | Locked | Passed |
+| macOS 15.8.2 | 3.12.10 | arm64 | Locked | Passed |
+| Ubuntu 24.04 | 3.12.16 | x86_64 | Fresh ranges | Passed |
+
+The locked workflow baseline received a fresh independent review with no findings;
+the subsequently observed Windows defects were reproduced and corrected as above.
+Documentation checks verified 38 local links/anchors. Historical fixtures and their
+PNGs remain unchanged. No provider credentials, paid calls, or spectator uploads
+were used. This evidence covers the listed combinations, not newer Python versions,
+other architectures, live provider compatibility, browser behavior, or the pending
+source/privacy and dependency/license audits (#23/#24). Parent #11 remains open.
