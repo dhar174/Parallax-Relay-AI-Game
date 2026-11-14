@@ -144,6 +144,52 @@ class ProvenanceTests(unittest.TestCase):
         self.assertEqual(data['lifecycle']['stop_reason'], 'local_error')
         self.assertEqual(self.p.read_provenance({'provenance': data}), data)
 
+    def test_reader_rejects_invalid_nested_values_even_with_matching_hashes(self):
+        run = self.p.RunProvenance()
+        run.begin(MatchSettings(), {}, initial_world().snapshot())
+        original = run.snapshot()
+        mutations = [
+            ('execution', ('settings',), []),
+            ('execution', ('settings', 'max_turns'), 0),
+            ('execution', ('settings',), {}),
+            ('execution', ('pricing',), {}),
+            ('execution', ('pricing', 'SPECTRA'), {'input_per_million': -1, 'output_per_million': 2}),
+            ('execution', ('players',), {}),
+            ('execution', ('conditions',), {'communication': []}),
+            ('environment', ('python',), {}),
+            ('environment', ('os',), {}),
+            ('environment', ('packages',), [{'name': 'example'}]),
+            ('room', (), 'not a room'),
+            ('room', ('initial_state',), []),
+            ('room', ('constants',), {}),
+            ('schemas', (), {}),
+            ('schemas', ('wire',), []),
+            ('prompt', (), {}),
+        ]
+        for identity, path, replacement in mutations:
+            with self.subTest(identity=identity, path=path):
+                data = copy.deepcopy(original)
+                fingerprint = data[identity] if identity in ('execution', 'environment') else data['inputs'][identity]
+                if path:
+                    target = fingerprint['value']
+                    for key in path[:-1]: target = target[key]
+                    target[path[-1]] = replacement
+                else:
+                    fingerprint['value'] = replacement
+                fingerprint['sha256'] = self.p.canonical_hash(fingerprint['value'])
+                with self.assertRaises(self.p.ProvenanceError): self.p.read_provenance({'provenance': data})
+
+    def test_reader_preserves_optional_nested_extensions(self):
+        run = self.p.RunProvenance()
+        run.begin(MatchSettings(), {}, initial_world().snapshot())
+        data = run.snapshot()
+        data['extension'] = {'future': True}
+        for identity in (data['execution'], data['environment'], data['inputs']['schemas'], data['inputs']['room']):
+            identity['value']['extension'] = {'future': True}
+            identity['sha256'] = self.p.canonical_hash(identity['value'])
+        data['lifecycle']['extension'] = True
+        self.assertEqual(self.p.read_provenance({'provenance': data}), data)
+
     def test_historical_fixture_remains_legacy_readable(self):
         manifest = json.loads(Path('example_run/manifest.json').read_text(encoding='utf-8'))
         self.assertEqual(manifest['schema_version'], 2)

@@ -18,7 +18,7 @@ from uuid import UUID, uuid4
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from . import prompts, protocol, state
-from .config import MatchSettings
+from .config import MatchSettings, Rates
 from .providers import provider_contract
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -269,21 +269,142 @@ class _Distribution(_RecordModel):
     version: str
 
 
+class _PythonIdentity(_RecordModel):
+    implementation: str
+    version: str
+
+
+class _OSIdentity(_RecordModel):
+    system: str
+    release: str
+    machine: str
+
+
 class _EnvironmentValue(_RecordModel):
     status: Literal['complete', 'partial', 'unavailable']
-    python: dict[str, str]
-    os: dict[str, str]
+    python: _PythonIdentity
+    os: _OSIdentity
     packages: list[_Distribution]
 
 
 class _PlayerRecord(_RecordModel):
-    provider: str
-    model: str | None
+    provider: Literal['openai', 'anthropic', 'gemini', 'mock', 'unknown']
+    model: str | None = Field(pattern=r'^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$')
     identity_source: Literal['declared', 'unavailable']
     model_revision: str | None
     api_contract: dict | None
     sampling: Literal['provider_default', 'not_applicable', 'unavailable']
     seed: None
+
+
+def _complete_config(model, value):
+    # Snapshot fields must be present; defaults would conceal missing identity.
+    # Ignore additive extensions without removing them from the returned record.
+    if not isinstance(value, dict) or not set(model.model_fields) <= set(value):
+        raise ValueError('Incomplete configuration snapshot')
+    return model.model_validate({k: value[k] for k in model.model_fields}, strict=True)
+
+
+def _require_roles(value):
+    if set(value) != set(protocol.ROLES):
+        raise ValueError('Missing role identities')
+    return value
+
+
+class _Conditions(_RecordModel):
+    communication: Literal['full', 'reduced']
+    observations: Literal['role_png_and_hud']
+
+
+class _ExecutionValue(_RecordModel):
+    mode: Literal['mock', 'live', 'programmatic']
+    settings: dict
+    pricing: dict[str, dict | None]
+    players: dict[str, _PlayerRecord]
+    conditions: _Conditions
+
+    @model_validator(mode='after')
+    def valid_configuration(self):
+        settings = _complete_config(MatchSettings, self.settings)
+        _require_roles(self.players)
+        for rate in _require_roles(self.pricing).values():
+            if rate is not None:
+                _complete_config(Rates, rate)
+            elif settings.max_estimated_cost_usd is not None:
+                raise ValueError('Missing guarded pricing')
+        if self.conditions.communication != ('full' if settings.communication_rounds == 2 else 'reduced'):
+            raise ValueError('Inconsistent communication condition')
+        return self
+
+
+class _RequestStructure(_RecordModel):
+    role: str
+    turn: int
+    phase: str
+    observation: dict
+    public_messages: list
+    your_recent_history: list
+    your_private_notes: str
+    format_repair: str
+
+
+class _SchemaValue(_RecordModel):
+    request_format_version: int = Field(ge=1)
+    request_structure: _RequestStructure
+    wire: dict[str, dict]
+    local: dict[str, dict]
+    max_reply_chars: int = Field(ge=1)
+
+    @model_validator(mode='after')
+    def required_contracts(self):
+        if not {'broadcast', 'negotiate', 'commit'} <= set(self.wire) or not {'broadcast', 'commit'} <= set(self.local):
+            raise ValueError('Missing reply contracts')
+        return self
+
+
+class _RoomValue(_RecordModel):
+    id: str
+    version: int = Field(ge=1)
+    constants: dict[str, int]
+    gap: list[int]
+    objectives: dict[str, str]
+    initial_state: dict
+
+    @model_validator(mode='after')
+    def required_definition(self):
+        if not {'WIDTH', 'MAX_TURNS', 'EXIT', 'ARTIFACT', 'ENERGY_CELL', 'MOTOR'} <= set(self.constants):
+            raise ValueError('Missing room constants')
+        _require_roles(self.objectives)
+        # Validate the recorded snapshot, without requiring it to equal this
+        # checkout's room values or constructing/mutating an engine world.
+        _WorldSnapshot.model_validate(self.initial_state)
+        return self
+
+
+class _RobotSnapshot(_RecordModel):
+    role: str
+    x: int
+    damage: int
+
+
+class _WorldSnapshot(_RecordModel):
+    turn: int
+    robots: dict[str, _RobotSnapshot]
+    energy: int
+    coolant: int
+    motor_heat: int
+    bridge_extended: bool
+    exit_unlocked: bool
+    shard_collected: bool
+    cell_collected: bool
+    win: bool
+    loss: bool
+    events: list[str]
+
+    @field_validator('robots')
+    @classmethod
+    def robot_roles(cls, value):
+        return _require_roles(value)
 
 
 class ProvenanceRecord(_RecordModel):
@@ -301,16 +422,22 @@ class ProvenanceRecord(_RecordModel):
 
     @model_validator(mode='after')
     def required_structure(self):
-        if set(self.players) != set(protocol.ROLES):
-            raise ValueError('Missing role identities')
+        _require_roles(self.players)
         _EnvironmentValue.model_validate(self.environment.value)
+        if self.requested_settings is not None:
+            _complete_config(MatchSettings, self.requested_settings)
         if self.lifecycle.stage in ('running', 'ended'):
             if self.execution is None or self.inputs is None or not {'prompt', 'schemas', 'room'} <= set(self.inputs):
                 raise ValueError('Missing execution identity')
         if self.execution is not None:
-            config = self.execution.value
-            if not isinstance(config, dict) or not {'mode', 'settings', 'pricing', 'players', 'conditions'} <= set(config):
-                raise ValueError('Missing effective configuration')
+            _ExecutionValue.model_validate(self.execution.value)
+        if self.inputs is not None:
+            if not {'prompt', 'schemas', 'room'} <= set(self.inputs):
+                raise ValueError('Missing input identity')
+            if not isinstance(self.inputs['prompt'].value, str):
+                raise ValueError('Invalid prompt identity')
+            _SchemaValue.model_validate(self.inputs['schemas'].value)
+            _RoomValue.model_validate(self.inputs['room'].value)
         return self
 
 

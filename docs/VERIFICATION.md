@@ -1,5 +1,31 @@
 # Verification record
 
+## Slice 5 final review and local verification — November 14, 2026
+
+A fresh read-only whole-branch review independently passed 150 tests and found one
+P2 issue: the new reader checked hashes without validating every known nested
+payload. Matching hashes for malformed settings, incomplete Python identity, or a
+non-object room were accepted. The fix validates complete settings/prices,
+players/conditions, environment identities and named input payloads while preserving
+additive extensions. New regressions first reproduced 15 malformed cases with
+recomputed valid hashes, then passed after the fix; an extension-preservation test
+also passed. The final focused provenance suite has **23 passing tests**.
+
+After that fix, the complete suite passed **152 tests with no skips** on Linux/
+Python 3.12.14 (24.184 seconds) and Python 3.11.18 (24.414 seconds). Dependency
+consistency, compilation and standalone normal/fast mock CLIs plus the reusable
+checker passed; victories retain seven turns, 63/42 calls, five energy, and scores
+100. Actionlint and whitespace checks passed. Before the reader fix, standalone
+mock manifests also verified clean source revision, actual communication condition,
+distinct UUIDs and ended/victory lifecycle metadata. Historical fixtures and all
+dependency files are unchanged. The delivery PR carries actual hosted matrix
+results; local Linux testing alone does not establish Windows/macOS execution.
+
+No other actionable findings or deferred minor findings were reported. The review
+excluded remote provider acceptance/billing/model behavior and the future runtime
+implementations of #18/#19/#20. Those remain unverified or unimplemented; no paid
+campaigns, remote compatibility, or held-out generalization is claimed.
+
 ## Slice 5 evaluation protocol — November 14, 2026
 
 Specified #17 in [evaluation protocol v1](EVALUATION.md), without implementing

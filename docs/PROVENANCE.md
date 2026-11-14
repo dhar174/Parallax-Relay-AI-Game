@@ -127,8 +127,11 @@ match-resume guarantee. Pre-match setup failure may leave only initialized metad
 ## Reading and compatibility
 
 `read_provenance(manifest)` returns a detached dictionary for supported version-1
-records after structural, timestamp, and fingerprint validation. Legacy manifests
-without the block return `None`; absent provenance means unknown identity, not a
+records after structural, timestamp, and fingerprint validation. Validation covers
+known nested settings/prices, environment, request contracts, and room
+snapshots; matching a digest alone does not make an arbitrary payload valid.
+Fingerprints are identity/checksum evidence, not signatures or authenticity proofs.
+Legacy manifests without the block return `None`; absent provenance means unknown identity, not a
 clean or fully reproducible run. Unsupported versions and malformed records raise
 a sanitized `ProvenanceError`. The function validates the provenance block, not the
 rest of an arbitrary replay. Existing version-2 fixtures/viewers remain readable
