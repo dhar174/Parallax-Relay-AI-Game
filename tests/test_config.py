@@ -15,7 +15,7 @@ class ConfigTests(unittest.TestCase):
             self.assertNotIn('SECRET_SENTINEL', str(ctx.exception))
 
     def test_malformed_toml_and_invalid_fields_remain_safe(self):
-        original = Path('configs/three_models.toml').read_text()
+        original = Path('configs/three_models.toml').read_text(encoding='utf-8')
         cases = ('SECRET_SENTINEL = [',
                  original.replace('max_turns = 12', 'max_turns = "SECRET_SENTINEL"'))
         with tempfile.TemporaryDirectory() as tmp:
@@ -47,7 +47,7 @@ class ConfigTests(unittest.TestCase):
 
     def test_unknown_settings_do_not_silently_pass(self):
         with tempfile.TemporaryDirectory() as tmp:
-            p=Path(tmp)/'cfg.toml'; p.write_text('[match]\nmax_callls=5\n')
+            p=Path(tmp)/'cfg.toml'; p.write_text('[match]\nmax_callls=5\n', encoding='utf-8')
             with self.assertRaises(ConfigError): load_config(p)
 
     def test_invalid_bounds(self):

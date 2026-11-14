@@ -21,17 +21,47 @@ ROOT = Path(__file__).resolve().parent.parent
 class DemoTests(unittest.TestCase):
     def command(self, cwd, *args):
         env = os.environ.copy()
+        env['PYTHONIOENCODING'] = 'utf-8'
         env['PYTHONPATH'] = str(ROOT)
         return subprocess.run(
             [sys.executable, '-m', 'parallax_relay.demo', *map(str, args)],
-            cwd=cwd, env=env, capture_output=True, text=True, timeout=30)
+            cwd=cwd, env=env, capture_output=True, text=True,
+            encoding='utf-8', errors='replace', timeout=30)
+
+    def test_cli_rejects_dangling_and_file_symlinks_without_following(self):
+        for kind in ('dangling', 'file'):
+            with self.subTest(kind=kind), tempfile.TemporaryDirectory() as tmp:
+                target = Path(tmp) / 'target'
+                if kind == 'file': target.write_bytes(b'SENTINEL')
+                link = Path(tmp) / 'out'
+                try:
+                    link.symlink_to(target)
+                except (OSError, NotImplementedError):
+                    self.skipTest('Symlink creation is unavailable')
+                proc = self.command(tmp, '--out', link)
+                self.assertEqual(proc.returncode, 2, proc.stderr)
+                self.assertIn('Output path already exists', proc.stderr)
+                self.assertTrue(link.is_symlink())
+                self.assertEqual(link.readlink(), target)
+                if kind == 'file': self.assertEqual(target.read_bytes(), b'SENTINEL')
+                else: self.assertFalse(target.exists())
+
+    def test_file_exists_during_rendering_is_a_local_failure(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            stderr = io.StringIO()
+            with patch('parallax_relay.demo.render_png', side_effect=FileExistsError('SECRET_SENTINEL')), \
+                 contextlib.redirect_stderr(stderr):
+                code = main(['--out', str(Path(tmp) / 'new')])
+            self.assertEqual(code, 2)
+            self.assertIn('Local file operation failed', stderr.getvalue())
+            self.assertNotIn('SECRET_SENTINEL', stderr.getvalue())
 
     def assert_replay(self, out):
-        result = json.loads((out / 'result.json').read_text())
+        result = json.loads((out / 'result.json').read_text(encoding='utf-8'))
         self.assertEqual(result, {'win': True, 'turns': 7,
                                  'scores': {'SPECTRA': 100, 'PYRA': 100, 'FLUX': 100},
                                  'energy': 5})
-        records = [json.loads(line) for line in (out / 'replay.jsonl').read_text().splitlines()]
+        records = [json.loads(line) for line in (out / 'replay.jsonl').read_text(encoding='utf-8').splitlines()]
         self.assertEqual(len(records), 7)
         images = []
         for record in records:
@@ -171,7 +201,7 @@ class DemoTests(unittest.TestCase):
             parent.write_bytes(b'SECRET_SENTINEL')
             out = parent / 'run'
             stderr = io.StringIO()
-            with patch('parallax_relay.demo.run', side_effect=FileExistsError('SECRET_SENTINEL')), \
+            with patch('parallax_relay.demo.Path.mkdir', side_effect=FileExistsError('SECRET_SENTINEL')), \
                  contextlib.redirect_stderr(stderr):
                 code = main(['--out', str(out)])
             self.assertEqual(code, 2)

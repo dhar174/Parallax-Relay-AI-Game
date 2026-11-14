@@ -1,4 +1,6 @@
 import asyncio
+import contextlib
+import io
 import json
 import os
 from pathlib import Path
@@ -6,16 +8,30 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 from parallax_relay.recording import Recorder
 from parallax_relay.orchestrator import run_match
 from parallax_relay.agents import ScriptedAgent
 from parallax_relay.config import MatchSettings, ConfigError
 from parallax_relay.protocol import ROLES, ModelReply, Usage
-from parallax_relay.play import load_env_file
+from parallax_relay.play import load_env_file, main
 from parallax_relay.providers import ProviderError
 
 
 class CLITests(unittest.TestCase):
+    def test_windows_parent_file_error_is_a_safe_setup_failure(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            parent = Path(tmp) / 'parent'
+            parent.write_bytes(b'SECRET_SENTINEL')
+            stderr = io.StringIO()
+            with patch('parallax_relay.play.Recorder', side_effect=FileExistsError('SECRET_SENTINEL')), \
+                 contextlib.redirect_stderr(stderr):
+                code = main(['--mock', '--quiet', '--out', str(parent / 'run')])
+            self.assertEqual(code, 2)
+            self.assertIn('Local file or connection setup failed', stderr.getvalue())
+            self.assertNotIn('SECRET_SENTINEL', stderr.getvalue())
+            self.assertEqual(parent.read_bytes(), b'SECRET_SENTINEL')
+
     def test_non_utf8_toml_exits_safely_before_creating_output(self):
         with tempfile.TemporaryDirectory() as tmp:
             config = Path(tmp) / 'invalid.toml'
@@ -30,9 +46,40 @@ class CLITests(unittest.TestCase):
 
     def command(self,*args):
         env=os.environ.copy()
+        env['PYTHONIOENCODING'] = 'utf-8'
         for name in ('OPENAI_API_KEY','ANTHROPIC_API_KEY','GEMINI_API_KEY','OPENAI_MODEL','ANTHROPIC_MODEL','GEMINI_MODEL'):
             env.pop(name,None)
-        return subprocess.run([sys.executable,'-m','parallax_relay.play',*map(str,args)],capture_output=True,text=True,env=env,timeout=30)
+        return subprocess.run([sys.executable,'-m','parallax_relay.play',*map(str,args)],capture_output=True,text=True,
+                              encoding='utf-8',errors='replace',env=env,timeout=30)
+
+    def test_default_output_below_runs_file_is_a_safe_setup_failure(self):
+        with tempfile.TemporaryDirectory() as tmp, contextlib.chdir(tmp):
+            Path('runs').write_bytes(b'SECRET_SENTINEL')
+            stderr = io.StringIO()
+            with contextlib.redirect_stderr(stderr):
+                code = main(['--mock', '--quiet'])
+            self.assertEqual(code, 2)
+            self.assertIn('Local file or connection setup failed', stderr.getvalue())
+            self.assertNotIn('SECRET_SENTINEL', stderr.getvalue())
+            self.assertEqual(Path('runs').read_bytes(), b'SECRET_SENTINEL')
+
+    def test_dangling_and_file_symlinks_are_existing_destinations(self):
+        for kind in ('dangling', 'file'):
+            with self.subTest(kind=kind), tempfile.TemporaryDirectory() as tmp:
+                target = Path(tmp) / 'target'
+                if kind == 'file': target.write_bytes(b'SENTINEL')
+                link = Path(tmp) / 'out'
+                try:
+                    link.symlink_to(target)
+                except (OSError, NotImplementedError):
+                    self.skipTest('Symlink creation is unavailable')
+                proc = self.command('--mock', '--quiet', '--out', link)
+                self.assertEqual(proc.returncode, 2, proc.stderr)
+                self.assertIn('Output directory already exists', proc.stderr)
+                self.assertTrue(link.is_symlink())
+                self.assertEqual(link.readlink(), target)
+                if kind == 'file': self.assertEqual(target.read_bytes(), b'SENTINEL')
+                else: self.assertFalse(target.exists())
 
     def test_mock_cli_no_keys_and_saves_replay(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -56,7 +103,7 @@ class CLITests(unittest.TestCase):
 
     def test_existing_output_directory_never_overwritten(self):
         with tempfile.TemporaryDirectory() as tmp:
-            out=Path(tmp)/'run';out.mkdir();(out/'keep.txt').write_text('keep')
+            out=Path(tmp)/'run';out.mkdir();(out/'keep.txt').write_text('keep', encoding='utf-8')
             proc=self.command('--mock','--out',out)
             self.assertEqual(proc.returncode,2)
             self.assertEqual((out/'keep.txt').read_text(encoding='utf-8'),'keep')
@@ -66,14 +113,14 @@ class CLITests(unittest.TestCase):
 
     def test_env_file_is_data_only_and_does_not_override(self):
         with tempfile.TemporaryDirectory() as tmp:
-            p=Path(tmp)/'.env';p.write_text('# comment\nFOO="literal $(not_run)"\nBAR=new\n')
+            p=Path(tmp)/'.env';p.write_text('# comment\nFOO="literal $(not_run)"\nBAR=new\n', encoding='utf-8')
             env={'BAR':'existing'};load_env_file(p,env)
             self.assertEqual(env['FOO'],'literal $(not_run)')
             self.assertEqual(env['BAR'],'existing')
 
     def test_env_error_does_not_echo_value(self):
         with tempfile.TemporaryDirectory() as tmp:
-            p=Path(tmp)/'.env';p.write_text('THIS IS SECRET_SENTINEL')
+            p=Path(tmp)/'.env';p.write_text('THIS IS SECRET_SENTINEL', encoding='utf-8')
             with self.assertRaises(ConfigError) as ctx: load_env_file(p,{})
             self.assertNotIn('SECRET_SENTINEL',str(ctx.exception))
 
@@ -89,7 +136,7 @@ class CLITests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             p=Path(tmp)/'.env'
             p.write_text('\n'.join(f'{provider}_{suffix}={"test-model" if suffix=="MODEL" else "KEY_SENTINEL"}'
-                                   for provider in ('OPENAI','ANTHROPIC','GEMINI') for suffix in ('MODEL','API_KEY')))
+                                   for provider in ('OPENAI','ANTHROPIC','GEMINI') for suffix in ('MODEL','API_KEY')), encoding='utf-8')
             proc=self.command('--check','--env-file',p)
             self.assertEqual(proc.returncode,0,proc.stderr)
             self.assertNotIn('KEY_SENTINEL',proc.stdout+proc.stderr)

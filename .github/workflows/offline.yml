@@ -10,8 +10,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   verify:
@@ -32,13 +32,17 @@ jobs:
       PIP_DISABLE_PIP_VERSION_CHECK: '1'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         id: python
         with:
           python-version: ${{ matrix.python }}
-          cache: pip
+          cache: ${{ matrix.dependencies == 'locked' && 'pip' || '' }}
           cache-dependency-path: |
             requirements-dev.lock
+            requirements-bootstrap.lock
             requirements.txt
       - name: Create isolated environment and pin pip
         id: bootstrap
@@ -48,12 +52,14 @@ jobs:
           from pathlib import Path
           import subprocess
           import sys
+          import tempfile
           import venv
-          root = Path('.venv').resolve()
+          root = Path(tempfile.mkdtemp(prefix='parallax-venv-', dir=os.environ['RUNNER_TEMP']))
           venv.create(root, with_pip=False)
           scripts = root / ('Scripts' if os.name == 'nt' else 'bin')
           python = scripts / ('python.exe' if os.name == 'nt' else 'python')
-          subprocess.run([sys.executable, '-m', 'pip', '--python', str(python), 'install', 'pip==26.3'], check=True)
+          subprocess.run([sys.executable, '-m', 'pip', '--python', str(python), 'install',
+                          '--require-hashes', '--only-binary=:all:', '-r', 'requirements-bootstrap.lock'], check=True)
           with open(os.environ['GITHUB_PATH'], 'a', encoding='utf-8') as handle:
               handle.write(str(scripts) + '\n')
       - name: Install locked dependencies
@@ -66,7 +72,7 @@ jobs:
         run: >-
           python -m pip install --only-binary=:all: -r requirements.txt
       - name: Report verification environment
-        if: always() && steps.bootstrap.outcome == 'success'
+        if: ${{ !cancelled() && steps.bootstrap.outcome == 'success' }}
         shell: python
         run: |
           import platform
@@ -85,4 +91,6 @@ jobs:
       - name: Check normal and fast mock outcomes
         run: python scripts/check_mock_runs.py
       - name: Check diff whitespace
+        run: python scripts/check_committed_diff.py
+      - name: Check working-tree whitespace
         run: git diff --check

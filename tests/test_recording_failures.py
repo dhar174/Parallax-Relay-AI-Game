@@ -13,6 +13,28 @@ from parallax_relay.recording import Recorder
 
 
 class RecordingFailureTests(unittest.IsolatedAsyncioTestCase):
+    async def test_incremental_jsonl_matches_final_snapshot_under_windows_newlines(self):
+        from parallax_relay.config import MatchSettings
+        with tempfile.TemporaryDirectory() as tmp:
+            recorder = Recorder(Path(tmp) / 'run', {'mode': 'mock'})
+            real_open = Path.open
+            real_finish = recorder.finish
+            before = {}
+            def windows_open(path, mode='r', buffering=-1, encoding=None, errors=None, newline=None):
+                if mode == 'a' and newline is None:
+                    newline = '\r\n'
+                return real_open(path, mode, buffering, encoding, errors, newline)
+            def finish(result):
+                for name in ('calls.jsonl', 'phases.jsonl', 'replay.jsonl'):
+                    before[name] = (recorder.out / name).read_bytes()
+                real_finish(result)
+            with patch.object(Path, 'open', windows_open), patch.object(recorder, 'finish', finish):
+                await driver.run_match({r: ScriptedAgent(r) for r in ROLES},
+                                       MatchSettings(max_turns=1), recorder=recorder)
+            for name, data in before.items():
+                self.assertNotIn(b'\r\n', data)
+                self.assertEqual(data, (recorder.out / name).read_bytes())
+
     async def test_partial_temp_writes_preserve_final_png_and_viewer(self):
         import traceback
         from parallax_relay.config import MatchSettings
@@ -79,7 +101,7 @@ class RecordingFailureTests(unittest.IsolatedAsyncioTestCase):
                     def fail(*args):
                         if timing == 'after': real(*args)
                         if timing == 'partial' and filename:
-                            with (out / filename).open('a') as handle: handle.write('{partial')
+                            with (out / filename).open('a', encoding='utf-8') as handle: handle.write('{partial')
                         raise original
                     with patch.object(recorder, method, side_effect=fail):
                         with self.assertRaises(driver.MatchExecutionError) as ctx:

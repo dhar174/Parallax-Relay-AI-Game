@@ -95,6 +95,11 @@ not a hard provider-enforced monetary ceiling.
 
 ## Reproduce
 
+Historical milestone commands follow. For current verification, also include
+`scripts` in compilation (`python -m compileall -q parallax_relay tests scripts`)
+and run `python scripts/check_mock_runs.py`; CI also checks committed diff ranges
+as described in [Contributing](../CONTRIBUTING.md#supported-environments-and-ci).
+
 ```bash
 python -m unittest discover -s tests -v
 python -m compileall -q parallax_relay tests
@@ -415,3 +420,33 @@ PNGs remain unchanged. No provider credentials, paid calls, or spectator uploads
 were used. This evidence covers the listed combinations, not newer Python versions,
 other architectures, live provider compatibility, browser behavior, or the pending
 source/privacy and dependency/license audits (#23/#24). Parent #11 remains open.
+
+### PR #30 Antigravity review follow-up — November 14, 2026
+
+Against review baseline `38470e4`, focused regressions reproduced the main
+launcher's Windows EEXIST classification, Unicode subprocess failure under ASCII
+parent stdio, acceptance of integer booleans/float turn values, and incremental
+Windows CRLF versus final LF snapshots. The fixes passed those regressions.
+Disposable Git repositories demonstrate that a clean `git diff --check` misses
+committed defects; the new committed-range checker rejects them for PR, push,
+manual, and initial/root events while accepting clean changes and rejecting an
+invalid PR base. No comparison boundary is interpolated into shell code.
+
+Fresh full discovery passed **129 tests without skips** on Linux/Python 3.11.18
+and 3.12.14 with pip 26.3. Coverage now includes actual unmocked helper execution
+with Unicode temporary paths, both-mode fault injection, isolated diagnostics,
+strict score/result types, sibling artifacts, quiet progress suppression, cleanup
+failures, existing/broken/file symlinks, default output below a regular `runs` file,
+and later demo writes failing with FileExistsError. UTF-8 is explicit for all test
+text fixtures; child stdio is UTF-8 without forcing native filesystem UTF-8 mode.
+
+The exact revised workflow bootstrap ran locally under a temporary runner root,
+producing only hash-verified pip 26.3 before project installation. Corrupting its
+hashes was rejected with exit 1. Generation headers and parent annotations were
+added without changing any of the 12 project versions or 247 hashes. `pip check`,
+compilation, normal/fast real mock assertions, actionlint 1.7.12, and diff checks
+passed. Historical fixtures, compatibility ranges, and milestone pins are intact.
+
+Inspect the final-head PR checks for hosted verification; earlier hosted runs
+above apply only to their recorded revisions. Security/dependency audits, paid
+provider testing, and merging remain outside this review follow-up.

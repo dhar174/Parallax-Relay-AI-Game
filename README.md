@@ -37,7 +37,7 @@ source .venv/bin/activate
 Install dependencies, run the offline tests, and play the scripted fixture:
 
 ```bash
-python -m pip install pip==26.3
+python -m pip install --require-hashes --only-binary=:all: -r requirements-bootstrap.lock
 python -m pip install --require-hashes --only-binary=:all: -r requirements-dev.lock -r requirements.txt
 python -m unittest discover -s tests -v
 python -m parallax_relay.play --mock

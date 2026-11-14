@@ -20,8 +20,15 @@ from .scripted import PLAN, FIRST_BROADCAST
 from .render import render_png
 
 
+class _OutputPathExistsError(FileExistsError):
+    """Only output-directory creation failed with EEXIST."""
+
+
 def run(out: Path) -> dict:
-    out.mkdir(parents=True, exist_ok=False)
+    try:
+        out.mkdir(parents=True, exist_ok=False)
+    except FileExistsError as error:
+        raise _OutputPathExistsError(*error.args) from None
     world = initial_world()
     records = []
     for idx, actions in enumerate(PLAN):
@@ -119,7 +126,7 @@ def main(argv: list[str] | None = None) -> int:
         'demo_' + datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ') + '_' + uuid4().hex[:6])
     try:
         run(out)
-    except FileExistsError:
+    except _OutputPathExistsError:
         # Windows also raises EEXIST when a parent component is a regular file.
         try:
             out.lstat()

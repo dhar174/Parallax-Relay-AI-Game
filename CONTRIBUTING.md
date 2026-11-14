@@ -8,9 +8,10 @@ solvability, not model intelligence.
 ## Environment
 
 Use Python 3.12 by default (minimum 3.11) and a fresh local virtual environment as
-shown in the README. Bootstrap pip 26.3, then install with:
+shown in the README. Bootstrap pip 26.3 and install project dependencies with:
 
 ```bash
+python -m pip install --require-hashes --only-binary=:all: -r requirements-bootstrap.lock
 python -m pip install --require-hashes --only-binary=:all: -r requirements-dev.lock -r requirements.txt
 ```
 
@@ -18,7 +19,10 @@ python -m pip install --require-hashes --only-binary=:all: -r requirements-dev.l
 runtime dependencies. It uses universal resolution from Python 3.11 upward; its
 portability is established only for environments actually exercised. Both files
 are supplied to installation so incompatible ranges or missing pins fail rather
-than silently resolving a different environment. Binary wheels are required.
+than silently resolving a different environment. Binary wheels are required for
+both the project lock and the separate pip bootstrap lock. Generated hashes may
+also describe sdists; always retain `--only-binary=:all:` to prevent source builds.
+Generation headers and `# via` comments record commands and dependency parents.
 `requirements.txt` retains direct compatibility ranges. `requirements-tested.txt`
 preserves the original milestone's three direct versions and is not a lockfile.
 The [verification record](docs/VERIFICATION.md) records actual environments.
@@ -26,14 +30,20 @@ The [verification record](docs/VERIFICATION.md) records actual environments.
 ### Updating the lock
 
 Use uv **0.13.6** as a development-only generator, installed in a separate tooling
-environment (for example `python -m pip install uv==0.13.6` there). uv is not needed
+environment (for example `python -m pip install --only-binary=:all: uv==0.13.6` there). uv is not needed
 to install the lock or run the game. From the checkout root:
 
 ```bash
-uv pip compile requirements.txt --universal --generate-hashes --python-version 3.11 --no-header --no-annotate --upgrade --output-file requirements-dev.lock
+uv pip compile requirements.txt --universal --generate-hashes --python-version 3.11 --upgrade --output-file requirements-dev.lock
 ```
 
 Use `--upgrade` to refresh an existing lock; omit it for the initial generation.
+To regenerate the bootstrap lock for the selected pip version:
+
+```bash
+python -c "print('pip==26.3')" | uv pip compile - --universal --generate-hashes --python-version 3.11 --output-file requirements-bootstrap.lock
+```
+
 Review every version/marker/hash change and confirm direct versions stay within
 the compatibility ranges. Install in fresh environments with pip 26.3 and run all
 checks below before accepting the change. Record the generator version, exact
@@ -82,13 +92,17 @@ Python 3.11 is the minimum, not a promise that all later releases work.
 The [offline workflow](.github/workflows/offline.yml) runs on pull requests, pushes
 to `main`, and manual dispatch. Each of its six jobs checks dependencies, runs the
 complete unittest suite, compiles sources, and checks both real mock CLI outcomes.
-Each job creates a fresh virtual environment, bootstraps pip 26.3 there, and uses
+Each job creates a fresh virtual environment under `RUNNER_TEMP`, installs pip 26.3
+with the hashed binary-only bootstrap lock, and uses
 that interpreter for installation and verification, excluding preinstalled runner
 packages from the verification environment.
-The standalone checker uses temporary destinations, strips provider credentials
-from its child environments, fails on incorrect results, and removes outputs.
-For an independent compatibility check, install `requirements.txt` alone in a
-fresh environment using pip 26.3, then run the same checks. The floating job tests
+The standalone checker uses temporary destinations, strips provider credentials,
+proxies/base URLs and Python path/startup overrides from its child environments,
+standardizes child stdio as UTF-8, checks strict JSON types and required artifacts,
+and removes outputs. `--quiet` suppresses banners/progress while retaining the
+result and replay path. For an independent compatibility check, bootstrap pip in a
+fresh environment, then run `python -m pip install --only-binary=:all: -r requirements.txt`
+without the project lock and run the same checks. The floating job tests
 the latest compatible resolution for Python 3.12, not every historical combination.
 
 Offline here means no real provider/model calls: providers are intercepted in
@@ -97,6 +111,17 @@ CI configures no provider keys, does not print environment variables, and upload
 no spectator artifacts. Python, pip, OS/architecture, dependencies, test diagnostics,
 and concise mock outcomes remain in job logs. Runner images and Python patch
 versions can change; the lock pins dependencies rather than the entire OS image.
+Only locked jobs use the shared pip cache; range jobs resolve without restoring
+or saving it. Superseded PR runs are cancelled; push/manual runs have unique groups.
+Diagnostics run after failures when bootstrap succeeded, but not on cancellation.
+
+CI fetches full history and runs `python scripts/check_committed_diff.py`: PRs
+compare the event's base SHA to the checked-out merge commit using a merge base;
+pushes compare the event's `before` SHA to `HEAD`; manual runs compare `HEAD^` to
+`HEAD`. Initial/root commits and unavailable pre-force-push history compare the
+whole tree with an empty tree. Invalid/missing PR boundaries fail closed. This
+rejects committed whitespace/conflict markers on an otherwise clean checkout.
+The separate `git diff --check` still checks uncommitted changes.
 
 ## Making a change
 

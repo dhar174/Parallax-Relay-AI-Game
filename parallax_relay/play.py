@@ -88,7 +88,15 @@ async def _run(args, cfg, settings, runtime) -> int:
                 'settings':settings.model_dump(), 'room':'The Split Span'}
     if args.mock:
         manifest['requested_settings'] = requested_settings
-    recorder = Recorder(out, manifest)
+    try:
+        recorder = Recorder(out, manifest)
+    except FileExistsError:
+        # Windows also uses EEXIST for a nonexistent path below a regular file.
+        try:
+            out.lstat()
+        except OSError:
+            raise OSError('Cannot create output directory') from None
+        raise
     agents = {}
     failure = None
     try:
