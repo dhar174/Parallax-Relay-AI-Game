@@ -34,19 +34,27 @@ def _tokens(value) -> int | None:
     return value if type(value) is int and value >= 0 else None
 
 
+def _optional_tokens(usage: dict, name: str) -> int | None:
+    # Omitted optional breakdowns retain legacy zero semantics. Explicit null or
+    # malformed values cannot establish a complete sum for conservative pricing.
+    return _tokens(usage[name]) if name in usage else 0
+
+
 def _usage(provider: str, data: dict) -> Usage:
     if provider == 'gemini':
         u = data.get('usageMetadata') or {}
         inp, out = _tokens(u.get('promptTokenCount')), _tokens(u.get('candidatesTokenCount'))
-        thought = _tokens(u.get('thoughtsTokenCount')) or 0
-        return Usage(inp, None if out is None else out + thought,
-                     _tokens(u.get('cachedContentTokenCount')) or 0, thought)
+        thought = _optional_tokens(u, 'thoughtsTokenCount')
+        return Usage(inp, None if out is None or thought is None else out + thought,
+                     _tokens(u.get('cachedContentTokenCount')) or 0, thought or 0)
     u = data.get('usage') or {}
     inp, out = _tokens(u.get('input_tokens')), _tokens(u.get('output_tokens'))
     if provider == 'anthropic':
-        cached = _tokens(u.get('cache_read_input_tokens')) or 0
-        written = _tokens(u.get('cache_creation_input_tokens')) or 0
-        return Usage(None if inp is None else inp + cached + written, out, cached)
+        cached = _optional_tokens(u, 'cache_read_input_tokens')
+        written = _optional_tokens(u, 'cache_creation_input_tokens')
+        thought = _tokens((u.get('output_tokens_details') or {}).get('thinking_tokens')) or 0
+        return Usage(None if any(n is None for n in (inp, cached, written)) else inp + cached + written,
+                     out, cached or 0, thought)
     cached = _tokens((u.get('input_tokens_details') or {}).get('cached_tokens')) or 0
     thought = _tokens((u.get('output_tokens_details') or {}).get('reasoning_tokens')) or 0
     return Usage(inp, out, cached, thought)  # OpenAI output already includes reasoning.
@@ -55,12 +63,19 @@ def _usage(provider: str, data: dict) -> Usage:
 def _decode(provider: str, data: dict) -> ModelReply:
     usage = _usage(provider, data)
     if provider == 'openai':
-        parts = [p for item in data.get('output', []) if item.get('type') == 'message'
-                 for p in item.get('content', [])]
-        if any(p.get('type') == 'refusal' for p in parts):
+        if data.get('status') == 'failed' or data.get('error') is not None:
+            code = (data.get('error') or {}).get('code')
+            raise ProviderError('response_failed', code in {'server_error', 'rate_limit_exceeded'})
+        messages = [item for item in data.get('output', []) if item.get('type') == 'message']
+        if any(p.get('type') == 'refusal' for item in messages for p in item.get('content', [])) or (
+                data.get('incomplete_details') or {}).get('reason') == 'content_filter':
             return ModelReply('', usage, 'refusal')
+        messages = [item for item in messages if item.get('phase') in (None, 'final_answer')]
+        parts = [p for item in messages for p in item.get('content', [])]
         text = ''.join(p.get('text', '') for p in parts if p.get('type') == 'output_text')
-        return ModelReply(text, usage, 'ok' if data.get('status') == 'completed' else 'incomplete')
+        complete = data.get('status') == 'completed' and messages and all(
+            item.get('status', 'completed') == 'completed' for item in messages)
+        return ModelReply(text, usage, 'ok' if complete else 'incomplete')
     if provider == 'anthropic':
         stop = data.get('stop_reason')
         text = ''.join(p.get('text', '') for p in data.get('content', []) if p.get('type') == 'text')
