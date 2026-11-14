@@ -2,6 +2,14 @@
 
 Install dependencies and activate the virtual environment using the
 [README](../README.md). Run commands from the checkout root.
+The default installation uses the hashed development lock plus the compatibility
+ranges. See [Contributing](../CONTRIBUTING.md#environment) for applicability,
+fresh-environment setup, and lock updates. The historical direct-version file is
+not a complete lockfile.
+The [support policy](../CONTRIBUTING.md#supported-environments-and-ci) distinguishes
+the configured CI matrix from actual verification evidence. Run
+`python scripts/check_mock_runs.py` to assert both scripted victories using
+temporary output directories; it returns 1 on a failed CLI or unexpected result.
 
 ## Offline modes
 
@@ -196,6 +204,10 @@ Use `result.json` when present to distinguish outcomes. A bounded run is not a l
 use 12 turns. No experiment-horizon override is currently sent to the players.
 
 - **Output already exists:** choose another directory or omit `--out`.
+- **Local file/setup failure:** check parent directories and permissions. A regular
+  file used as an output parent (including a file named `runs`) is a setup failure,
+  not an existing destination. Broken symlinks at the destination are rejected
+  without following them. Both launchers report safe exit 2 diagnostics.
 - **Missing environment values:** populate the named variables; check inherited
   process variables if an edited `.env` value is being ignored.
 - **`provider_error`:** inspect sanitized HTTP status and role. Check permissions,

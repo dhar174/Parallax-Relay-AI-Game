@@ -11,9 +11,7 @@ and dependencies; optional mechanics are not automatically defects.
 
 ## 1. Documented baseline
 
-**Status:** documentation delivered in PR #1. Slice 1 delivered R01/R04/R05
-in PR #27. Slice 2 implements the R02 CLI mock override on its review branch, pending
-merge; other runtime findings and validation gates remain open.
+**Status:** documentation delivered in PR #1.
 
 Establish reproducible onboarding, explain current contracts and limitations, and
 provide compact coding-agent guidance. Preserve original milestone evidence while
@@ -26,16 +24,21 @@ Browser and security-scan limitations must remain explicit, not implied successe
 
 ## 2. Reliable execution
 
-**Status:** proposed. Depends on the documented baseline.
+**Status:** partially implemented. Slice 1 delivered R01/R04/R05 in PR #27,
+slice 2 delivered R02 in PR #28, and slice 3 delivered R03 in PR #29. Slice 4's
+CI/lock work (#21/#22) is implemented and verified in open PR #30. Provider
+validation (R06) and source/privacy and dependency/license audits (#23/#24) remain
+open. See the verification guide for actual hosted results.
 
-Resolve local error handling and output recovery (R01, R03), mock cost semantics
-(R02), and the non-MOVE contract mismatch (R04). Decide and enforce safe legacy-demo
-output behavior (R05). Verify each provider's exact endpoint and schema contract,
-then perform explicitly authorized, bounded live smoke tests (R06).
+Local error handling/output recovery (R01, R03), mock cost semantics (R02), the
+non-MOVE contract (R04), and safe legacy-demo outputs (R05) have regression coverage.
+Next verify each provider's exact endpoint/schema contract, then perform explicitly
+authorized, bounded live smoke tests (R06).
 
-Add offline CI, supported Python/platform checks, and a reproducible development
-dependency strategy (R09). Include retry/cancellation, partial usage, malformed
-responses, output failures, and privacy regressions in the relevant tests.
+Offline CI, the focused Python/platform matrix, and reproducible dependencies
+(R09) are covered by PR #30. Its suite includes retry/cancellation, partial usage,
+malformed responses, output failures, and privacy regressions. The separate audits
+remain required before closing R09's parent #11.
 
 **Completion gate:** reproduced defects have regression tests; the full offline
 suite and mock runs pass in the declared supported matrix; provider references

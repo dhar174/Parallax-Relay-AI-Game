@@ -80,7 +80,8 @@ Recording/progress failures stop the match and trigger bounded best-effort
 finalization. The checkpoint is the last successfully resolved engine turn, including
 its original submitted actions, even if its incremental write failed. Completed
 phases and all started-call evidence are retained in memory and used to rebuild
-JSONL at finalization. A failed write never causes another model call or transition.
+JSONL at finalization. Incremental and rebuilt JSONL use UTF-8 with LF line endings
+on every supported platform. A failed write never causes another model call or transition.
 Persistently unwritable storage or process termination can still leave partial output.
 
 A phase reserves the full team's maximum attempts before starting. Unknown token

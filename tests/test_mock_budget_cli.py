@@ -47,17 +47,18 @@ class MockBudgetCLITests(unittest.TestCase):
 
     def command(self, config, out, *args):
         env = os.environ.copy()
+        env['PYTHONIOENCODING'] = 'utf-8'
         for provider in ('OPENAI', 'ANTHROPIC', 'GEMINI'):
             for suffix in ('MODEL', 'API_KEY'):
                 env.pop(provider + '_' + suffix, None)
         return subprocess.run(
             [sys.executable, '-m', 'parallax_relay.play', '--mock', '--quiet',
              '--config', str(config), '--out', str(out), *args],
-            capture_output=True, text=True, env=env, timeout=30)
+            capture_output=True, text=True, encoding='utf-8', errors='replace', env=env, timeout=30)
 
     def artifacts(self, out):
-        return (json.loads((out / 'result.json').read_text()),
-                json.loads((out / 'manifest.json').read_text()))
+        return (json.loads((out / 'result.json').read_text(encoding='utf-8')),
+                json.loads((out / 'manifest.json').read_text(encoding='utf-8')))
 
     def test_priced_tiny_cap_mock_wins_in_normal_and_fast_modes(self):
         config = self.config()
@@ -132,8 +133,8 @@ class MockBudgetCLITests(unittest.TestCase):
                 self.assertEqual(manifest['requested_settings'], manifest['settings'])
 
     def test_mock_does_not_bypass_requested_config_validation(self):
-        valid = self.config().read_text()
-        cases = [self.config(priced_roles=ROLES[:-1]).read_text(),
+        valid = self.config().read_text(encoding='utf-8')
+        cases = [self.config(priced_roles=ROLES[:-1]).read_text(encoding='utf-8'),
                  valid.replace('input_per_million = 1', 'input_per_million = 0', 1),
                  valid.replace('input_per_million = 1', 'input_per_million = "SECRET_SENTINEL"', 1),
                  valid.replace('max_calls = 216', 'max_calls = 0')]
@@ -166,7 +167,7 @@ class MockBudgetCLITests(unittest.TestCase):
         self.assertEqual(result['budget']['calls_started'], 0)
         self.assertEqual(manifest['settings']['max_estimated_cost_usd'], 0.001)
         self.assertNotIn('requested_settings', manifest)
-        self.assertNotIn('KEY_SENTINEL', (out / 'manifest.json').read_text())
+        self.assertNotIn('KEY_SENTINEL', (out / 'manifest.json').read_text(encoding='utf-8'))
 
     def test_check_leaves_priced_config_intact_without_starting_a_match(self):
         config = self.config()

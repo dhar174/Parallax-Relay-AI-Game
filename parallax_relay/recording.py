@@ -44,7 +44,7 @@ class Recorder:
         temp.replace(target)
 
     def _append(self, filename: str, data: dict) -> None:
-        with (self.out / filename).open('a', encoding='utf-8') as handle:
+        with (self.out / filename).open('a', encoding='utf-8', newline='\n') as handle:
             handle.write(json.dumps(data, ensure_ascii=True) + '\n')
             handle.flush()
 

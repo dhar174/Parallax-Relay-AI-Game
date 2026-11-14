@@ -13,6 +13,28 @@ from parallax_relay.recording import Recorder
 
 
 class RecordingFailureTests(unittest.IsolatedAsyncioTestCase):
+    async def test_incremental_jsonl_matches_final_snapshot_under_windows_newlines(self):
+        from parallax_relay.config import MatchSettings
+        with tempfile.TemporaryDirectory() as tmp:
+            recorder = Recorder(Path(tmp) / 'run', {'mode': 'mock'})
+            real_open = Path.open
+            real_finish = recorder.finish
+            before = {}
+            def windows_open(path, mode='r', buffering=-1, encoding=None, errors=None, newline=None):
+                if mode == 'a' and newline is None:
+                    newline = '\r\n'
+                return real_open(path, mode, buffering, encoding, errors, newline)
+            def finish(result):
+                for name in ('calls.jsonl', 'phases.jsonl', 'replay.jsonl'):
+                    before[name] = (recorder.out / name).read_bytes()
+                real_finish(result)
+            with patch.object(Path, 'open', windows_open), patch.object(recorder, 'finish', finish):
+                await driver.run_match({r: ScriptedAgent(r) for r in ROLES},
+                                       MatchSettings(max_turns=1), recorder=recorder)
+            for name, data in before.items():
+                self.assertNotIn(b'\r\n', data)
+                self.assertEqual(data, (recorder.out / name).read_bytes())
+
     async def test_partial_temp_writes_preserve_final_png_and_viewer(self):
         import traceback
         from parallax_relay.config import MatchSettings
@@ -46,7 +68,7 @@ class RecordingFailureTests(unittest.IsolatedAsyncioTestCase):
                 self.assertNotIn('SECRET_SENTINEL', ''.join(traceback.format_exception(ctx.exception)))
                 for artifact in out.iterdir():
                     if artifact.suffix in ('.json', '.jsonl', '.html'):
-                        self.assertNotIn('SECRET_SENTINEL', artifact.read_text())
+                        self.assertNotIn('SECRET_SENTINEL', artifact.read_text(encoding='utf-8'))
 
     async def test_phase_failure_recovers_zero_turn_result(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -63,7 +85,7 @@ class RecordingFailureTests(unittest.IsolatedAsyncioTestCase):
                     self.assertEqual(error.result.stop_reason, 'local_error')
                 else:
                     self.fail('A recording failure must raise')
-            summary = json.loads((out / 'result.json').read_text())
+            summary = json.loads((out / 'result.json').read_text(encoding='utf-8'))
             self.assertEqual(summary['stop_reason'], 'local_error')
             self.assertEqual(summary['turns'], 0)
             self.assertTrue((out / 'index.html').is_file())
@@ -79,7 +101,7 @@ class RecordingFailureTests(unittest.IsolatedAsyncioTestCase):
                     def fail(*args):
                         if timing == 'after': real(*args)
                         if timing == 'partial' and filename:
-                            with (out / filename).open('a') as handle: handle.write('{partial')
+                            with (out / filename).open('a', encoding='utf-8') as handle: handle.write('{partial')
                         raise original
                     with patch.object(recorder, method, side_effect=fail):
                         with self.assertRaises(driver.MatchExecutionError) as ctx:
@@ -91,20 +113,20 @@ class RecordingFailureTests(unittest.IsolatedAsyncioTestCase):
                     for filename, rows in [('calls.jsonl', error.result.calls),
                                            ('phases.jsonl', error.result.phases),
                                            ('replay.jsonl', error.result.records)]:
-                        saved = [json.loads(line) for line in (out / filename).read_text().splitlines()]
+                        saved = [json.loads(line) for line in (out / filename).read_text(encoding='utf-8').splitlines()]
                         self.assertEqual(saved, rows)
                     self.assertEqual(error.result.budget['calls_started'], len(error.result.calls))
-                    state = json.loads((out / 'final_state.json').read_text())
+                    state = json.loads((out / 'final_state.json').read_text(encoding='utf-8'))
                     self.assertEqual(state, error.result.world.snapshot())
-                    self.assertEqual(json.loads((out / 'result.json').read_text()), error.result.summary())
-                    data = json.loads((out / 'index.html').read_text().split('const DATA=', 1)[1].split(';\nconst $=', 1)[0])
+                    self.assertEqual(json.loads((out / 'result.json').read_text(encoding='utf-8')), error.result.summary())
+                    data = json.loads((out / 'index.html').read_text(encoding='utf-8').split('const DATA=', 1)[1].split(';\nconst $=', 1)[0])
                     self.assertEqual(data['records'], error.result.records)
                     self.assertEqual(data['result'], error.result.summary())
                     import traceback
                     self.assertNotIn('SECRET_SENTINEL', ''.join(traceback.format_exception(error)))
                     for file in out.iterdir():
                         if file.suffix in ('.json', '.jsonl', '.html'):
-                            self.assertNotIn('SECRET_SENTINEL', file.read_text())
+                            self.assertNotIn('SECRET_SENTINEL', file.read_text(encoding='utf-8'))
 
     async def test_progress_and_unexpected_driver_errors(self):
         for operation in ('progress', 'driver'):
@@ -140,7 +162,7 @@ class RecordingFailureTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(ctx.exception.result.world.turn, 1)
                 for name in set(names) - {failed}: self.assertTrue((out / name).exists())
                 if failed != 'result.json':
-                    self.assertEqual(json.loads((out / 'result.json').read_text())['stop_reason'], 'local_error')
+                    self.assertEqual(json.loads((out / 'result.json').read_text(encoding='utf-8'))['stop_reason'], 'local_error')
                 self.assertEqual(recorder.viewer_ready, failed != 'index.html')
 
     async def test_transient_finish_failure_after_victory_keeps_game_outcome(self):

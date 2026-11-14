@@ -95,6 +95,11 @@ not a hard provider-enforced monetary ceiling.
 
 ## Reproduce
 
+Historical milestone commands follow. For current verification, also include
+`scripts` in compilation (`python -m compileall -q parallax_relay tests scripts`)
+and run `python scripts/check_mock_runs.py`; CI also checks committed diff ranges
+as described in [Contributing](../CONTRIBUTING.md#supported-environments-and-ci).
+
 ```bash
 python -m unittest discover -s tests -v
 python -m compileall -q parallax_relay tests
@@ -317,3 +322,137 @@ verify that local failure status survives slow teardown and raw errors stay priv
 Fresh full unittest discovery: **112 tests passed**, with an asyncio slow-task
 diagnostic and no failures/errors. Diff checks passed. The review required no
 production behavior correction; this follow-up adds explicit atomicity evidence.
+
+## Slice 4 dependency checkpoint — November 14, 2026
+
+Baseline: merged slice 3 (`cda9220`). Fresh Linux x86_64/glibc 2.41 environments
+used Python **3.11.18** and **3.12.14**, with pip **26.3**. uv **0.13.6** generated
+the universal Python-3.11-minimum lock, with 12 pinned distributions and 247 SHA-256
+entries. No compatibility ranges or historical direct pins were changed.
+
+Both installations used `--require-hashes --only-binary=:all:` with
+`-r requirements-dev.lock -r requirements.txt`. Their installed inventories matched
+all 12 pins (apart from the separately pinned pip bootstrap):
+
+```text
+annotated-types==0.8.0
+anyio==4.16.0
+certifi==2026.10.23
+h11==0.16.0
+httpcore==1.0.9
+httpx==0.28.1
+idna==3.20
+pillow==12.3.0
+pydantic==2.14.3
+pydantic-core==2.50.4
+typing-extensions==4.16.0
+typing-inspection==0.4.5
+```
+
+At this dependency checkpoint both interpreters passed the existing **112 tests**,
+`pip check`, and compilation. Normal/fast mock results were checked for exit 0,
+victory in seven turns, 63/42 calls, five energy, and every score 100. A dry-run
+installation with conflicting httpx requirements failed with `ResolutionImpossible`;
+removing the httpx lock entry failed the hash-mode exact-pin requirement. Both
+negative cases returned exit 1 as required.
+
+Hosted matrix evidence and the completed smoke-checker suite follow separately.
+This checkpoint does not establish Windows/macOS support or complete R09's audits.
+
+## Slice 4 CI and smoke checks — November 14, 2026
+
+The checker tests first failed because the helper was absent (three expected
+failures), then passed after implementation. They cover both modes, current
+interpreter use, credential stripping, fresh destinations, cleanup on success and
+failure, subprocess failure/timeout/launch errors, missing/malformed JSON, wrong
+call counts, incomplete outcomes, and missing role scores.
+
+Fresh complete discovery passed **115 tests** on both Linux/Python 3.11.18 and
+3.12.14 with the locked inventories above. Both real CLI modes also passed their
+explicit outcome checks. Compilation includes the new scripts directory. Local
+workflow validation passed with actionlint 1.7.12 after correcting YAML quoting
+around pip's binary-only option. `pip check` and diff whitespace checks passed.
+
+The workflow targets Ubuntu 24.04/Python 3.11–3.13, Windows Server 2022/Python 3.12,
+macOS 15/Python 3.12, and a separate Ubuntu/Python 3.12 range-resolution job. The
+action release commits are pinned and no provider credentials are configured.
+The [initial PR run](https://github.com/dhar174/Parallax-Relay-AI-Game/actions/runs/43563157911)
+passed the four Linux jobs and macOS, each with 115 tests and the asserted mocks.
+Windows installed the lock successfully but reported 16 decoding errors in tests
+that read UTF-8 HTML with the Windows cp1252 default, plus one legacy-demo assertion:
+Windows can raise `FileExistsError` for a nonexistent destination below a file.
+
+Tests now read recording artifacts explicitly as UTF-8. The demo checks the
+destination with `lstat` before choosing its existing-path message; parent-file
+failures retain the sanitized local-file error and exit 2. An injected Windows
+error regression failed before this correction and passed afterward. The complete
+**116-test** suite passed on Linux/Python 3.11 and on 3.12 with cp1252 emulation for
+unspecified pathlib text encodings. No assertions were relaxed or tests skipped.
+
+The initial logs also exposed preinstalled runner packages, so each revised job
+creates a fresh virtual environment and bootstraps pip 26.3 into it. The exact
+workflow bootstrap was exercised locally and produced only pip before project
+installation. An additional fresh Linux/Python 3.12 range installation passed
+115 tests, compilation, and both asserted mocks before the portability correction.
+
+### Verified hosted matrix
+
+The [revised run](https://github.com/dhar174/Parallax-Relay-AI-Game/actions/runs/43563739314)
+at `055bc7f` passed all six jobs. Each log was inspected for the fresh `.venv`
+interpreter, pip 26.3, the exact 12 project pins listed above, **116 passing tests
+with no skips**, dependency consistency, compilation, both asserted mock victories,
+and the diff check. The independent range resolution selected the same versions
+on this date, without using lock constraints.
+
+| Environment | Python | Architecture | Dependencies | Result |
+|---|---|---|---|---|
+| Ubuntu 24.04 | 3.11.18 | x86_64 | Locked | Passed |
+| Ubuntu 24.04 | 3.12.16 | x86_64 | Locked | Passed |
+| Ubuntu 24.04 | 3.13.18 | x86_64 | Locked | Passed |
+| Windows Server 2022 (10.0.20348) | 3.12.10 | AMD64 | Locked | Passed |
+| macOS 15.8.2 | 3.12.10 | arm64 | Locked | Passed |
+| Ubuntu 24.04 | 3.12.16 | x86_64 | Fresh ranges | Passed |
+
+The locked workflow baseline received a fresh independent review with no findings;
+the subsequently observed Windows defects were reproduced and corrected as above.
+Documentation checks verified 38 local links/anchors. Historical fixtures and their
+PNGs remain unchanged. No provider credentials, paid calls, or spectator uploads
+were used. This evidence covers the listed combinations, not newer Python versions,
+other architectures, live provider compatibility, browser behavior, or the pending
+source/privacy and dependency/license audits (#23/#24). Parent #11 remains open.
+
+### PR #30 Antigravity review follow-up — November 14, 2026
+
+Against review baseline `38470e4`, focused regressions reproduced the main
+launcher's Windows EEXIST classification, Unicode subprocess failure under ASCII
+parent stdio, acceptance of integer booleans/float turn values, and incremental
+Windows CRLF versus final LF snapshots. The fixes passed those regressions.
+Disposable Git repositories demonstrate that a clean `git diff --check` misses
+committed defects; the new committed-range checker rejects them for PR, push,
+manual, and initial/root events while accepting clean changes and rejecting an
+invalid PR base. No comparison boundary is interpolated into shell code.
+
+Fresh full discovery passed **129 tests without skips** on Linux/Python 3.11.18
+and 3.12.14 with pip 26.3. Coverage now includes actual unmocked helper execution
+with Unicode temporary paths, both-mode fault injection, isolated diagnostics,
+strict score/result types, sibling artifacts, quiet progress suppression, cleanup
+failures, existing/broken/file symlinks, default output below a regular `runs` file,
+and later demo writes failing with FileExistsError. UTF-8 is explicit for all test
+text fixtures; child stdio is UTF-8 without forcing native filesystem UTF-8 mode.
+
+The exact revised workflow bootstrap ran locally under a temporary runner root,
+producing only hash-verified pip 26.3 before project installation. Corrupting its
+hashes was rejected with exit 1. Generation headers and parent annotations were
+added without changing any of the 12 project versions or 247 hashes. `pip check`,
+compilation, normal/fast real mock assertions, actionlint 1.7.12, and diff checks
+passed. Historical fixtures, compatibility ranges, and milestone pins are intact.
+
+Inspect the final-head PR checks for hosted verification; earlier hosted runs
+above apply only to their recorded revisions. Security/dependency audits, paid
+provider testing, and merging remain outside this review follow-up.
+
+The first follow-up run passed five jobs; Windows exposed four assertions in the
+new symlink cases because `readlink()` supplies a `\\?\` extended-path prefix.
+Those tests now snapshot the original link target before invoking the launcher
+and require exact equality afterward, alongside untouched-target checks. This
+verifies preservation without assuming the operating system's path spelling.

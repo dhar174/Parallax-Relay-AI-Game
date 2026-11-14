@@ -12,7 +12,9 @@ already know the solution; they are not evidence of model reasoning or cooperati
 
 ## Try it without API keys
 
-Use Python **3.11 or later**. Run from the repository root:
+Use Python **3.12** for the usual development environment; the minimum is 3.11.
+See [Contributing](CONTRIBUTING.md#environment) for dependency reproducibility and
+tested-environment coverage. Run from the repository root:
 
 ```bash
 git clone https://github.com/dhar174/Parallax-Relay-AI-Game.git
@@ -35,7 +37,8 @@ source .venv/bin/activate
 Install dependencies, run the offline tests, and play the scripted fixture:
 
 ```bash
-python -m pip install -r requirements.txt
+python -m pip install --require-hashes --only-binary=:all: -r requirements-bootstrap.lock
+python -m pip install --require-hashes --only-binary=:all: -r requirements-dev.lock -r requirements.txt
 python -m unittest discover -s tests -v
 python -m parallax_relay.play --mock
 ```
@@ -44,6 +47,10 @@ Open the `index.html` path printed by the launcher. Each invocation creates a ne
 folder under `runs/`. A normal mock match wins in seven turns with 63 scripted
 calls, five energy remaining, and a score of 100 for each role. No provider calls
 are made. Add `--fast` for one communication pass and 42 scripted calls.
+For an automated check of both modes with temporary outputs, run
+`python scripts/check_mock_runs.py`. CI checks the
+[focused Python/OS matrix](CONTRIBUTING.md#supported-environments-and-ci), with
+locked dependencies and a separate compatibility-range job.
 
 For a ready-made replay, download or clone the repository and open
 [`example_run/index.html`](example_run/index.html) locally, keeping its PNGs beside

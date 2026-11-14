@@ -4,7 +4,7 @@ Reviewed **2026-11-13**, against runtime baseline
 [`719c7696c4bfe50934fc936bbccfb62812633164`](https://github.com/dhar174/Parallax-Relay-AI-Game/commit/719c7696c4bfe50934fc936bbccfb62812633164).
 This is a documentation and source review with offline reproductions. Runtime code,
 tests, dependencies, and committed fixtures were not changed during that review.
-Subsequent slice 1/2/3 resolutions are annotated below; in those sections the original
+Subsequent slice 1–4 resolutions are annotated below; in those sections the original
 evidence, suggested remedies, and reproductions are historical baseline records.
 
 ## Method and coverage
@@ -43,13 +43,13 @@ review; that is not a security assurance.
 |---|---|---|---|---|
 | R01 | P2 | Confirmed defect | Non-UTF-8 TOML bypasses CLI error handling | Fixed in PR #27 |
 | R02 | P2 | Confirmed defect | Dollar guard blocks no-cost mock runs | Fixed in PR #28 |
-| R03 | P2 | Confirmed defect | Recording errors bypass finalization | Fixed in slice 3; pending merge |
+| R03 | P2 | Confirmed defect | Recording errors bypass finalization | Fixed in PR #29 |
 | R04 | P3 | Documentation mismatch | Non-MOVE zero fields are requested but unenforced | Fixed in PR #27 |
 | R05 | P2 | Documentation mismatch | Legacy demo overwrites existing output | Fixed in PR #27 |
 | R06 | P1 | Unverified assumption | Offline wire tests do not establish live compatibility | Open validation gate |
 | R07 | P1 | Future enhancement | Fixed room cannot establish general cooperative ability | Open research gate |
 | R08 | P2 | Future enhancement | Run artifacts lack full experiment provenance | Open |
-| R09 | P2 | Test gap | No CI or supported-environment matrix | Open |
+| R09 | P2 | Test gap | CI, reproducibility, and missing audit coverage | Partially addressed; audits open |
 | R10 | P3 | Test gap / future enhancement | Replay browser coverage and partial-run inspection | Open |
 
 ## R01: Non-UTF-8 TOML escapes CLI error handling
@@ -230,7 +230,7 @@ explain the distinction. For a future code change, make the legacy demo reject
 existing output like the main launcher.
 **Acceptance:** an existing destination and sentinel remain unchanged with a clear
 error; a new directory still produces the seven-turn demo. These criteria are now
-covered by the slice 1 resolution above, pending merge.
+covered by the slice 1 resolution merged in PR #27.
 
 ## R06: Live provider compatibility is unverified
 
@@ -298,6 +298,16 @@ development dependency set without confusing it with broad compatibility ranges.
 **Acceptance:** CI needs no secrets, runs the full suite and mock checks, reports
 its environment, and checks the minimum Python plus declared OS/version targets.
 Include regressions for R01–R05 when those fixes are implemented.
+
+**Slice 4 status (November 14, 2026):** #22 adds a complete hashed dependency lock
+and documented refresh procedure; #21 adds five locked Python/OS combinations plus
+an independent Linux/Python 3.12 range-resolution check. All jobs run the complete
+offline suite, compilation, dependency checks, and asserted normal/fast mock runs.
+See the [support policy](../CONTRIBUTING.md#supported-environments-and-ci) and
+[dated evidence](VERIFICATION.md#slice-4-ci-and-smoke-checks--november-14-2026) for
+what actually ran. The original evidence above remains historical. Parent #11
+stays open for the separate source/privacy audit #23 and dependency/license audit
+#24; CI success does not complete those audits or establish live compatibility.
 
 ## R10: Replay coverage and partial-run inspection need work
 
