@@ -49,7 +49,7 @@ review; that is not a security assurance.
 | R06 | P1 | Unverified assumption | Offline wire tests do not establish live compatibility | Open validation gate |
 | R07 | P1 | Future enhancement | Fixed room cannot establish general cooperative ability | Open research gate |
 | R08 | P2 | Future enhancement | Run artifacts lack full experiment provenance | Open |
-| R09 | P2 | Test gap | No CI or supported-environment matrix | Open |
+| R09 | P2 | Test gap | CI, reproducibility, and missing audit coverage | Partially addressed; audits open |
 | R10 | P3 | Test gap / future enhancement | Replay browser coverage and partial-run inspection | Open |
 
 ## R01: Non-UTF-8 TOML escapes CLI error handling
@@ -298,6 +298,16 @@ development dependency set without confusing it with broad compatibility ranges.
 **Acceptance:** CI needs no secrets, runs the full suite and mock checks, reports
 its environment, and checks the minimum Python plus declared OS/version targets.
 Include regressions for R01–R05 when those fixes are implemented.
+
+**Slice 4 status (November 14, 2026):** #22 adds a complete hashed dependency lock
+and documented refresh procedure; #21 adds five locked Python/OS combinations plus
+an independent Linux/Python 3.12 range-resolution check. All jobs run the complete
+offline suite, compilation, dependency checks, and asserted normal/fast mock runs.
+See the [support policy](../CONTRIBUTING.md#supported-environments-and-ci) and
+[dated evidence](VERIFICATION.md#slice-4-ci-and-smoke-checks--november-14-2026) for
+what actually ran. The original evidence above remains historical. Parent #11
+stays open for the separate source/privacy audit #23 and dependency/license audit
+#24; CI success does not complete those audits or establish live compatibility.
 
 ## R10: Replay coverage and partial-run inspection need work
 

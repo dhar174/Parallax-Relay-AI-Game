@@ -46,9 +46,10 @@ Run commands from the repository root with the environment activated:
 ```bash
 python -m pip check
 python -m unittest discover -s tests -v
-python -m compileall -q parallax_relay tests
+python -m compileall -q parallax_relay tests scripts
 python -m parallax_relay.play --mock
 python -m parallax_relay.play --mock --fast
+python scripts/check_mock_runs.py
 ```
 
 The main launcher chooses a unique output directory when `--out` is omitted.
@@ -60,6 +61,39 @@ For a focused module, use discovery rather than assuming `tests` is a package:
 ```bash
 python -m unittest discover -s tests -p 'test_protocol.py' -v
 ```
+
+## Supported environments and CI
+
+The focused support targets are:
+
+| GitHub-hosted operating system | Python | Dependency set |
+|---|---|---|
+| Ubuntu 24.04 | 3.11, 3.12, 3.13 | Locked |
+| Windows Server 2022 | 3.12 | Locked |
+| macOS 15 | 3.12 | Locked |
+| Ubuntu 24.04 | 3.12 | Fresh compatibility-range resolution |
+
+Hosted verification is pending the first workflow run; current local evidence is
+Linux/Python 3.11 and 3.12. Support claims require successful checks in the specific
+matrix combinations. Newer Python versions, other OS/version combinations,
+architectures outside the runners' reported architecture, and WSL are unverified.
+Python 3.11 is the minimum, not a promise that all later releases work.
+
+The [offline workflow](.github/workflows/offline.yml) runs on pull requests, pushes
+to `main`, and manual dispatch. Each of its six jobs checks dependencies, runs the
+complete unittest suite, compiles sources, and checks both real mock CLI outcomes.
+The standalone checker uses temporary destinations, strips provider credentials
+from its child environments, fails on incorrect results, and removes outputs.
+For an independent compatibility check, install `requirements.txt` alone in a
+fresh environment using pip 26.3, then run the same checks. The floating job tests
+the latest compatible resolution for Python 3.12, not every historical combination.
+
+Offline here means no real provider/model calls: providers are intercepted in
+tests and CLI smoke runs use `--mock`. Registry access is still needed for installs.
+CI configures no provider keys, does not print environment variables, and uploads
+no spectator artifacts. Python, pip, OS/architecture, dependencies, test diagnostics,
+and concise mock outcomes remain in job logs. Runner images and Python patch
+versions can change; the lock pins dependencies rather than the entire OS image.
 
 ## Making a change
 
@@ -97,5 +131,5 @@ or unrelated run output. `.env.example` is a blank template. Read the
 
 Before handing off, inspect `git diff --check`, the changed-file list, and the
 relevant documentation links. Describe the problem, final behavior, verification,
-and any remaining limitations. No CI workflow is currently configured, so local
-checks are the available automated evidence.
+and any remaining limitations. Inspect all six CI job results on the actual PR
+revision before treating the configured matrix as verified.

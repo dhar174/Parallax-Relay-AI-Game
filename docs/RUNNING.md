@@ -6,6 +6,10 @@ The default installation uses the hashed development lock plus the compatibility
 ranges. See [Contributing](../CONTRIBUTING.md#environment) for applicability,
 fresh-environment setup, and lock updates. The historical direct-version file is
 not a complete lockfile.
+The [support policy](../CONTRIBUTING.md#supported-environments-and-ci) distinguishes
+the configured CI matrix from actual verification evidence. Run
+`python scripts/check_mock_runs.py` to assert both scripted victories using
+temporary output directories; it returns 1 on a failed CLI or unexpected result.
 
 ## Offline modes
 

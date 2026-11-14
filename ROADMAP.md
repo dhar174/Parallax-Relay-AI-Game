@@ -12,8 +12,10 @@ and dependencies; optional mechanics are not automatically defects.
 ## 1. Documented baseline
 
 **Status:** documentation delivered in PR #1. Slice 1 delivered R01/R04/R05
-in PR #27. Slice 2 implements the R02 CLI mock override on its review branch, pending
-merge; other runtime findings and validation gates remain open.
+in PR #27, slice 2 delivered R02 in PR #28, and slice 3 delivered R03 in PR #29.
+Slice 4 adds the dependency lock and offline CI matrix for #22/#21; actual hosted
+results are recorded in the verification guide. Provider validation and the
+security/dependency audits remain open.
 
 Establish reproducible onboarding, explain current contracts and limitations, and
 provide compact coding-agent guidance. Preserve original milestone evidence while

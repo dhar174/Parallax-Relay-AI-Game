@@ -4,6 +4,8 @@
 
 - Add a complete hashed development dependency lock, retaining compatibility
   ranges and historical pins, with a documented refresh procedure.
+- Add a six-job offline CI matrix and a reusable normal/fast mock outcome checker,
+  with focused failure tests and explicit Python/platform support policy.
 
 - Preserve the last resolved checkpoint on recording/callback failure; recover
   independent atomic artifacts before raising a sanitized partial-result exception.

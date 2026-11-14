@@ -349,9 +349,28 @@ At this dependency checkpoint both interpreters passed the existing **112 tests*
 victory in seven turns, 63/42 calls, five energy, and every score 100. A dry-run
 installation with conflicting httpx requirements failed with `ResolutionImpossible`;
 removing the httpx lock entry failed the hash-mode exact-pin requirement. Both
-negative cases returned exit 1 as required. An initial diagnostic assertion expected
-the missing-pin rejection to mention missing hashes; it was corrected to check
-pip's actual exact-pin rejection and both checks were rerun successfully.
+negative cases returned exit 1 as required.
 
 Hosted matrix evidence and the completed smoke-checker suite follow separately.
 This checkpoint does not establish Windows/macOS support or complete R09's audits.
+
+## Slice 4 CI and smoke checks — November 14, 2026
+
+The checker tests first failed because the helper was absent (three expected
+failures), then passed after implementation. They cover both modes, current
+interpreter use, credential stripping, fresh destinations, cleanup on success and
+failure, subprocess failure/timeout/launch errors, missing/malformed JSON, wrong
+call counts, incomplete outcomes, and missing role scores.
+
+Fresh complete discovery passed **115 tests** on both Linux/Python 3.11.18 and
+3.12.14 with the locked inventories above. Both real CLI modes also passed their
+explicit outcome checks. Compilation includes the new scripts directory. Local
+workflow validation passed with actionlint 1.7.12 after correcting YAML quoting
+around pip's binary-only option. `pip check` and diff whitespace checks passed.
+
+The workflow targets Ubuntu 24.04/Python 3.11–3.13, Windows Server 2022/Python 3.12,
+macOS 15/Python 3.12, and a separate Ubuntu/Python 3.12 range-resolution job. The
+action release commits are pinned and no provider credentials are configured.
+Hosted verification is pending the first PR run; the configured matrix is not
+yet evidence of successful Windows/macOS execution. Historical fixtures and their
+PNGs remain unchanged; no private run artifacts are published.

@@ -35,9 +35,10 @@ Verification commands:
 ```bash
 python -m pip check
 python -m unittest discover -s tests -v
-python -m compileall -q parallax_relay tests
+python -m compileall -q parallax_relay tests scripts
 python -m parallax_relay.play --mock
 python -m parallax_relay.play --mock --fast
+python scripts/check_mock_runs.py
 ```
 
 For a focused test module:
@@ -46,6 +47,8 @@ For a focused test module:
 python -m unittest discover -s tests -p 'test_protocol.py' -v
 ```
 
+CI targets Linux/Python 3.11–3.13, Windows/macOS Python 3.12, plus a separate Linux
+3.12 range-resolution job. Inspect actual results; see CONTRIBUTING.md for policy.
 Mock runs should win in seven turns, with 63 calls normally or 42 in fast mode,
 five energy remaining, and all scores 100. Run the full offline suite after code
 changes. For documentation changes, verify affected commands, links, and claims.
