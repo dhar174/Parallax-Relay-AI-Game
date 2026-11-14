@@ -1,5 +1,45 @@
 # Verification record
 
+## Slice 6 independent provider-contract audit — November 14, 2026
+
+Implemented #13 from merged-main revision `08c5048` on
+`audit/slice-6-provider-contracts`. The clean baseline passed 129 tests. The audit
+read official provider REST/guides and 12 official SDK source files pinned to
+OpenAI `3dae6090`, Anthropic `5139cf2e`, and Google `a3d04bd5`; full immutable links
+and source-to-test coverage are in [API sources](API_SOURCES.md#independent-contract-audit--november-14-2026).
+Public-source retrieval is separate from intercepted tests; no provider SDK was
+installed/executed and no credentialed model endpoint was contacted.
+
+New regressions first reproduced seven test failures comprising 27 failing cases:
+OpenAI failed/filter/incomplete/commentary handling, malformed additive usage,
+lost Anthropic thinking metadata, and premature replacement of budget estimates.
+After correction they passed. An additional refusal-precedence regression failed
+when commentary filtering hid a refusal; moving refusal detection before filtering
+fixed it. The final provider-focused run passed **28 tests**, including all 16 new
+contract tests and the existing 12 provider tests. Request expectations are literal,
+independently sourced, and cover all nine provider/phase combinations.
+
+Fresh Linux verification with hash-installed locked dependencies and pip 26.3:
+
+- Python 3.12.14: **145 tests passed**, no skips, 17.966 seconds.
+- Python 3.11.18: **145 tests passed**, no skips, 18.645 seconds.
+- Dependency consistency, compilation, actionlint and whitespace checks passed.
+- Standalone normal/fast mock CLIs and the reusable outcome checker passed: seven
+  turns, 63/42 calls, five energy, all scores 100. These are scripted fixtures.
+- Checked 48 local documentation links/anchors before this verification entry;
+  historical fixtures and all dependency files remain unchanged.
+
+The audit corroborates and retains Anthropic's `2026-10-21` header and Gemini's
+generateContent `responseJsonSchema` shape. It distinguishes local retry and omitted
+optional-counter conventions from universal provider guarantees. Model-selection
+requirements are documented; no named shortlist, model defaults, API migration,
+token-limit increase or paid execution is included. Existing interfaces/schemas,
+engine rules, budgeting, cancellation and recording recovery remain intact.
+The independent review and actual final-head hosted matrix evidence accompany the
+delivery PR. Remote access/model acceptance, billing accuracy and image understanding
+remain unverified; #14–#16 and parent #8 stay open. Slice 5/PR #31 was not merged
+or incorporated as a prerequisite.
+
 Original milestone release date: November 12, 2026.
 
 The original evidence below is historical. See the dated repository import and

@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Independently audit all three provider contracts against official references and
+  pinned SDK source, retaining Anthropic's version and Gemini's generateContent format.
+- Correct OpenAI failed/filter/incomplete/final-message handling; retain unknown
+  additive token aggregates and Anthropic thinking metadata without double-counting.
+- Expand intercepted request/response/error/budget/privacy coverage and document
+  model-selection requirements; defer named models and paid validation.
 - Check committed CI diffs, isolate caches/cancellation, and hash-check pip bootstrap
   wheels in runner temporary environments without persisting checkout credentials.
 - Harden mock-checker encoding, environment isolation, strict result/artifact checks,

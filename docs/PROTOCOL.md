@@ -70,7 +70,17 @@ exponential delay and bounded provider Retry-After. Refusal is not retried. A JS
 repair request gives a fixed safe instruction without echoing raw malformed text.
 Schema-valid illegal moves go to the engine without retry. Transient network/HTTP
 failures retry, then silence/WAIT. Authentication, unsupported model/schema requests,
-and exhausted quota are fatal. No automatic SDK/transport retry is hidden.
+and recognized exhausted-quota errors are fatal. Other 429 errors retain bounded
+retries; the adapter cannot establish that every provider quota error is transient.
+No automatic SDK/transport retry is hidden.
+
+OpenAI failed/error envelopes raise sanitized `response_failed`; only documented
+`server_error`/`rate_limit_exceeded` response codes retry. Content filtering is a
+refusal; unfinished messages remain incomplete, and commentary/reasoning are not
+final JSON replies. Anthropic thinking usage is metadata within the inclusive output
+total. Invalid additive cache/thought counters leave the affected total unknown,
+retaining its budget estimate. See the [dated contract audit](API_SOURCES.md#independent-contract-audit--november-14-2026)
+for source references and the distinction between provider contracts and local policy.
 
 The failure streak counts failed **phases**, not rounds. Three consecutive failed
 phases for one role abort by default. Any successful phase resets that role's streak.
