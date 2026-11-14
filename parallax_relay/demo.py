@@ -120,7 +120,13 @@ def main(argv: list[str] | None = None) -> int:
     try:
         run(out)
     except FileExistsError:
-        print('Output path already exists. Choose a new --out path.', file=sys.stderr)
+        # Windows also raises EEXIST when a parent component is a regular file.
+        try:
+            out.lstat()
+        except OSError:
+            print('Local file operation failed. Check paths and permissions.', file=sys.stderr)
+        else:
+            print('Output path already exists. Choose a new --out path.', file=sys.stderr)
         return 2
     except OSError:
         print('Local file operation failed. Check paths and permissions.', file=sys.stderr)

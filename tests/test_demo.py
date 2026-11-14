@@ -163,3 +163,18 @@ class DemoTests(unittest.TestCase):
             self.assertNotIn('Traceback', proc.stderr)
             self.assertNotIn('SECRET_SENTINEL', proc.stdout + proc.stderr)
             self.assertEqual(parent.read_bytes(), b'SECRET_SENTINEL')
+
+    def test_parent_file_windows_error_is_reported_as_local_failure(self):
+        # Windows can report EEXIST for a nonexistent destination below a file.
+        with tempfile.TemporaryDirectory() as tmp:
+            parent = Path(tmp) / 'file-not-directory'
+            parent.write_bytes(b'SECRET_SENTINEL')
+            out = parent / 'run'
+            stderr = io.StringIO()
+            with patch('parallax_relay.demo.run', side_effect=FileExistsError('SECRET_SENTINEL')), \
+                 contextlib.redirect_stderr(stderr):
+                code = main(['--out', str(out)])
+            self.assertEqual(code, 2)
+            self.assertIn('Local file operation failed', stderr.getvalue())
+            self.assertNotIn('SECRET_SENTINEL', stderr.getvalue())
+            self.assertEqual(parent.read_bytes(), b'SECRET_SENTINEL')

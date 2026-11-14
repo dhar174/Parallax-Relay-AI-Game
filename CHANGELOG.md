@@ -6,6 +6,8 @@
   ranges and historical pins, with a documented refresh procedure.
 - Add a six-job offline CI matrix and a reusable normal/fast mock outcome checker,
   with focused failure tests and explicit Python/platform support policy.
+- Correct the legacy demo's Windows parent-file error classification; read UTF-8
+  recording artifacts explicitly in cross-platform tests without relaxing checks.
 
 - Preserve the last resolved checkpoint on recording/callback failure; recover
   independent atomic artifacts before raising a sanitized partial-result exception.

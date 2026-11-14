@@ -371,6 +371,23 @@ around pip's binary-only option. `pip check` and diff whitespace checks passed.
 The workflow targets Ubuntu 24.04/Python 3.11–3.13, Windows Server 2022/Python 3.12,
 macOS 15/Python 3.12, and a separate Ubuntu/Python 3.12 range-resolution job. The
 action release commits are pinned and no provider credentials are configured.
-Hosted verification is pending the first PR run; the configured matrix is not
-yet evidence of successful Windows/macOS execution. Historical fixtures and their
+The [initial PR run](https://github.com/dhar174/Parallax-Relay-AI-Game/actions/runs/43563157911)
+passed the four Linux jobs and macOS, each with 115 tests and the asserted mocks.
+Windows installed the lock successfully but reported 16 decoding errors in tests
+that read UTF-8 HTML with the Windows cp1252 default, plus one legacy-demo assertion:
+Windows can raise `FileExistsError` for a nonexistent destination below a file.
+
+Tests now read recording artifacts explicitly as UTF-8. The demo checks the
+destination with `lstat` before choosing its existing-path message; parent-file
+failures retain the sanitized local-file error and exit 2. An injected Windows
+error regression failed before this correction and passed afterward. The complete
+**116-test** suite passed on Linux/Python 3.11 and on 3.12 with cp1252 emulation for
+unspecified pathlib text encodings. No assertions were relaxed or tests skipped.
+
+The initial logs also exposed preinstalled runner packages, so each revised job
+creates a fresh virtual environment and bootstraps pip 26.3 into it. The exact
+workflow bootstrap was exercised locally and produced only pip before project
+installation. An additional fresh Linux/Python 3.12 range installation passed
+115 tests, compilation, and both asserted mocks before the portability correction.
+Hosted verification of the revised jobs is pending. Historical fixtures and their
 PNGs remain unchanged; no private run artifacts are published.

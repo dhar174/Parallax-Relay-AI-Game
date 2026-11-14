@@ -73,15 +73,18 @@ The focused support targets are:
 | macOS 15 | 3.12 | Locked |
 | Ubuntu 24.04 | 3.12 | Fresh compatibility-range resolution |
 
-Hosted verification is pending the first workflow run; current local evidence is
-Linux/Python 3.11 and 3.12. Support claims require successful checks in the specific
-matrix combinations. Newer Python versions, other OS/version combinations,
+Support is limited to successful matrix combinations recorded in the
+[verification record](docs/VERIFICATION.md#slice-4-ci-and-smoke-checks--november-14-2026).
+Newer Python versions, other OS/version combinations,
 architectures outside the runners' reported architecture, and WSL are unverified.
 Python 3.11 is the minimum, not a promise that all later releases work.
 
 The [offline workflow](.github/workflows/offline.yml) runs on pull requests, pushes
 to `main`, and manual dispatch. Each of its six jobs checks dependencies, runs the
 complete unittest suite, compiles sources, and checks both real mock CLI outcomes.
+Each job creates a fresh virtual environment, bootstraps pip 26.3 there, and uses
+that interpreter for installation and verification, excluding preinstalled runner
+packages from the verification environment.
 The standalone checker uses temporary destinations, strips provider credentials
 from its child environments, fails on incorrect results, and removes outputs.
 For an independent compatibility check, install `requirements.txt` alone in a

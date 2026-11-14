@@ -77,4 +77,4 @@ class HTTPIntegrationTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(result.budget['unknown_usage_calls'], 1)
                 for file in out.glob('*'):
                     if file.suffix in {'.json', '.jsonl', '.html'}:
-                        self.assertNotIn('PRIVATE_KEY_FIXTURE', file.read_text())
+                        self.assertNotIn('PRIVATE_KEY_FIXTURE', file.read_text(encoding='utf-8'))

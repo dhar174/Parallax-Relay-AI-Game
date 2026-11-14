@@ -46,7 +46,7 @@ class RecordingFailureTests(unittest.IsolatedAsyncioTestCase):
                 self.assertNotIn('SECRET_SENTINEL', ''.join(traceback.format_exception(ctx.exception)))
                 for artifact in out.iterdir():
                     if artifact.suffix in ('.json', '.jsonl', '.html'):
-                        self.assertNotIn('SECRET_SENTINEL', artifact.read_text())
+                        self.assertNotIn('SECRET_SENTINEL', artifact.read_text(encoding='utf-8'))
 
     async def test_phase_failure_recovers_zero_turn_result(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -63,7 +63,7 @@ class RecordingFailureTests(unittest.IsolatedAsyncioTestCase):
                     self.assertEqual(error.result.stop_reason, 'local_error')
                 else:
                     self.fail('A recording failure must raise')
-            summary = json.loads((out / 'result.json').read_text())
+            summary = json.loads((out / 'result.json').read_text(encoding='utf-8'))
             self.assertEqual(summary['stop_reason'], 'local_error')
             self.assertEqual(summary['turns'], 0)
             self.assertTrue((out / 'index.html').is_file())
@@ -91,20 +91,20 @@ class RecordingFailureTests(unittest.IsolatedAsyncioTestCase):
                     for filename, rows in [('calls.jsonl', error.result.calls),
                                            ('phases.jsonl', error.result.phases),
                                            ('replay.jsonl', error.result.records)]:
-                        saved = [json.loads(line) for line in (out / filename).read_text().splitlines()]
+                        saved = [json.loads(line) for line in (out / filename).read_text(encoding='utf-8').splitlines()]
                         self.assertEqual(saved, rows)
                     self.assertEqual(error.result.budget['calls_started'], len(error.result.calls))
-                    state = json.loads((out / 'final_state.json').read_text())
+                    state = json.loads((out / 'final_state.json').read_text(encoding='utf-8'))
                     self.assertEqual(state, error.result.world.snapshot())
-                    self.assertEqual(json.loads((out / 'result.json').read_text()), error.result.summary())
-                    data = json.loads((out / 'index.html').read_text().split('const DATA=', 1)[1].split(';\nconst $=', 1)[0])
+                    self.assertEqual(json.loads((out / 'result.json').read_text(encoding='utf-8')), error.result.summary())
+                    data = json.loads((out / 'index.html').read_text(encoding='utf-8').split('const DATA=', 1)[1].split(';\nconst $=', 1)[0])
                     self.assertEqual(data['records'], error.result.records)
                     self.assertEqual(data['result'], error.result.summary())
                     import traceback
                     self.assertNotIn('SECRET_SENTINEL', ''.join(traceback.format_exception(error)))
                     for file in out.iterdir():
                         if file.suffix in ('.json', '.jsonl', '.html'):
-                            self.assertNotIn('SECRET_SENTINEL', file.read_text())
+                            self.assertNotIn('SECRET_SENTINEL', file.read_text(encoding='utf-8'))
 
     async def test_progress_and_unexpected_driver_errors(self):
         for operation in ('progress', 'driver'):
@@ -140,7 +140,7 @@ class RecordingFailureTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(ctx.exception.result.world.turn, 1)
                 for name in set(names) - {failed}: self.assertTrue((out / name).exists())
                 if failed != 'result.json':
-                    self.assertEqual(json.loads((out / 'result.json').read_text())['stop_reason'], 'local_error')
+                    self.assertEqual(json.loads((out / 'result.json').read_text(encoding='utf-8'))['stop_reason'], 'local_error')
                 self.assertEqual(recorder.viewer_ready, failed != 'index.html')
 
     async def test_transient_finish_failure_after_victory_keeps_game_outcome(self):

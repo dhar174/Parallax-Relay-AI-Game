@@ -39,13 +39,13 @@ class CLITests(unittest.TestCase):
             out=Path(tmp)/'run'
             proc=self.command('--mock','--out',out)
             self.assertEqual(proc.returncode,0,proc.stderr)
-            result=json.loads((out/'result.json').read_text())
+            result=json.loads((out/'result.json').read_text(encoding='utf-8'))
             self.assertTrue(result['win'])
             self.assertEqual(result['budget']['calls_started'],63)
             self.assertTrue((out/'index.html').exists())
-            self.assertEqual(len((out/'calls.jsonl').read_text().splitlines()),63)
+            self.assertEqual(len((out/'calls.jsonl').read_text(encoding='utf-8').splitlines()),63)
             self.assertTrue((out/'final_spectator.png').exists())
-            self.assertIn('mock', (out/'manifest.json').read_text())
+            self.assertIn('mock', (out/'manifest.json').read_text(encoding='utf-8'))
 
     def test_live_missing_config_is_no_network_and_no_output_directory(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -59,7 +59,7 @@ class CLITests(unittest.TestCase):
             out=Path(tmp)/'run';out.mkdir();(out/'keep.txt').write_text('keep')
             proc=self.command('--mock','--out',out)
             self.assertEqual(proc.returncode,2)
-            self.assertEqual((out/'keep.txt').read_text(),'keep')
+            self.assertEqual((out/'keep.txt').read_text(encoding='utf-8'),'keep')
 
     def test_mode_required(self):
         self.assertEqual(self.command().returncode,2)
@@ -105,10 +105,10 @@ class RecordingTests(unittest.IsolatedAsyncioTestCase):
             agents={r:Broken(r) if r=='PYRA' else ScriptedAgent(r) for r in ROLES}
             result=await run_match(agents,recorder=rec)
             self.assertEqual(result.stop_reason,'provider_error')
-            self.assertEqual(len((out/'calls.jsonl').read_text().splitlines()),3)
+            self.assertEqual(len((out/'calls.jsonl').read_text(encoding='utf-8').splitlines()),3)
             self.assertTrue((out/'phases.jsonl').exists())
             self.assertTrue((out/'index.html').exists())
-            self.assertEqual(json.loads((out/'result.json').read_text())['turns'],0)
+            self.assertEqual(json.loads((out/'result.json').read_text(encoding='utf-8'))['turns'],0)
 
     async def test_replay_escapes_model_html(self):
         evil='</script><script>globalThis.INJECTED=true</script>'
@@ -119,7 +119,7 @@ class RecordingTests(unittest.IsolatedAsyncioTestCase):
         with tempfile.TemporaryDirectory() as tmp:
             out=Path(tmp)/'xss';rec=Recorder(out,{'mode':'mock'})
             await run_match({r:Talker(r) for r in ROLES},MatchSettings(max_turns=1),recorder=rec)
-            html=(out/'index.html').read_text()
+            html=(out/'index.html').read_text(encoding='utf-8')
             self.assertNotIn(evil,html)
             self.assertIn('\\u003c/script',html)
 
@@ -132,5 +132,5 @@ class RecordingTests(unittest.IsolatedAsyncioTestCase):
             task=asyncio.create_task(run_match({r:Slow(r) for r in ROLES},recorder=rec))
             await started.wait();task.cancel()
             with self.assertRaises(asyncio.CancelledError): await task
-            self.assertEqual(json.loads((out/'result.json').read_text())['stop_reason'],'cancelled')
-            self.assertEqual(len((out/'calls.jsonl').read_text().splitlines()),3)
+            self.assertEqual(json.loads((out/'result.json').read_text(encoding='utf-8'))['stop_reason'],'cancelled')
+            self.assertEqual(len((out/'calls.jsonl').read_text(encoding='utf-8').splitlines()),3)
