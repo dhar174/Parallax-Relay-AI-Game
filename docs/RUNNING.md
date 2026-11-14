@@ -189,6 +189,10 @@ identities, UUIDs and execution timing. Unknown provider revisions/default sampl
 and dirty or unavailable source still limit reconstruction. Historical fixtures
 remain readable without provenance; missing identity is unknown.
 
+For comparative work, follow the prospective [evaluation protocol](EVALUATION.md).
+Current UUID flags label single runs; they do not implement its future campaign
+ledger, budget scheduler, baseline policies or missing ablation controls.
+
 Open `index.html` locally. The round slider and arrow buttons select resolved turns.
 Images show the state **before** that round; events describe its result. Calls and
 phases from an unfinished round may only be visible in JSONL, not in the viewer.

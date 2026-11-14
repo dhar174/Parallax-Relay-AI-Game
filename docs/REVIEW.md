@@ -47,7 +47,7 @@ review; that is not a security assurance.
 | R04 | P3 | Documentation mismatch | Non-MOVE zero fields are requested but unenforced | Fixed in PR #27 |
 | R05 | P2 | Documentation mismatch | Legacy demo overwrites existing output | Fixed in PR #27 |
 | R06 | P1 | Unverified assumption | Offline wire tests do not establish live compatibility | Open validation gate |
-| R07 | P1 | Future enhancement | Fixed room cannot establish general cooperative ability | Open research gate |
+| R07 | P1 | Future enhancement | Fixed room cannot establish general cooperative ability | Protocol specified (#17); #9 research gate remains open |
 | R08 | P2 | Future enhancement | Run artifacts lack full experiment provenance | Run provenance implemented (#10); runner #19 pending |
 | R09 | P2 | Test gap | CI, reproducibility, and missing audit coverage | Partially addressed; audits open |
 | R10 | P3 | Test gap / future enhancement | Replay browser coverage and partial-run inspection | Open |
@@ -254,6 +254,14 @@ run with explicit spending authorization. Until then, label support as implement
 adapters with offline coverage rather than verified model compatibility.
 
 ## R07: A fixed scripted room is insufficient research evidence
+
+**Slice 5 status (#17), November 14, 2026:** [evaluation protocol v1](EVALUATION.md)
+defines trial identity, balanced rotations, five arms, baseline policies, 5 pilot
+plus 30 confirmatory repetitions per assignment/condition, room-split gates,
+operational versus engine outcomes, failed-trial denominators, uncertainty and
+campaign budgets. This is prospective design, not experimental evidence. Controls
+and policies (#18), the campaign runner (#19), held-out rooms (#20), and the parent
+#9 research gate remain open. The fixed-room limitation below still applies.
 
 **Evidence:** `state.py:13–27,64–69` fixes geometry, initial conditions, and goals;
 `scripted.py` contains the successful plan. The fixture does not need to interpret

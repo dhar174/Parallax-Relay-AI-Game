@@ -1,5 +1,18 @@
 # Verification record
 
+## Slice 5 evaluation protocol — November 14, 2026
+
+Specified #17 in [evaluation protocol v1](EVALUATION.md), without implementing
+future controls/agents (#18), campaigns/analysis (#19), or held-out rooms (#20).
+The selected five arms and balanced role assignments use 5 pilot plus 30
+confirmatory trials per unique assignment/condition/room. A synthetic example
+demonstrates operational versus engine outcomes, complete denominators and bounds;
+no experimental observations are reported. Standard-library arithmetic verified
+150/900 trials and 25,920/155,520 maximum attempts per room/three-model roster, plus
+the synthetic 5/10 Wilson interval of 23.7%–76.3%. Checked 59 local documentation
+links/anchors and unchanged historical fixtures/dependency files. Parent #9 stays
+open; no paid runs or live compatibility claims were introduced.
+
 ## Slice 5 provenance checkpoint — November 14, 2026
 
 Implemented #10 from merged `origin/main` revision `08c5048` on

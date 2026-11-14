@@ -4,6 +4,9 @@ Start with the [README](README.md), [architecture](docs/ARCHITECTURE.md), and
 [review](docs/REVIEW.md). Work against the current implementation, and distinguish
 bug fixes from roadmap features. A scripted victory proves infrastructure and room
 solvability, not model intelligence.
+Read the prospective [evaluation protocol](docs/EVALUATION.md) before implementing
+experimental controls, policies, campaigns, or comparative reporting. Preserve its
+information boundaries, failed-trial denominators and explicit future-work gates.
 
 ## Environment
 

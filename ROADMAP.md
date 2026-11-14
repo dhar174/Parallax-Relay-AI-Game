@@ -49,6 +49,7 @@ Document remaining limitations rather than silently switching models or contract
 ## 3. Reproducible evaluation
 
 **Status:** partly implemented. Slice 5 adds versioned run provenance (#10);
+the prospective evaluation protocol (#17) is specified. Controls/baselines (#18),
 the experiment runner (#19) and controlled campaigns remain future work.
 
 Run provenance (R08) now records source/configuration,
@@ -58,11 +59,12 @@ room generation or a supported provider option; it cannot promise deterministic
 model output. See [Run provenance](docs/PROVENANCE.md). The experiment runner must
 still schedule/aggregate trials and preserve setup failures and missing artifacts.
 
-Define evaluation protocols before making comparative claims (R07): repeated trials,
-provider-to-role rotations, scripted and simple policy baselines, communication
-ablations, and observation ablations. The current `--fast` mode reduces communication
-but does not disable it. Account separately for victories, defeats, incomplete runs,
-invalid outputs, reliability failures, usage, latency, and estimated cost.
+[Evaluation protocol v1](docs/EVALUATION.md) specifies repeated trials, balanced
+role assignments, policy baselines and five comparison arms. Its selected design
+is 5 pilot plus 30 confirmatory trials per unique assignment/condition/room, with
+all-trial denominators, uncertainty and campaign budgets. The current `--fast`
+mode reduces communication but does not disable it; the other controls and campaign
+machinery still need implementation. No experimental results are claimed.
 
 **Completion gate:** another researcher can reconstruct experiment configuration and
 aggregate results from saved artifacts; the runner enforces a campaign budget;

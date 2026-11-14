@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Specify prospective cooperative evaluation: five arms, balanced role rotations,
+  5 pilot/30 confirmatory trials per cell, policy baselines, failed-trial reporting,
+  uncertainty, room-split and budget gates; conduct no campaigns.
 - Add versioned run provenance with source/environment availability, canonical
   effective settings/pricing and input identities, optional UUID grouping, and
   execution timing preserved through bounded finalization recovery.
