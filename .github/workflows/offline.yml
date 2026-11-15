@@ -87,9 +87,21 @@ jobs:
       - name: Run complete offline unittest suite
         run: python -m unittest discover -s tests -v
       - name: Compile Python sources
-        run: python -m compileall -q parallax_relay tests scripts
+        run: python -m compileall -q parallax_relay tests scripts site
       - name: Check normal and fast mock outcomes
         run: python scripts/check_mock_runs.py
+      - name: Set up Node for workbench regression tests
+        if: matrix.os == 'ubuntu-24.04' && matrix.python == '3.12' && matrix.dependencies == 'locked'
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
+      - name: Check workbench JavaScript and import flows
+        if: matrix.os == 'ubuntu-24.04' && matrix.python == '3.12' && matrix.dependencies == 'locked'
+        run: |
+          python site/build_workbench.py
+          node --check site/web/app.js
+          node --check site/web/contracts.mjs
+          node --test --test-concurrency=1 tests/test_workbench_web.mjs
       - name: Check diff whitespace
         run: python scripts/check_committed_diff.py
       - name: Check working-tree whitespace

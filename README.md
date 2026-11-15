@@ -74,6 +74,13 @@ Each turn follows this sequence:
 The replay is an offline spectator view containing all roles' private information.
 It must not be used as a participant's context.
 
+## Experiment workbench
+
+Use the [private workbench](https://parallax-relay-lab.dhar174.chatgpt.site) to
+configure a match and inspect native replay records. The local companion runs
+the scripted fixture through the Python CLI. See the [workbench guide](docs/WORKBENCH.md)
+for setup, the engine contract map and the Site release process.
+
 ## Run real models
 
 Read the [running guide](docs/RUNNING.md) before using live mode. Configure explicit
@@ -102,6 +109,7 @@ separates original milestone evidence from subsequent checks.
 
 | Document | Use it for |
 |---|---|
+| [Workbench guide](docs/WORKBENCH.md) | Browser configuration, native imports, and local companion |
 | [Running guide](docs/RUNNING.md) | Configuration, limits, troubleshooting, and replay files |
 | [Architecture](docs/ARCHITECTURE.md) | Modules, data flow, and extension boundaries |
 | [Protocol](docs/PROTOCOL.md) | Player inputs, reply contracts, phases, and outcomes |

@@ -38,11 +38,15 @@ Verification commands:
 ```bash
 python -m pip check
 python -m unittest discover -s tests -v
-python -m compileall -q parallax_relay tests scripts
+python -m compileall -q parallax_relay tests scripts site
 python -m parallax_relay.play --mock
 python -m parallax_relay.play --mock --fast
 python scripts/check_mock_runs.py
 ```
+
+The Ubuntu/Python 3.12 locked CI job also uses Node 24 for workbench JavaScript
+syntax and offline import/configuration regressions; see docs/WORKBENCH.md.
+The other five jobs retain their Python checks.
 
 For a focused test module:
 
@@ -69,6 +73,9 @@ Use the actual results in your report; do not copy historical test counts.
 - provenance.py owns versioned input identities and lifecycle metadata.
 - agents.py and scripted.py are explicit offline fixtures.
 - demo.py is a separate legacy driver with an older replay format.
+- site/ holds the experiment workbench. Review docs/WORKBENCH.md when changing
+  the configuration, CLI, roles, observations, budget semantics, or run records.
+  Update affected UI and contract checks in the same PR.
 
 ## Preserve these boundaries
 
