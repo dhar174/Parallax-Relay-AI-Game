@@ -1,7 +1,8 @@
 # Architecture
 
-Parallax Relay is a local Python application, with no server, database, frontend
-build, or agent framework. Pillow renders observations, Pydantic validates replies
+Parallax Relay is a local Python application with a static browser workbench and
+an optional loopback mock companion. It has no hosted game-execution backend,
+database, or agent framework. Pillow renders observations, Pydantic validates replies
 and configuration, and httpx sends direct provider requests. The game engine
 remains independent of the provider adapters.
 
@@ -116,6 +117,22 @@ Only built-in recorders receive the optional begin/end hooks; existing custom
 recorders and `run_match` calls retain their interfaces. See
 [Run provenance](PROVENANCE.md) for versioning, unknown identities, UUID grouping,
 direct `finish` limits, and persistent-storage failure semantics.
+
+## Named smoke preparation
+
+The public live-smoke profile is shared by a thin local launcher and the generated
+workbench contract. It selects models and complete pricing without changing the
+ordinary defaults, engine, characters, observations, abilities or objectives. Two
+separate OpenAI clients can share one key while retaining role-local contexts;
+there is no shared conversation. The helper pins model variables, validates an
+optional matching TOML export, and invokes the real CLI once. It neither resumes
+matches nor schedules campaigns. The companion continues to expose only mock
+execution. Profile and helper changes invalidate its runtime fingerprint.
+
+Call usage adds optional allowlisted counter-origin metadata, leaving normalized
+accounting and budget policy intact. The offline smoke verifier checks native
+artifacts and a local launcher receipt; hashes/metadata are not signatures or proof
+that imported data came from a provider. See [Running](RUNNING.md#named-one-turn-live-smoke).
 
 ## Extension points
 

@@ -11,7 +11,63 @@ const root = fileURLToPath(new URL('../', import.meta.url));
 const dist = join(root, 'build/workbench/dist');
 const contract = JSON.parse(await readFile(join(dist, 'contract.json'), 'utf8'));
 const fixture = JSON.parse(await readFile(join(dist, 'fixture.json'), 'utf8'));
+const smokeProfile = JSON.parse(await readFile(join(root, 'configs/live_smoke.json'), 'utf8'));
 let appInstance = 0;
+
+test('named live preset exports Python-valid settings and exact independent role models', async t => {
+  const app = await workbench(t);
+  await app.tab('scenario');
+  await app.click('live-smoke');
+  const text = await app.exportConfig();
+  assert.ok(text.includes('max_output_tokens = 4096'), 'Named preset was not applied');
+  const parsed = spawnSync(process.env.PYTHON || 'python', ['-c',
+    'import sys,json,tomllib; from parallax_relay.config import GameConfig; print(json.dumps(GameConfig.model_validate(tomllib.loads(sys.stdin.read())).model_dump()))'],
+    { cwd: root, input: text, encoding: 'utf8' });
+  assert.equal(parsed.status, 0, parsed.stderr);
+  assert.deepEqual(JSON.parse(parsed.stdout), smokeProfile.config);
+  await app.tab('live');
+  assert.match(app.node('panel').innerHTML, /gpt-6-luna/);
+  assert.match(app.node('panel').innerHTML, /gemini-3\.5-flash-lite/);
+  assert.match(app.node('panel').innerHTML, /scripts\/live_smoke\.py --check/);
+  assert.match(app.node('panel').innerHTML, /href="https:\/\/developers\.openai\.com\/api\/docs\/pricing\.md"/);
+  assert.match(app.node('panel').innerHTML, /free-tier eligibility\/quota unverified/);
+  for (const role of ['SPECTRA', 'PYRA', 'FLUX']) {
+    const source = smokeProfile.sources[role];
+    const escape = text => text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#39;');
+    for (const url of [source.model_url, source.pricing_url]) {
+      assert.ok(app.node('panel').innerHTML.includes(`href="${escape(url)}"`), `${role} source link missing`);
+    }
+    assert.ok(app.node('panel').innerHTML.includes(escape(source.notes)), `${role} notes missing`);
+  }
+  await app.click('approve');
+  assert.match(app.node('panel').innerHTML, /scripts\/live_smoke\.py --live/);
+  app.input({ dataset: { match: 'max_calls' }, value: '17', valueAsNumber: 17 });
+  await app.tab('live');
+  assert.doesNotMatch(app.node('panel').innerHTML, /approved-download/);
+  assert.doesNotMatch(app.node('panel').innerHTML, /scripts\/live_smoke\.py --live/);
+});
+
+test('semantically matching preset survives reordered configuration properties', async t => {
+  const modified = structuredClone(contract);
+  modified.defaults = Object.fromEntries(Object.entries(smokeProfile.config).reverse());
+  modified.defaults.players = Object.fromEntries(Object.entries(modified.defaults.players).reverse().map(([role, player]) =>
+    [role, Object.fromEntries(Object.entries(player).reverse())]));
+  const app = await workbench(t, { contract: modified });
+  await app.tab('live');
+  assert.match(app.node('panel').innerHTML, /Named live-smoke roster/);
+});
+
+test('old and additive usage-origin records survive import and export', async t => {
+  const app = await workbench(t);
+  for (const annotated of [false, true]) {
+    const data = structuredClone(fixture);
+    if (annotated) data.calls[0].usage.source_usage = {
+      'usage.cache_read_input_tokens': { state: 'null', value: null },
+    };
+    await app.importJSON(data);
+    assert.deepEqual(await app.exportJSON(), data);
+  }
+});
 
 // Execute the unmodified application module and its real event handlers. This
 // harness supplies only browser I/O; it does not establish browser/layout coverage.

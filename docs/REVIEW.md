@@ -252,6 +252,25 @@ usage, retry/fatal, stream/client cleanup and priced-driver assertions are expan
 Anthropic explicit null cache counts remain conservatively unknown, with their live
 representation deferred to #15; this does not close the live-compatibility gate.
 
+**Slice 7 preparation, November 15, 2026:** a frozen one-turn profile and real-CLI
+helper select two independent `gpt-6-luna` agents and `gemini-3.5-flash-lite`, with
+bounded attempts/output and a local estimated-cost guard. PYRA selects
+`provider=openai`, model `gpt-6-luna`, `model_env=PYRA_MODEL` and
+`api_key_env=OPENAI_API_KEY`; its character/abilities/view/objective remain
+unchanged. Anthropic credits were
+unavailable, so #15 and parent #8 remain open. Counter-origin metadata distinguishes
+omitted/null/zero usage without changing conservative accounting. Consult the
+[verification record](VERIFICATION.md) for actual execution evidence; preparation,
+source checks, synthetic success and local --check do not establish live support.
+
+**Slice 7 live evidence, November 15, 2026:** both OpenAI roles completed all
+three phase contracts, but six Gemini HTTP 429 failures caused `unreliable_agent`
+before any resolved turn. The one invocation exited 3; it was incomplete, unscored
+and not an engine defeat. The [dated record](VERIFICATION.md#slice-7-bounded-live-attempt--november-15-2026)
+contains the sanitized evidence and retained unknown-usage estimates. Complete
+mixed-provider acceptance remains blocked; #14/#15/#16 and parent #8 remain open.
+No additional live invocation is authorized by this evidence.
+
 **Evidence:** `tests/test_providers.py` supplies its own response envelopes and
 asserts the request fields emitted by `providers.py`. The integration test intercepts
 all HTTP and drives the known script. These are useful serialization/control tests,

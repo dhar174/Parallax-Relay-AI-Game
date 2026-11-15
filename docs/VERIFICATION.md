@@ -1,5 +1,178 @@
 # Verification record
 
+## PR #36 comment recheck — November 15, 2026
+
+All 18 inline comments and the full Antigravity review against `8d297d5` were
+checked against `6276f0f`, rather than treating GitHub's outdated markers as proof
+of resolution. The runtime repairs in `b83d85a` and `73f7a37` remain effective in
+the covered cases. This follow-up changes tests and documentation only.
+
+Eight additional Python tests close the remaining direct coverage gaps: all 13
+provider counter paths and parent/leaf states; malformed usage/status containers;
+raw counter-metadata projection for every role; main exit/verification behavior;
+default versus explicit credential files and process precedence; fresh-output
+rejection; timeout with a generated output path; and failed atomic receipt
+replacement without relaunch. Existing tests now cover all profile container
+levels, `ModelReply` hashing, every roster source URL/note, nested property-order
+equivalence, and LF generated JSON in both the build and companion ZIP. Remaining
+launcher-test text writes explicitly use UTF-8. The review annotation spells out
+PYRA's provider/model/key-variable mapping.
+
+Local verification: **260 Python tests passed in 33.355 seconds**, with no
+unittest skips; the subsequently strengthened hashing assertions also passed in
+the focused seven-test usage suite. All **52 Node tests** passed with `PYTHON`
+explicitly selecting the worktree's virtual environment. Dependency consistency,
+compilation, JavaScript syntax, build, normal/fast mock checks (63/42 calls, seven
+turns, five energy, all scores 100), and diff whitespace checks passed. The
+broken-symlink case ran locally; Windows environments without symlink creation
+privileges still exercise existing file/directory rejection. Final-head CI
+evidence and individual comment replies are recorded on PR #36.
+
+All execution-shaped tests in this follow-up use scripted agents, fake
+credentials or intercepted subprocesses. No additional live invocation, provider
+probe, merge or Site publication occurred. The incomplete live result below and
+the open acceptance issues remain unchanged.
+
+## Slice 7 bounded live attempt — November 15, 2026
+
+The single authorized live invocation executed clean source
+`73f7a373aca0cecda3747e7b3081292a4c94a764` at 03:18 EST
+(08:18 UTC). It lasted 11.843 seconds. This execution revision is distinct from
+later documentation/evidence commits and any future merged Site release.
+
+**Outcome: partial provider evidence; mixed-provider acceptance blocked.**
+SPECTRA and PYRA, both independent `gpt-6-luna` agents, returned valid broadcast,
+negotiation and commitment output: six successful first attempts. FLUX requested
+`gemini-3.5-flash-lite` and returned HTTP 429 on all six bounded attempts. The
+specific account rate/quota cause is unverified; no diagnostic provider probes or
+additional live invocation were made. PYRA's character, abilities, thermal view
+and private objective remain unchanged. Anthropic was not called.
+
+The CLI and wrapper exited **3** with `unreliable_agent`, **12/18 started calls**,
+**zero resolved turns**, energy **6**, `completed=false`, no win/loss and null
+scores. The driver stopped after three failed FLUX phases, before applying any
+sealed actions. Three phase records, all attempted-call evidence, consistent
+initial final state, five PNGs and the partial viewer were finalized. An empty
+turn log is truthful here. The offline verifier returned overall acceptance false;
+its per-role OpenAI transport verdicts do not mean a resolved match succeeded.
+
+Reported usage totals are **9,099 input / 1,151 output**, including **715 reasoning
+tokens** within output, with explicit zero OpenAI cache counts. Six Gemini failures
+have unknown usage. The local estimate **$0.0903868** includes **$0.0889014** of
+retained unknown-usage quotes and **$0.0014854** from known OpenAI usage at the
+configured rates; no provider invoice was inspected. Do not treat that estimate
+as exact billing or infer zero cost from missing failed-call usage.
+
+The [sanitized JSON summary](verification/2026-11-15-slice7-live-summary.json)
+contains source/input fingerprints, environment/package versions, exact settings,
+requested models/API contracts, timing, phase statuses, attempts and usage-origin
+counts. It excludes prompts, model messages, notes, HUDs, image bytes, raw errors,
+credentials and account identifiers. Full native artifacts remain private and
+ignored. Runtime: CPython 3.12.14/Linux x86_64, locked dependencies, pip 26.3.
+OpenAI model/backend aliases remain unresolved; sampling used provider defaults.
+No general image-understanding, strategic or cooperation claim follows.
+
+The [six-job execution-head workflow](https://github.com/dhar174/Parallax-Relay-AI-Game/actions/runs/43692796768)
+passed, and every job log was inspected before the live invocation:
+
+| Job | Actual Python | Python tests | Additional frontend tests |
+|---|---|---:|---:|
+| [Ubuntu locked](https://github.com/dhar174/Parallax-Relay-AI-Game/actions/runs/43692796768/job/132746769229) | 3.11.18 | 252 | — |
+| [Ubuntu locked](https://github.com/dhar174/Parallax-Relay-AI-Game/actions/runs/43692796768/job/132746769356) | 3.12.16 | 252 | 52 |
+| [Ubuntu locked](https://github.com/dhar174/Parallax-Relay-AI-Game/actions/runs/43692796768/job/132746769081) | 3.13.18 | 252 | — |
+| [Windows locked](https://github.com/dhar174/Parallax-Relay-AI-Game/actions/runs/43692796768/job/132746769223) | 3.12.10 | 252 | — |
+| [macOS locked](https://github.com/dhar174/Parallax-Relay-AI-Game/actions/runs/43692796768/job/132746769352) | 3.12.10 | 252 | — |
+| [Ubuntu ranges](https://github.com/dhar174/Parallax-Relay-AI-Game/actions/runs/43692796768/job/132746769277) | 3.12.16 | 252 | — |
+
+There were no unittest skips. All six jobs passed pip consistency, compilation,
+normal/fast scripted victories (63/42 calls, seven turns, five energy, all scores
+100), committed diff and working-tree checks. These scripted wins remain distinct
+from the incomplete live attempt. Independent review findings and Antigravity's
+additional initial-head concerns were reproduced and corrected as described below;
+this is not an unqualified claim that the original review was clean.
+
+Issues #14/#15/#16 and parent #8 stay open pending complete live acceptance. No
+merge or hosted Site publication occurred. After a maintainer merges the code PR,
+the separately authorized private Site refresh must preserve existing access and
+record the merged game revision separately from its Site-source revision.
+
+
+## Slice 7 preparation — November 15, 2026
+
+Implementation started from merged PR #33 at `115adddaa8f50c54fbd6054934eb66b4275dec8b`
+in `validation/slice-7-live-smoke`, with an isolated locked Python environment.
+The clean baseline passed 226 Python tests. The first implementation suite passed
+239 Python tests (30.466s), with 51 Node tests passing and no unittest skips.
+`pip check` reported no broken requirements. Usage-origin and smoke/preset tests
+were observed failing before their implementation; malformed/mismatched artifacts,
+changed exports and copied secret sentinels have negative coverage.
+
+The user replaced the planned Claude slot with a second independent OpenAI
+`gpt-6-luna` agent due to unavailable Anthropic credits. SPECTRA and PYRA share a
+key, with separate model selections and role-local inputs/history. PYRA's character,
+abilities, thermal observation and objective remain unchanged. FLUX uses
+`gemini-3.5-flash-lite`. The one-turn/18-attempt/4,096-output-token/60-second/$1-local-
+estimate limits remain selected. Official model/pricing sources were retrieved
+November 15; no provider SDK, dependency or historical fixture was changed.
+
+Focused rendered verification used isolated Playwright 1.57.0 with system
+Chromium 156.0.8078.79 because no connected Browser control tool was exposed.
+At `http://127.0.0.1:40275/`, 1440×1000 and 390×844 checks passed: named roster,
+exported TOML independently parsed by Python, approval invalidation, actual mock
+one-turn/nine-call execution, synthetic live-shaped record import, and actual
+zero-turn/zero-call call-budget output. No page/console errors or external requests
+were observed; the narrow viewport had no horizontal overflow. Screenshots and
+receipt were inspected locally in `/tmp/parallax-slice7-qa-NxWAjL/`; these are
+local evidence, not hosted artifacts or proof of a paid run. Compilation and diff
+checks passed. The existing private hosted Site has not been changed.
+
+The real helper's `--check` returned 0 using existing local credential variables,
+without a run directory or provider calls. Missing variables exit 2; dummy placeholders can support offline validation
+but do not establish authentication. See the running guide.
+Synthetic tests exercise the real driver/recorder and cannot establish remote
+support. The independent review found credential-file startup influence and incomplete
+record acceptance; negative regressions reproduced both before repair. The verifier
+now checks required world/role/phase/replay structure and cross-record agreement,
+decodes all required role/spectator PNGs and cross-checks embedded viewer data.
+Oversized integer costs reject safely, aborted runs retain attempt counts, and
+public status labels are allowlisted. Credential files now supply selected keys
+only; process transport settings remain available. These are validation checks,
+not artifact signatures or evidence of model intelligence.
+
+Initial workflow [43690357997](https://github.com/dhar174/Parallax-Relay-AI-Game/actions/runs/43690357997)
+passed five jobs; Windows failed a UTF-8 privacy scan and two CRLF test cases.
+The HTML read used the platform codec, and the newline test doubled existing
+CRLF into CRCRLF. Explicit UTF-8 reads and idempotent newline conversion fix those
+causes without relaxing assertions; a CRLF fixture reproduced the latter on Linux.
+The repaired local suite passed **245 Python tests** (30.807s) with no skips,
+plus **51 Node tests**, the regenerated build, compilation, normal/fast mock
+victories and diff checks. All six logs in [workflow 43691736704](https://github.com/dhar174/Parallax-Relay-AI-Game/actions/runs/43691736704)
+then passed at `b83d85a`: 245 tests/no skips, pip 26.3 consistency, compilation,
+63/42-call mock victories and diff checks; Ubuntu/Python 3.12 locked also passed
+51 Node tests. Versions: Linux 3.11.18/3.12.16/3.13.18, Windows/macOS 3.12.10.
+
+A subsequently discovered [Antigravity review](https://github.com/dhar174/Parallax-Relay-AI-Game/pull/36#pullrequestreview-5909694226)
+against the initial head supplied additional cases before paid execution. Regressions
+reproduced missing companion inputs, malformed profile containers, timeout output
+loss, mutable metadata and source-link/preset-order behavior. Corrections preserve
+immutable/hashable usage and JSON serialization, report timeout paths/atomic
+receipts without relaunch, reject malformed profiles and ignored verify flags,
+retain partial accounting, expose safe source references and handle missing inputs.
+A real unpacked companion exits cleanly on older checkouts. Generated JSON uses LF.
+Valid retries and unknown usage retain estimates with explicit source-counter
+projection coverage. Full final-head checks and the single live invocation remain
+pending; no provider attempts have started. After these corrections, **252 Python
+tests** passed (34.124s) with no skips and **52 Node tests** passed. Build,
+compilation, mock outcomes and whitespace checks passed. Focused Chromium 156
+verification at 1440×1000 and 390×844 confirmed all six HTTPS reference links,
+eligibility notes, approval and no overflow/console errors/external requests.
+Local screenshot/receipt evidence is `/tmp/parallax-slice7-review-qa-dVubA8/`.
+A controlled no-network probe also rejected existing output and a broken symlink
+before launching any CLI, with a safe fresh-directory diagnostic. Anthropic #15 and parent #8 stay open.
+The delivery PR will record final source/CI evidence; a later merged Site release
+must distinguish game revision G from Site-source revision S.
+
+
 ## PR #33 independent-review follow-up — November 15, 2026
 
 Final integration merged `main` at `685681f` into the PR branch without conflicts.

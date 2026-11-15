@@ -74,7 +74,7 @@ default model IDs, custom endpoints, OpenRouter, Ollama, or Vertex AI adapters.
 See [API references](API_SOURCES.md) for checked and unresolved contract assumptions.
 Follow its [model-selection requirements](API_SOURCES.md#selecting-a-compatible-model)
 for endpoint/schema/PNG compatibility, context/image limits, reasoning headroom and
-output bounds. No named shortlist or model defaults are supplied. The 2,048-token
+output bounds. A separate named smoke profile is described below; ordinary model defaults remain unset. The 2,048-token
 default does not guarantee a complete reply for every model; limits never increase
 automatically, and `--check` cannot establish remote capability or account access.
 Malformed/compressed provider output uses bounded retries and conservative unknown
@@ -109,6 +109,75 @@ python -m parallax_relay.play --check --env-file .env
 This checks local settings only. It prints role/provider/model assignments, not
 keys, and makes no requests. It cannot establish authentication, billing access,
 model capabilities, or service availability.
+
+## Named one-turn live smoke
+
+[`configs/live_smoke.json`](../configs/live_smoke.json) is a public, frozen run
+sheet, not standing permission to spend. It selects SPECTRA and PYRA as separate
+`gpt-6-luna` OpenAI agents and FLUX as `gemini-3.5-flash-lite`. PYRA keeps its
+character, abilities, thermal view and private objective. Its execution mapping
+selects OpenAI, `PYRA_MODEL` and `OPENAI_API_KEY` instead of the default Anthropic
+provider and variables.
+Both OpenAI agents use `OPENAI_API_KEY`, with separate `OPENAI_MODEL` and
+`PYRA_MODEL` selections pinned by the helper. FLUX uses `GEMINI_MODEL` and `GEMINI_API_KEY`.
+Anthropic smoke validation #15 remains deferred; no Anthropic key is required.
+
+The profile retains normal broadcast, negotiation and commitment, limits execution
+to one turn, permits at most 18 total attempts (two per request), bounds output at
+4,096 tokens per request and timeouts at 60 seconds, and uses a $1 **local estimate**
+guard. Nine calls are expected without retries. Prices are standard short-prompt
+rates checked November 15, 2026: OpenAI $0.10/$0.50 and Gemini $0.30/$2.50 per
+million input/output tokens. Recheck the linked sources, account access, and rates
+before any separately authorized invocation. Free-tier eligibility is unverified;
+prices do not establish actual invoices, cache tiers or billing ceilings.
+
+```bash
+python scripts/live_smoke.py --check
+# Only after explicit authorization for this roster and these bounds:
+python scripts/live_smoke.py --live
+# No network; use the output directory reported by the live invocation:
+python scripts/live_smoke.py --verify runs/<fresh-run>
+```
+
+The helper inherits process credentials, optionally filling missing values from
+ignored `.env.smoke` or an explicit `--env-file`. Process values win. Credential files may contain only the selected API-key
+variables; unrelated assignments are rejected. Python startup overrides are removed
+from the child environment, while process proxy/certificate settings are retained. It pins all
+model selections in a child environment, passes the real CLI a validated temporary
+TOML and an explicit empty env file, and never loads the ordinary `.env` implicitly.
+It does not write credentials. `--check` requires the selected local credential
+variables (or dummy placeholders for offline validation), exits 2 when they are
+missing, makes no provider requests and creates no recorded run; it cannot establish authentication or model support. An optional
+`--config relay-workbench.toml` must normalize to the frozen profile exactly.
+The workbench's named preset exports this configuration; edits invalidate its
+approval and require renewed review. The original default configuration is unchanged.
+
+`--live` invokes the actual CLI once and records its exit code/profile digest in
+`smoke_launch.json` when the run directory exists. The subprocess has a 600-second
+outer timeout; existing per-attempt and cooperative cleanup bounds still apply.
+Errors/timeouts do not cause another invocation. On timeout the helper reports the
+selected partial-output directory, an unknown CLI exit code and `timed_out=true`;
+if the directory exists, it attempts an atomic launcher receipt. A failed receipt
+write is reported and acceptance stays unverified. After **any** started provider
+attempt, another live invocation needs new authorization. A timeout or missing
+artifact is unverified, never a reason to retry automatically. Outputs stay ignored
+and private; child stdout/stderr are not echoed by the helper.
+
+The helper preserves a nonzero CLI exit status. If CLI exit is zero but offline
+artifact verification fails, it returns 1; local preparation/launcher errors and timeouts return
+2. `--verify` rejects execution-only `--config`, `--env-file` and `--out` flags. `--verify` returns 0 only when the receipt, provenance settings/prices/models,
+three successful phases, complete/cross-checked replay and world records, bounded
+attempts, usage counters, decoded role/spectator PNGs, the embedded viewer, and consistent
+one-turn incomplete state agree. Healthy output is `turn_limit`, `completed=false`,
+no victory/defeat and null scores. Failed attempts may precede a valid bounded retry;
+fallback outputs cannot establish acceptance. Per-role verdicts are distinct from
+overall acceptance, and both OpenAI roles must pass to claim this roster's OpenAI
+smoke succeeded. Files and hashes are not signatures or proof of authenticity.
+
+Keep full spectator artifacts local. Publish only a reviewed sanitized summary,
+including exact execution source/dependency/model/API evidence and unknown usage.
+One round does not establish image understanding, strategy or cooperation. See the
+[verification record](VERIFICATION.md) for actual results and limitations.
 
 ## TOML settings and CLI overrides
 

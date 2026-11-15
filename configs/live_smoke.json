@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "verified_date": "2026-11-15",
+  "models": {
+    "SPECTRA": "gpt-6-luna",
+    "PYRA": "gpt-6-luna",
+    "FLUX": "gemini-3.5-flash-lite"
+  },
+  "sources": {
+    "SPECTRA": {
+      "model_url": "https://developers.openai.com/api/docs/models/gpt-6-luna.md",
+      "pricing_url": "https://developers.openai.com/api/docs/pricing.md",
+      "notes": "Standard short-prompt rates; reasoning defaults retained; backend revision unknown."
+    },
+    "PYRA": {
+      "model_url": "https://developers.openai.com/api/docs/models/gpt-6-luna.md",
+      "pricing_url": "https://developers.openai.com/api/docs/pricing.md",
+      "notes": "Independent PYRA agent sharing the OpenAI key; character, abilities and thermal observation unchanged. Anthropic validation deferred."
+    },
+    "FLUX": {
+      "model_url": "https://aistudio.google.com/docs/models/gemini-3.5-flash-lite",
+      "pricing_url": "https://aistudio.google.com/docs/pricing#gemini-3.5-flash-lite",
+      "notes": "Standard paid text/image rates including output thinking; free-tier eligibility/quota unverified. generateContent retained."
+    }
+  },
+  "config": {
+    "match": {
+      "communication_rounds": 2,
+      "max_turns": 1,
+      "max_calls": 18,
+      "max_attempts": 2,
+      "timeout_seconds": 60.0,
+      "max_output_tokens": 4096,
+      "history_turns": 4,
+      "retry_delay_seconds": 0.5,
+      "max_consecutive_failures": 3,
+      "max_estimated_cost_usd": 1.0,
+      "image_token_reserve": 8192
+    },
+    "players": {
+      "SPECTRA": {
+        "provider": "openai",
+        "model_env": "OPENAI_MODEL",
+        "api_key_env": "OPENAI_API_KEY",
+        "pricing": {"input_per_million": 0.1, "output_per_million": 0.5}
+      },
+      "PYRA": {
+        "provider": "openai",
+        "model_env": "PYRA_MODEL",
+        "api_key_env": "OPENAI_API_KEY",
+        "pricing": {"input_per_million": 0.1, "output_per_million": 0.5}
+      },
+      "FLUX": {
+        "provider": "gemini",
+        "model_env": "GEMINI_MODEL",
+        "api_key_env": "GEMINI_API_KEY",
+        "pricing": {"input_per_million": 0.3, "output_per_million": 2.5}
+      }
+    }
+  }
+}

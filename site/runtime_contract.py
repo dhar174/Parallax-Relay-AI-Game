@@ -42,7 +42,8 @@ def runtime_fingerprint(root: Path) -> str:
     Normalize line endings so the same revision works with Git autocrlf.
     Ignore generated Python caches and include the default configuration.
     """
-    files = [root / "configs" / "three_models.toml"]
+    files = [root / "configs" / "three_models.toml",
+             root / "configs" / "live_smoke.json", root / "scripts" / "live_smoke.py"]
     files.extend(
         path for path in (root / "parallax_relay").rglob("*")
         if path.is_file() and path.suffix in {".py", ".html"}
@@ -50,5 +51,8 @@ def runtime_fingerprint(root: Path) -> str:
     digest = hashlib.sha256()
     for path in sorted(files):
         digest.update(path.relative_to(root).as_posix().encode("utf-8") + b"\0")
-        digest.update(hashlib.sha256(path.read_bytes().replace(b"\r\n", b"\n")).digest())
+        if path.is_file():
+            digest.update(b"present\0" + hashlib.sha256(path.read_bytes().replace(b"\r\n", b"\n")).digest())
+        else:
+            digest.update(b"missing\0")
     return digest.hexdigest()

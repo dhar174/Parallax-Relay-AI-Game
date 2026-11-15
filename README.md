@@ -5,10 +5,12 @@ sees a different sensor image, exchanges public messages, and commits one action
 without seeing its teammates' current actions. A deterministic Python engine
 resolves the turn.
 
-**Status:** Milestone 2 is an offline-tested coordination prototype. It includes
-OpenAI, Anthropic, and Gemini REST adapters, but no credentialed provider match has
-been verified for this repository. The bundled victories use scripted players that
-already know the solution; they are not evidence of model reasoning or cooperation.
+**Status:** Milestone 2 is an offline-tested coordination prototype. A bounded live
+attempt accepted all six OpenAI outputs from two independent `gpt-6-luna` agents;
+Gemini returned HTTP 429 and blocked the first resolved turn. Anthropic remains
+untested live. See the [dated evidence](docs/VERIFICATION.md#slice-7-bounded-live-attempt--november-15-2026).
+The bundled victories use scripted players that already know the solution; they
+are not evidence of model reasoning or cooperation.
 
 ## Try it without API keys
 
@@ -91,8 +93,10 @@ python -m parallax_relay.play --check --env-file .env
 ```
 
 `--check` makes no provider requests and cannot verify remote access or model
-capabilities. `--live` explicitly enables potentially billable requests. Model IDs
-and prices are not supplied by default. Current validation limits and open issues
+capabilities. `--live` explicitly enables potentially billable requests. Ordinary model IDs
+and prices are not supplied by default. A separate [named one-turn smoke profile](docs/RUNNING.md#named-one-turn-live-smoke)
+selects two independent OpenAI agents and one Gemini agent, preserving all characters
+and abilities; it requires explicit spending authorization. Current validation limits and open issues
 are documented in the [review](docs/REVIEW.md).
 
 ## Current limits and direction

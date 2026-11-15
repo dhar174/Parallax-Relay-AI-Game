@@ -74,13 +74,47 @@ def _error_code(value) -> str | None:
     return code if isinstance(code, str) else None
 
 
+def _source_usage(provider: str, data: dict) -> dict[str, dict]:
+    """Only allowlisted counter states/counts, never arbitrary provider values."""
+    paths = {
+        'openai': ('usage.input_tokens', 'usage.output_tokens',
+                   'usage.input_tokens_details.cached_tokens',
+                   'usage.output_tokens_details.reasoning_tokens'),
+        'anthropic': ('usage.input_tokens', 'usage.output_tokens',
+                      'usage.cache_read_input_tokens', 'usage.cache_creation_input_tokens',
+                      'usage.output_tokens_details.thinking_tokens'),
+        'gemini': ('usageMetadata.promptTokenCount', 'usageMetadata.candidatesTokenCount',
+                   'usageMetadata.cachedContentTokenCount', 'usageMetadata.thoughtsTokenCount'),
+    }
+    result = {}
+    for path in paths[provider]:
+        value = data
+        state = 'count'
+        for key in path.split('.'):
+            if value is None:
+                state = 'null'
+                break
+            if not isinstance(value, dict):
+                state = 'invalid'
+                break
+            if key not in value:
+                state = 'omitted'
+                break
+            value = value[key]
+        if state == 'count':
+            state = 'null' if value is None else 'count' if _tokens(value) is not None else 'invalid'
+        result[path] = {'state': state, 'value': value if state == 'count' else None}
+    return result
+
+
 def _usage(provider: str, data: dict) -> Usage:
+    source = _source_usage(provider, data)
     if provider == 'gemini':
         u = _object(data.get('usageMetadata'))
         inp, out = _tokens(u.get('promptTokenCount')), _tokens(u.get('candidatesTokenCount'))
         thought = _optional_tokens(u, 'thoughtsTokenCount')
         return Usage(inp, None if out is None or thought is None else out + thought,
-                     _tokens(u.get('cachedContentTokenCount')) or 0, thought or 0)
+                     _tokens(u.get('cachedContentTokenCount')) or 0, thought or 0, source)
     u = _object(data.get('usage'))
     inp, out = _tokens(u.get('input_tokens')), _tokens(u.get('output_tokens'))
     if provider == 'anthropic':
@@ -88,10 +122,10 @@ def _usage(provider: str, data: dict) -> Usage:
         written = _optional_tokens(u, 'cache_creation_input_tokens')
         thought = _tokens(_object(u.get('output_tokens_details')).get('thinking_tokens')) or 0
         return Usage(None if any(n is None for n in (inp, cached, written)) else inp + cached + written,
-                     out, cached or 0, thought)
+                     out, cached or 0, thought, source)
     cached = _tokens(_object(u.get('input_tokens_details')).get('cached_tokens')) or 0
     thought = _tokens(_object(u.get('output_tokens_details')).get('reasoning_tokens')) or 0
-    return Usage(inp, out, cached, thought)  # OpenAI output already includes reasoning.
+    return Usage(inp, out, cached, thought, source)  # OpenAI output already includes reasoning.
 
 
 def _decode(provider: str, data: dict) -> ModelReply:

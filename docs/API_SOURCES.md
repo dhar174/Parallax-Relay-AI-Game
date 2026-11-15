@@ -1,8 +1,10 @@
 # Provider contract references
 
 The adapters in `parallax_relay/providers.py` use direct REST calls. This document
-separates implementation choices, source checks, and live evidence. No credentialed
-provider match has been verified for this repository.
+separates implementation choices, source checks, and live evidence. The bounded
+[November 15 attempt](#bounded-live-evidence--november-15-2026) accepted OpenAI
+phase outputs but was blocked by Gemini HTTP 429 before resolving a turn;
+complete mixed-provider match acceptance remains unverified.
 
 ## Independent contract audit — November 14, 2026
 
@@ -139,7 +141,8 @@ local contract handling, not remote model acceptance.
 
 ### Selecting a compatible model
 
-No model shortlist or default ID is supplied. Before a separately authorized smoke
+Ordinary defaults supply no model IDs. A separate [named smoke profile](../configs/live_smoke.json)
+saves selected IDs and dated sources. Before a separately authorized smoke
 test, consult the exact model's official documentation and confirm:
 
 1. The account can access that bare ID on this exact endpoint/API version; it accepts
@@ -259,3 +262,79 @@ Live compatibility requires separately authorized smoke tests with selected mode
 and sanitized evidence. Record provider, model, date, result, usage, and limitations;
 never record keys or raw provider errors. [R06](REVIEW.md#r06-live-provider-compatibility-is-unverified)
 tracks this open validation gate.
+
+## Slice 7 selected profile — November 15, 2026
+
+The [named run sheet](../configs/live_smoke.json) assigns `gpt-6-luna` to two
+independent agents (SPECTRA and PYRA), and `gemini-3.5-flash-lite` to FLUX. A second
+OpenAI agent replaces the planned Claude slot because Anthropic credits were
+unavailable; PYRA's character, thermal observation, abilities and objective remain
+unchanged. Anthropic #15 and parent #8 stay open. This selection does not change
+ordinary defaults or establish remote compatibility.
+
+| Model | Official model/pricing sources | Checked standard input/output USD per million |
+|---|---|---:|
+| `gpt-6-luna` | [Model, PNG/structured output and reasoning](https://developers.openai.com/api/docs/models/gpt-6-luna.md), [pricing](https://developers.openai.com/api/docs/pricing.md) | $0.10 / $0.50 |
+| `gemini-3.5-flash-lite` | [Model, modalities and schema support](https://aistudio.google.com/docs/models/gemini-3.5-flash-lite), [pricing](https://aistudio.google.com/docs/pricing#gemini-3.5-flash-lite) | $0.30 / $2.50 |
+
+OpenAI uses Responses with provider-default medium reasoning; the documented ID
+has no separately pinned backend revision. Gemini retains generateContent and its
+current structured-output fields, with thinking included in normalized output.
+The 4,096-token output allowance can still truncate reasoning-heavy responses;
+there is no automatic increase or model substitution. Rates exclude long-context,
+regional, cache-write/read tiers and invoice adjustments. Gemini documents a free
+tier, but this account's eligibility and quota are unverified; retain configured
+paid rates for the conservative local estimate. Actual execution evidence belongs
+in the [verification record](VERIFICATION.md), separately from source retrieval.
+
+HTTP-adapter usage now adds optional `source_usage` evidence inside call usage.
+Only fixed input/output/cache/reasoning counter paths are retained, each with
+`state` (`omitted`, `null`, `count`, `invalid`) and `value` (valid nonnegative integer
+only for `count`, otherwise null). Missing or null parent containers produce the
+corresponding state for their counter paths. Unknown fields and malformed raw
+values are never copied. This is additive schema-v2 metadata; old records remain
+readable and normalized totals, conservative unknown aggregates, retained estimates
+and reservation behavior are unchanged. Custom/scripted `Usage` defaults to no
+source evidence. Failed HTTP envelopes still have unknown usage, not invented
+counter values. This permits future #15 evidence to distinguish cache omission,
+zero and null without making an Anthropic request in this slice.
+
+## Bounded live evidence — November 15, 2026
+
+One authorized invocation ran on clean source
+`73f7a373aca0cecda3747e7b3081292a4c94a764`, with the selected one-turn profile.
+The [sanitized summary](verification/2026-11-15-slice7-live-summary.json) records
+actual settings, requested models, API namespaces, dependencies, attempts and usage.
+No second invocation, fallback model, increased limit or Anthropic request occurred.
+
+| Role / requested model | Started attempts | Observed phase output | Reported input/output tokens |
+|---|---:|---|---:|
+| SPECTRA / `gpt-6-luna` | 3 | broadcast, negotiate, commit valid on first attempts | 4,548 / 603 |
+| PYRA / `gpt-6-luna` | 3 | broadcast, negotiate, commit valid on first attempts | 4,551 / 548 |
+| FLUX / `gemini-3.5-flash-lite` | 6 | HTTP 429 on both allowed attempts in every phase | unknown / unknown |
+
+OpenAI accepted PNG-bearing Responses requests and returned parseable output for
+all three schema phases in both roles. No refusal/truncation was observed for
+those six responses. Reported output totals already include 715 reasoning tokens;
+cache-read counters were explicit zero. Backend revisions remain unknown. This is
+bounded transport/format evidence, not image comprehension or cooperative success.
+
+Gemini returned no usable reply or usage. HTTP 429 is consistent with rate/quota
+exhaustion, but sanitized logs cannot identify the specific account limit, credit
+state or whether waiting would help. Its model/schema/PNG acceptance remains
+unverified. See [Google's error guidance](https://aistudio.google.com/docs/troubleshooting#retry-strategy);
+the repository already performed only its selected bounded retries. Any further
+live invocation requires new user authorization after the account limit is checked.
+
+The driver stopped at `unreliable_agent` after FLUX failed three phases, before
+any engine transition. Exit 3, zero resolved turns, energy 6, `completed=false`,
+no win/loss and null scores are an execution abort, not engine defeat. Native
+partial records and the viewer were finalized. The total local estimate
+**$0.0903868** consists of **$0.0014854** from known OpenAI usage at configured
+rates plus **$0.0889014** retained estimates for six unknown-usage failures. These
+are not invoice amounts or a claim that failed requests incurred those charges.
+
+The healthy mixed-provider one-turn gate remains unmet. #14 retains the partial
+OpenAI evidence; #16 is blocked by the observed errors; #15 is deferred. All three
+and parent #8 remain open. A separately authorized successful follow-up can complete
+that gate without mislabeling this failed attempt as a winning or scored match.

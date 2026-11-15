@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+- Record one bounded live attempt: six valid OpenAI phase outputs, six Gemini
+  HTTP 429 failures, a consistent zero-turn abort and conservative unknown usage;
+  leave complete mixed-provider acceptance open without rerunning.
+
+- Add a frozen one-turn smoke profile, local check/live/offline-verification helper,
+  and shared workbench preset with exact model selection, rates and limits.
+- Select two independent OpenAI agents plus Gemini without changing PYRA's
+  character, abilities, thermal view or objective; defer Anthropic live validation.
+- Retain optional allowlisted usage-origin states without changing normalized
+  accounting, budget behavior or schema-v2 compatibility.
+- Include the smoke profile/launcher in companion compatibility checks; preserve
+  mock-only browser execution and private live artifact handling.
+
 - Address PR #32 review: preserve failed/refused response classifications across
   malformed/null payloads, reject wrong-type containers, use finite retry delays,
   and sanitize compressed/deep-JSON errors with bounded HTTP error-body reads.

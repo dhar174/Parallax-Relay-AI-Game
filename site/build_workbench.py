@@ -16,11 +16,12 @@ sys.path.insert(0, str(ROOT))
 
 from parallax_relay.config import GameConfig, load_config
 from parallax_relay.state import PRIVATE_GOALS
+from scripts.live_smoke import load_profile
 
 
 def write_json(path: Path, value) -> None:
     path.write_text(json.dumps(value, ensure_ascii=True, separators=(",", ":")) + "\n",
-                    encoding="utf-8")
+                    encoding="utf-8", newline="\n")
 
 
 def build(output: Path = OUTPUT) -> Path:
@@ -35,6 +36,7 @@ def build(output: Path = OUTPUT) -> Path:
         "schema": GameConfig.model_json_schema(),
         "defaults": load_config(ROOT / "configs" / "three_models.toml").model_dump(),
         "goals": PRIVATE_GOALS,
+        "live_smoke": load_profile(ROOT / "configs" / "live_smoke.json"),
     }
     write_json(output / "contract.json", contract)
     write_json(output / "fixture.json", read_run(ROOT / "example_run"))

@@ -13,7 +13,7 @@ python site/relay_workbench.py
 
 Open the `http://127.0.0.1:<port>` URL printed by the companion. The port is assigned for each launch. On Windows or WSL, open that URL in your browser while the Python process is running. Select **Offline execution → Run offline through Python** to invoke the real `parallax_relay.play --mock` CLI. Use **Load repository fixture** to view the committed seven-turn recording. The smoke preset runs one turn, which should end with `turn_limit` and no terminal scores.
 
-The build regenerates the ignored `build/workbench/dist/` directory. It contains the static Site, native example replay and `relay-workbench.zip`. The ZIP is the portable companion offered on the hosted Site. Extract it and run its `relay_workbench.py` by absolute path from the game checkout root. The companion compares a fingerprint of the package's Python/HTML files and default TOML to those used at build time. Documentation-only commits can use the same companion. Rebuild after runtime changes. The build records the project-root Git revision and a clean/dirty/unavailable status. Git-less archives remain usable and show unavailable source identity; an unrelated parent repository is never attributed to the game. Publish from a clean, committed revision with locked dependencies. ZIP entries use fixed timestamps and file modes, with a root LICENSE, so identical build inputs and compression tooling produce identical archives.
+The build regenerates the ignored `build/workbench/dist/` directory. It contains the static Site, native example replay and `relay-workbench.zip`. The ZIP is the portable companion offered on the hosted Site. Extract it and run its `relay_workbench.py` by absolute path from the game checkout root. The companion compares a fingerprint of the package's Python/HTML files, default TOML, named smoke profile and launcher to those used at build time. Documentation-only commits can use the same companion. Rebuild after runtime changes. The build records the project-root Git revision and a clean/dirty/unavailable status. Git-less archives remain usable and show unavailable source identity; an unrelated parent repository is never attributed to the game. Publish from a clean, committed revision with locked dependencies. ZIP entries use fixed timestamps and file modes, with a root LICENSE, so identical build inputs and compression tooling produce identical archives.
 
 Generated runs use temporary storage. Download **Export complete JSON** from Evaluation to keep the record, including images. To keep the native files separately, export the workbench TOML and invoke the CLI as described in the running guide. Import its output folder with **Evaluation → Import run folder**.
 
@@ -53,12 +53,36 @@ The loopback adapter revalidates TOML settings with the project's Pydantic model
 
 Live preparation exports a local configuration after the user reviews the spending guard and enters all per-role rates. The guard uses the runtime estimate. Provider billing can differ from this estimate. Set actual model IDs and keys in the local environment, use `--check` to validate configuration, and explicitly approve any paid execution before running `--live`. Both browser entry points leave execution to the local CLI.
 
+## Named live-smoke preset
+
+**Match configuration → Use named live-smoke preset** loads the same public
+[profile](../configs/live_smoke.json) used by the local helper. Live preparation
+shows SPECTRA/PYRA as independent `gpt-6-luna` agents, FLUX as
+`gemini-3.5-flash-lite`, the required environment-variable names, dated rates, model/pricing source links, eligibility/accounting notes and
+fixed limits. PYRA retains its character, abilities, thermal view and objective.
+No credential value enters the browser. Ordinary defaults still map PYRA to
+Anthropic; its live smoke issue #15 remains open.
+
+Download the TOML and use the displayed `scripts/live_smoke.py --check --config
+relay-workbench.toml` command locally. The helper accepts only an export matching
+the frozen profile. Editing the settings invalidates approval and switches back
+to the general CLI workflow. Local browser approval does not grant billing access
+or establish provider support. See [the running guide](RUNNING.md#named-one-turn-live-smoke)
+for explicit authorization, credentials, exit codes and one-invocation limits.
+
+The generated `contract.json.live_smoke` addition is public metadata. It contains
+model IDs, settings and source links, never keys or real live recordings. The
+companion remains mock-only; live records are imported in the browser locally.
+Usage-origin annotations are retained when present, and old records without them
+remain supported. Rebuild the companion after profile or helper changes. Missing smoke files in
+an older checkout produce a clear compatibility mismatch without a traceback.
+
 ## Review and release alongside engine changes
 
 1. Update the workbench in the same PR when a change touches the contract map above. Regenerate the build and inspect the relevant settings or replay. If changing recording schema, review compatibility against the committed fixture as well as a newly generated run.
 2. Run `python -m unittest discover -s tests -v`. The workbench smoke test checks generated settings and a native one-turn offline run. Verify the actual UI when changing frontend behavior. Check configuration export, a full or smoke offline run, a native replay import and the live-plan gate, as applicable.
 3. After merge, build from the clean merged revision with the repository's locked dependencies. Check the revision shown in the UI and retain the generated static directory and companion ZIP together.
 4. Publish over the **existing** private Parallax Relay Site. Its deployment source repository is separate from this game repository. In the authorized Sites workspace, keep that repository's existing `.openai/hosting.json`, copy the generated output into its configured static directory (`dist/`), commit and push the updated Site source, then save and deploy that version privately. Keep the Site's access settings and project identity. The hosted URL does not need to change.
-5. Confirm the deployment succeeded, then load the Site as its owner. Check the displayed source revision, native fixture and companion download. Record the Git revision and the Sites version or deployment link in the release notes. To roll back, republish the previous known-good saved Sites version and verify the revision and fixture again.
+5. Confirm the deployment succeeded, then load the Site as its owner. Check the displayed source revision, native fixture and companion download. Record the game revision **G** embedded in `contract.json` and the separate Site-source revision **S** used for the saved version/deployment, plus the archive hash and deployment receipt. Verify hosted contract G and the built fingerprint; the saved Site version must identify S. These are different repositories, so the SHAs need not match. To roll back, republish the previous known-good saved Sites version and verify the revision and fixture again.
 
 There is no automatic deployment on merge. The game repository contains the source and build procedure. It does not contain Sites credentials or provider secrets.

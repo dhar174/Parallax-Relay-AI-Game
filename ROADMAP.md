@@ -36,7 +36,16 @@ Local error handling/output recovery (R01, R03), mock cost semantics (R02), the
 non-MOVE contract (R04), and safe legacy-demo outputs (R05) have regression coverage.
 The dated API audit checks the three existing endpoint/schema contracts. Next
 select compatible models and perform explicitly authorized, bounded live smoke
-tests (#14–#16/R06); no shortlist or billable execution is supplied by this audit.
+tests (#14–#16/R06); no shortlist or billable execution is supplied by that audit.
+Slice 7 adds a separate dated smoke profile, single-invocation helper, native
+artifact verifier and matching workbench preset. The selected roster is two
+independent OpenAI agents and one Gemini agent; characters and abilities are
+unchanged. Anthropic #15 is deferred because credits were unavailable. The single live
+attempt accepted six OpenAI phase outputs, but six Gemini HTTP 429 failures
+blocked the first resolved turn. Full mixed-provider acceptance remains open;
+see the dated verification record. #14/#15/#16 and parent #8 stay open. PR #33
+supplies the static workbench and mock-only companion; general release automation
+#34 and comprehensive browser coverage #35 remain separate.
 
 Offline CI, the focused Python/platform matrix, and reproducible dependencies
 (R09) are covered by PR #30. Its suite includes retry/cancellation, partial usage,
