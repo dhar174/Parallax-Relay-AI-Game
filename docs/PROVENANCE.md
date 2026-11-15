@@ -118,10 +118,12 @@ without a started match leaves execution timestamps null. Calling `finish(result
 on an unrelated already-computed result records `external_result`, with unknown
 execution configuration and no invented start/end/duration. Stage means the last
 observed lifecycle hook, not a liveness assertion. Binding publishes execution and
-input identities together only after collection succeeds. A failed begin hook or
-collector leaves `initialized` with null identities, execution times and lifecycle
-stop reasons; result/HTML output still records the local failure. The recorder is
-claimed before the begin hook and cannot be reused after failed setup.
+input identities together only after collection succeeds. A begin-hook or collector
+failure **before successful provenance binding** leaves `initialized` with null
+identities, execution times and lifecycle stop reasons; result/HTML output still
+records the local failure. Failures after binding, such as a running-manifest write
+error, retain the known identity/start and proceed through end/recovery normally.
+The recorder is claimed before the begin hook and cannot be reused after failed setup.
 
 Initialized records have no stop reasons. External results have both stop reasons
 but no execution/input identities or execution times. Ordinary running records

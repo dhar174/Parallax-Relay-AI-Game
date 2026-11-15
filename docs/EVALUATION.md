@@ -53,7 +53,7 @@ added. For `no_images`, remove image attachments for every role, preserving the 
 own-HUD projection and schemas; do not substitute descriptions/OCR or expose a
 hidden-state text representation. Other arms retain their role-specific images.
 
-#18 must introduce an explicit request-level image-inclusion flag (default true).
+#18 must introduce an explicit `AgentRequest.include_image` flag (default true).
 Set it false for every `no_images` request and retry; each provider must then omit
 the image content part, and budget quotes must omit `image_token_reserve`. Keep
 valid role PNGs in observations and spectator recording. Emptying `image_png` is
