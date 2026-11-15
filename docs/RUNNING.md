@@ -115,9 +115,11 @@ model capabilities, or service availability.
 [`configs/live_smoke.json`](../configs/live_smoke.json) is a public, frozen run
 sheet, not standing permission to spend. It selects SPECTRA and PYRA as separate
 `gpt-6-luna` OpenAI agents and FLUX as `gemini-3.5-flash-lite`. PYRA keeps its
-character, abilities, thermal view and private objective; only its model changes.
+character, abilities, thermal view and private objective. Its execution mapping
+selects OpenAI, `PYRA_MODEL` and `OPENAI_API_KEY` instead of the default Anthropic
+provider and variables.
 Both OpenAI agents use `OPENAI_API_KEY`, with separate `OPENAI_MODEL` and
-`PYRA_MODEL` selections pinned by the helper. FLUX uses `GEMINI_API_KEY`.
+`PYRA_MODEL` selections pinned by the helper. FLUX uses `GEMINI_MODEL` and `GEMINI_API_KEY`.
 Anthropic smoke validation #15 remains deferred; no Anthropic key is required.
 
 The profile retains normal broadcast, negotiation and commitment, limits execution
@@ -143,8 +145,9 @@ variables; unrelated assignments are rejected. Python startup overrides are remo
 from the child environment, while process proxy/certificate settings are retained. It pins all
 model selections in a child environment, passes the real CLI a validated temporary
 TOML and an explicit empty env file, and never loads the ordinary `.env` implicitly.
-It does not write credentials. `--check` makes no provider requests and creates no
-recorded run; it cannot establish authentication or model support. An optional
+It does not write credentials. `--check` requires the selected local credential
+variables (or dummy placeholders for offline validation), exits 2 when they are
+missing, makes no provider requests and creates no recorded run; it cannot establish authentication or model support. An optional
 `--config relay-workbench.toml` must normalize to the frozen profile exactly.
 The workbench's named preset exports this configuration; edits invalidate its
 approval and require renewed review. The original default configuration is unchanged.
@@ -152,14 +155,17 @@ approval and require renewed review. The original default configuration is uncha
 `--live` invokes the actual CLI once and records its exit code/profile digest in
 `smoke_launch.json` when the run directory exists. The subprocess has a 600-second
 outer timeout; existing per-attempt and cooperative cleanup bounds still apply.
-Errors/timeouts do not cause another invocation. After **any** started provider
+Errors/timeouts do not cause another invocation. On timeout the helper reports the
+selected partial-output directory, an unknown CLI exit code and `timed_out=true`;
+if the directory exists, it attempts an atomic launcher receipt. A failed receipt
+write is reported and acceptance stays unverified. After **any** started provider
 attempt, another live invocation needs new authorization. A timeout or missing
 artifact is unverified, never a reason to retry automatically. Outputs stay ignored
 and private; child stdout/stderr are not echoed by the helper.
 
 The helper preserves a nonzero CLI exit status. If CLI exit is zero but offline
-artifact verification fails, it returns 1; local preparation/launcher errors return
-2. `--verify` returns 0 only when the receipt, provenance settings/prices/models,
+artifact verification fails, it returns 1; local preparation/launcher errors and timeouts return
+2. `--verify` rejects execution-only `--config`, `--env-file` and `--out` flags. `--verify` returns 0 only when the receipt, provenance settings/prices/models,
 three successful phases, complete/cross-checked replay and world records, bounded
 attempts, usage counters, decoded role/spectator PNGs, the embedded viewer, and consistent
 one-turn incomplete state agree. Healthy output is `turn_limit`, `completed=false`,

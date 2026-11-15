@@ -2,6 +2,8 @@
 import asyncio
 import copy
 import importlib.util
+from contextlib import redirect_stdout, redirect_stderr
+import io
 import json
 import os
 from pathlib import Path
@@ -13,10 +15,10 @@ from unittest.mock import patch
 from parallax_relay.agents import ScriptedAgent
 from parallax_relay.config import GameConfig, load_config
 from parallax_relay.orchestrator import run_match
-from parallax_relay.protocol import ROLES
+from parallax_relay.protocol import ModelReply, ROLES
 from parallax_relay.provenance import PlayerIdentity, ProvenanceContext
 from parallax_relay.recording import Recorder
-from parallax_relay.providers import ProviderError
+from parallax_relay.providers import ProviderError, _decode
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -280,3 +282,77 @@ class LiveSmokeTests(unittest.TestCase):
             path.write_text('\n'.join(map(json.dumps, rows)), encoding='utf-8')
             report = smoke.verify_run(out, profile)
             self.assertNotIn('secret_sentinel', json.dumps(report))
+
+    def test_malformed_profile_container_raises_safe_configuration_error(self):
+        smoke = self.smoke()
+        profile = smoke.load_profile()
+        profile['sources']['PYRA'] = ['model_url', 'pricing_url', 'notes']
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / 'profile.json'
+            path.write_text(json.dumps(profile), encoding='utf-8')
+            with self.assertRaises(ValueError):
+                smoke.load_profile(path)
+
+    def test_timeout_reports_partial_path_and_atomic_receipt_without_relaunch(self):
+        smoke = self.smoke()
+        profile = smoke.load_profile()
+        invocations = []
+        def timeout(command, **kwargs):
+            invocations.append(command)
+            Path(command[command.index('--out') + 1]).mkdir()
+            raise subprocess.TimeoutExpired(command, 600, output='SECRET_SENTINEL', stderr='SECRET_SENTINEL')
+        with tempfile.TemporaryDirectory() as temp, patch.object(smoke.subprocess, 'run', timeout):
+            out = Path(temp) / 'run'
+            result = smoke.launch(profile, live=True, out=out,
+                environ={'OPENAI_API_KEY': 'FAKE', 'GEMINI_API_KEY': 'FAKE'})
+            self.assertEqual(len(invocations), 1)
+            self.assertEqual(result['out'], str(out))
+            self.assertTrue(result['timed_out'])
+            self.assertIsNone(result['cli_returncode'])
+            self.assertFalse(result['verification']['accepted'])
+            receipt = json.loads((out / 'smoke_launch.json').read_text(encoding='utf-8'))
+            self.assertTrue(receipt['timed_out'])
+            self.assertIsNone(receipt['cli_returncode'])
+            self.assertFalse((out / 'smoke_launch.json.tmp').exists())
+            self.assertNotIn('SECRET_SENTINEL', json.dumps(result) + json.dumps(receipt))
+            with patch.object(smoke, 'launch', return_value=result), redirect_stdout(io.StringIO()):
+                self.assertEqual(smoke.main(['--live']), 2)
+
+    def test_verify_rejects_ignored_execution_flags(self):
+        smoke = self.smoke()
+        with redirect_stderr(io.StringIO()):
+            for option in ('--config', '--env-file'):
+                with self.subTest(option=option):
+                    with self.assertRaises(SystemExit) as error:
+                        smoke.main(['--verify', 'run', option, 'unused'])
+                    self.assertEqual(error.exception.code, 2)
+
+    def test_valid_retry_and_unknown_usage_keep_evidence_and_estimates(self):
+        smoke = self.smoke()
+        class MetadataAgent(ScriptedAgent):
+            def __init__(self, role):
+                super().__init__(role)
+                self.first = True
+
+            async def respond(self, request):
+                scripted = await super().respond(request)
+                usage = _decode('openai', {'usage': {'input_tokens': 9, 'output_tokens': None,
+                    'input_tokens_details': {'cached_tokens': 'SECRET_SENTINEL'}}}).usage
+                if self.role == 'SPECTRA' and self.first:
+                    self.first = False
+                    return ModelReply('not JSON', usage)
+                return ModelReply(scripted.text, usage)
+
+        with tempfile.TemporaryDirectory() as temp:
+            out = Path(temp) / 'run'
+            profile = self.synthetic_run(smoke, out, {r: MetadataAgent(r) for r in ROLES})
+            report = smoke.verify_run(out, profile)
+            self.assertTrue(report['accepted'], report)
+            self.assertEqual(report['providers']['SPECTRA']['attempts'], 4)
+            self.assertEqual(report['budget']['unknown_usage_calls'], 10)
+            self.assertGreater(report['budget']['estimated_cost_usd'], 0)
+            self.assertEqual(report['providers']['PYRA']['source_usage'][0]['usage.input_tokens'],
+                             {'state': 'count', 'value': 9})
+            self.assertEqual(report['providers']['PYRA']['source_usage'][0]['usage.input_tokens_details.cached_tokens'],
+                             {'state': 'invalid', 'value': None})
+            self.assertNotIn('SECRET_SENTINEL', json.dumps(report))

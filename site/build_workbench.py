@@ -21,7 +21,7 @@ from scripts.live_smoke import load_profile
 
 def write_json(path: Path, value) -> None:
     path.write_text(json.dumps(value, ensure_ascii=True, separators=(",", ":")) + "\n",
-                    encoding="utf-8")
+                    encoding="utf-8", newline="\n")
 
 
 def build(output: Path = OUTPUT) -> Path:

@@ -111,7 +111,9 @@ Call usage may contain optional `source_usage` counter-origin metadata. HTTP
 adapters record only allowlisted counter paths with an omitted/null/count/invalid
 state and a valid count or null. This never changes normalized accounting or copies
 raw invalid values. Existing `Usage(input, output, cached, reasoning)` constructors
-remain valid, with source metadata defaulting to null. Existing schema-v2 records
+remain valid, with source metadata defaulting to null. Supplied counter maps are detached and
+immutable (including nested counters); usage/replies remain hashable and the
+existing dataclass-to-JSON recording shape is preserved. Existing schema-v2 records
 without the field remain readable. See [API sources](API_SOURCES.md#slice-7-selected-profile--november-15-2026).
 
 ## Outcomes and exit codes

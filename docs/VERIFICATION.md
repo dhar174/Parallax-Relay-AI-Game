@@ -47,7 +47,29 @@ CRLF into CRCRLF. Explicit UTF-8 reads and idempotent newline conversion fix tho
 causes without relaxing assertions; a CRLF fixture reproduced the latter on Linux.
 The repaired local suite passed **245 Python tests** (30.807s) with no skips,
 plus **51 Node tests**, the regenerated build, compilation, normal/fast mock
-victories and diff checks. Final CI and the single live invocation remain pending. Anthropic #15 and parent #8 stay open.
+victories and diff checks. All six logs in [workflow 43691736704](https://github.com/dhar174/Parallax-Relay-AI-Game/actions/runs/43691736704)
+then passed at `b83d85a`: 245 tests/no skips, pip 26.3 consistency, compilation,
+63/42-call mock victories and diff checks; Ubuntu/Python 3.12 locked also passed
+51 Node tests. Versions: Linux 3.11.18/3.12.16/3.13.18, Windows/macOS 3.12.10.
+
+A subsequently discovered [Antigravity review](https://github.com/dhar174/Parallax-Relay-AI-Game/pull/36#pullrequestreview-5909694226)
+against the initial head supplied additional cases before paid execution. Regressions
+reproduced missing companion inputs, malformed profile containers, timeout output
+loss, mutable metadata and source-link/preset-order behavior. Corrections preserve
+immutable/hashable usage and JSON serialization, report timeout paths/atomic
+receipts without relaunch, reject malformed profiles and ignored verify flags,
+retain partial accounting, expose safe source references and handle missing inputs.
+A real unpacked companion exits cleanly on older checkouts. Generated JSON uses LF.
+Valid retries and unknown usage retain estimates with explicit source-counter
+projection coverage. Full final-head checks and the single live invocation remain
+pending; no provider attempts have started. After these corrections, **252 Python
+tests** passed (34.124s) with no skips and **52 Node tests** passed. Build,
+compilation, mock outcomes and whitespace checks passed. Focused Chromium 156
+verification at 1440×1000 and 390×844 confirmed all six HTTPS reference links,
+eligibility notes, approval and no overflow/console errors/external requests.
+Local screenshot/receipt evidence is `/tmp/parallax-slice7-review-qa-dVubA8/`.
+A controlled no-network probe also rejected existing output and a broken symlink
+before launching any CLI, with a safe fresh-directory diagnostic. Anthropic #15 and parent #8 stay open.
 The delivery PR will record final source/CI evidence; a later merged Site release
 must distinguish game revision G from Site-source revision S.
 

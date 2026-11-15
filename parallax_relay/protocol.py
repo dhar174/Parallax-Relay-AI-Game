@@ -73,6 +73,24 @@ class AgentRequest:
         }, ensure_ascii=True, separators=(',', ':'))
 
 
+class _UsageMap(dict):
+    """Detached immutable counter maps compatible with asdict/JSON and hashing."""
+    def __init__(self, items=()):
+        dict.__init__(self, ((key, _UsageMap(value) if isinstance(value, dict) else value)
+                            for key, value in dict(items).items()))
+
+    def _readonly(self, *args, **kwargs):
+        raise TypeError('Usage counter evidence is immutable')
+
+    __setitem__ = __delitem__ = clear = pop = popitem = setdefault = update = __ior__ = _readonly
+
+    def __hash__(self):
+        return hash(frozenset(self.items()))
+
+    def __deepcopy__(self, memo):
+        return self
+
+
 @dataclass(frozen=True)
 class Usage:
     input_tokens: int | None = None
@@ -80,6 +98,10 @@ class Usage:
     cached_input_tokens: int = 0
     reasoning_output_tokens: int = 0
     source_usage: dict[str, dict] | None = None
+
+    def __post_init__(self):
+        if self.source_usage is not None:
+            object.__setattr__(self, 'source_usage', _UsageMap(self.source_usage))
 
 
 @dataclass(frozen=True)

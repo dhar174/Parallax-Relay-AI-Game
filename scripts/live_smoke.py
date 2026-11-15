@@ -38,6 +38,10 @@ SAFE_STATUSES = frozenset({'ok', 'cancelled', 'timeout', 'refusal', 'incomplete'
     'invalid_provider_response', 'network_error', 'provider_error'})
 
 
+class _OutputPathError(ValueError):
+    pass
+
+
 def _canonical(value) -> str:
     return json.dumps(value, sort_keys=True, separators=(',', ':'), allow_nan=False)
 
@@ -49,13 +53,14 @@ def profile_digest(profile: dict) -> str:
 def load_profile(path: Path = PROFILE) -> dict:
     try:
         profile = json.loads(path.read_text(encoding='utf-8'))
-        if set(profile) != {'schema_version', 'verified_date', 'models', 'sources', 'config'}:
+        if not isinstance(profile, dict) or set(profile) != {'schema_version', 'verified_date', 'models', 'sources', 'config'}:
             raise ValueError
         if type(profile['schema_version']) is not int or profile['schema_version'] != 1:
             raise ValueError
         date.fromisoformat(profile['verified_date'])
         config = GameConfig.model_validate(profile['config'])
-        if set(profile['models']) != set(ROLES) or set(profile['sources']) != set(ROLES):
+        if (not isinstance(profile['models'], dict) or not isinstance(profile['sources'], dict)
+                or set(profile['models']) != set(ROLES) or set(profile['sources']) != set(ROLES)):
             raise ValueError
         model_vars = {p.model_env for p in config.players.values()}
         if len(model_vars) != len(ROLES) or model_vars & {p.api_key_env for p in config.players.values()}:
@@ -64,7 +69,7 @@ def load_profile(path: Path = PROFILE) -> dict:
             if not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._-]{0,127}', profile['models'][role]):
                 raise ValueError
             source = profile['sources'][role]
-            if set(source) != {'model_url', 'pricing_url', 'notes'} or not all(
+            if not isinstance(source, dict) or set(source) != {'model_url', 'pricing_url', 'notes'} or not all(
                     isinstance(value, str) for value in source.values()):
                 raise ValueError
         # Normalize defaults once for both the launcher and generated Site contract.
@@ -276,7 +281,8 @@ def verify_run(directory: Path, profile: dict) -> dict:
                               and attempts[-1].get('status') == 'ok'
                               and sum(c.get('status') == 'ok' for c in attempts) == 1
                               and len([p for p in phases if p.get('phase') == phase
-                                       and p.get('statuses', {}).get(role) == 'ok']) == 1)
+                                       and isinstance(p.get('statuses'), dict)
+                                       and p['statuses'].get(role) == 'ok']) == 1)
             report['providers'][role] = {
                 'accepted': bool(successes), 'attempts': len(own), **expected_players[role],
                 'statuses': report['providers'][role]['statuses'],
@@ -284,7 +290,8 @@ def verify_run(directory: Path, profile: dict) -> dict:
             }
             allowed = _source_usage(cfg.players[role].provider, {})
             for call in own:
-                source = (call.get('usage') or {}).get('source_usage')
+                usage = call.get('usage')
+                source = usage.get('source_usage') if isinstance(usage, dict) else None
                 safe = {}
                 if isinstance(source, dict):
                     for key in allowed:
@@ -309,9 +316,10 @@ def launch(profile: dict, *, live: bool, environ=None, out: Path | None = None,
         raise ValueError('Export differs from the frozen smoke profile; review changes before execution.')
     env = prepare_environment(profile, environ, env_file)
     directory = (out or ROOT / 'runs' / ('live_smoke_' + datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')
-                                       + '_' + uuid4().hex[:8])).resolve() if live else None
-    if directory is not None and directory.exists():
-        raise ValueError('Use a fresh output directory.')
+                                       + '_' + uuid4().hex[:8])).absolute() if live else None
+    if directory is not None and (directory.exists() or directory.is_symlink()):
+        raise _OutputPathError('Use a fresh output directory.')
+    code, timed_out = None, False
     with tempfile.TemporaryDirectory(prefix='parallax-smoke-') as temp:
         config_file, empty_env = Path(temp) / 'smoke.toml', Path(temp) / 'empty.env'
         config_file.write_text(configuration_toml(config), encoding='utf-8')
@@ -322,14 +330,23 @@ def launch(profile: dict, *, live: bool, environ=None, out: Path | None = None,
                    '--config', str(config_file), '--env-file', str(empty_env), '--quiet']
         if live:
             command += ['--out', str(directory)]
-        completed = subprocess.run(command, cwd=ROOT, env=env, capture_output=True,
-                                   text=True, encoding='utf-8', errors='replace', timeout=600)
-    result = {'cli_returncode': completed.returncode, 'out': str(directory) if directory else None}
+        try:
+            completed = subprocess.run(command, cwd=ROOT, env=env, capture_output=True,
+                                       text=True, encoding='utf-8', errors='replace', timeout=600)
+            code = completed.returncode
+        except subprocess.TimeoutExpired:
+            timed_out = True  # The child may have started billable attempts. Never relaunch.
+    result = {'cli_returncode': code, 'timed_out': timed_out, 'out': str(directory) if directory else None}
     if live:
         receipt = {'schema_version': 1, 'profile_sha256': profile_digest(profile),
-                   'cli_returncode': completed.returncode}
+                   'cli_returncode': code, 'timed_out': timed_out}
         if directory.is_dir():
-            (directory / 'smoke_launch.json').write_text(json.dumps(receipt, indent=2) + '\n', encoding='utf-8')
+            try:
+                temp_receipt = directory / 'smoke_launch.json.tmp'
+                temp_receipt.write_text(json.dumps(receipt, indent=2) + '\n', encoding='utf-8', newline='\n')
+                temp_receipt.replace(directory / 'smoke_launch.json')
+            except OSError:
+                result['receipt_write_failed'] = True
         result['verification'] = verify_run(directory, profile)
     return result
 
@@ -346,6 +363,8 @@ def main(argv=None) -> int:
     args = parser.parse_args(argv)
     if args.out and not args.live:
         parser.error('--out requires --live')
+    if args.verify and (args.config or args.env_file):
+        parser.error('--verify does not accept --config or --env-file')
     try:
         profile = load_profile()
         if args.verify:
@@ -356,7 +375,12 @@ def main(argv=None) -> int:
         result = launch(profile, live=args.live, out=args.out, config_path=args.config, env_file=env_file)
         print(json.dumps(result, indent=2))
         code = result['cli_returncode']
+        if code is None:
+            return 2
         return code if code != 0 else 0 if args.check or result['verification']['accepted'] else 1
+    except _OutputPathError:
+        print('Use a fresh output directory; existing files, directories and symlinks are rejected.', file=sys.stderr)
+        return 2
     except (ConfigError, ValueError):
         print('Smoke configuration/credentials invalid. Check the profile, matching export and required local variables.', file=sys.stderr)
         return 2

@@ -2,9 +2,11 @@
 import json
 from pathlib import Path
 import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
+import zipfile
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / 'site'))
@@ -43,3 +45,25 @@ class SmokeWorkbenchTests(unittest.TestCase):
                     path.write_bytes(content.replace(b'\r\n', b'\n').replace(b'\n', b'\r\n'))
                     self.assertEqual(runtime_fingerprint(root), original)
                     path.write_bytes(content)
+
+    def test_missing_smoke_files_produce_a_mismatch_without_a_traceback(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            for name in ('configs', 'parallax_relay', 'scripts'):
+                shutil.copytree(ROOT / name, root / name, ignore=shutil.ignore_patterns('__pycache__'))
+            expected = runtime_fingerprint(root)
+            output = build(root / 'built')
+            with zipfile.ZipFile(output / 'relay-workbench.zip') as archive:
+                archive.extractall(root / 'unpacked')
+            companion = root / 'unpacked/relay-workbench/relay_workbench.py'
+            for name in ('configs/live_smoke.json', 'scripts/live_smoke.py'):
+                path = root / name
+                original = path.read_bytes()
+                path.unlink()
+                self.assertNotEqual(runtime_fingerprint(root), expected)
+                completed = subprocess.run([sys.executable, str(companion)], cwd=root,
+                    capture_output=True, text=True, encoding='utf-8', timeout=10)
+                self.assertEqual(completed.returncode, 1)
+                self.assertIn('Checkout runtime differs', completed.stderr)
+                self.assertNotIn('Traceback', completed.stderr)
+                path.write_bytes(original)

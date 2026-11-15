@@ -20,7 +20,7 @@ test('named live preset exports Python-valid settings and exact independent role
   await app.click('live-smoke');
   const text = await app.exportConfig();
   assert.ok(text.includes('max_output_tokens = 4096'), 'Named preset was not applied');
-  const parsed = spawnSync('python', ['-c',
+  const parsed = spawnSync(process.env.PYTHON || 'python', ['-c',
     'import sys,json,tomllib; from parallax_relay.config import GameConfig; print(json.dumps(GameConfig.model_validate(tomllib.loads(sys.stdin.read())).model_dump()))'],
     { cwd: root, input: text, encoding: 'utf8' });
   assert.equal(parsed.status, 0, parsed.stderr);
@@ -29,12 +29,22 @@ test('named live preset exports Python-valid settings and exact independent role
   assert.match(app.node('panel').innerHTML, /gpt-6-luna/);
   assert.match(app.node('panel').innerHTML, /gemini-3\.5-flash-lite/);
   assert.match(app.node('panel').innerHTML, /scripts\/live_smoke\.py --check/);
+  assert.match(app.node('panel').innerHTML, /href="https:\/\/developers\.openai\.com\/api\/docs\/pricing\.md"/);
+  assert.match(app.node('panel').innerHTML, /free-tier eligibility\/quota unverified/);
   await app.click('approve');
   assert.match(app.node('panel').innerHTML, /scripts\/live_smoke\.py --live/);
   app.input({ dataset: { match: 'max_calls' }, value: '17', valueAsNumber: 17 });
   await app.tab('live');
   assert.doesNotMatch(app.node('panel').innerHTML, /approved-download/);
   assert.doesNotMatch(app.node('panel').innerHTML, /scripts\/live_smoke\.py --live/);
+});
+
+test('semantically matching preset survives reordered configuration properties', async t => {
+  const modified = structuredClone(contract);
+  modified.defaults = Object.fromEntries(Object.entries(smokeProfile.config).reverse());
+  const app = await workbench(t, { contract: modified });
+  await app.tab('live');
+  assert.match(app.node('panel').innerHTML, /Named live-smoke roster/);
 });
 
 test('old and additive usage-origin records survive import and export', async t => {

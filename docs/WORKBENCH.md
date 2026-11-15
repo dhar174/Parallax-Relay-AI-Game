@@ -58,7 +58,7 @@ Live preparation exports a local configuration after the user reviews the spendi
 **Match configuration → Use named live-smoke preset** loads the same public
 [profile](../configs/live_smoke.json) used by the local helper. Live preparation
 shows SPECTRA/PYRA as independent `gpt-6-luna` agents, FLUX as
-`gemini-3.5-flash-lite`, the required environment-variable names, dated rates and
+`gemini-3.5-flash-lite`, the required environment-variable names, dated rates, model/pricing source links, eligibility/accounting notes and
 fixed limits. PYRA retains its character, abilities, thermal view and objective.
 No credential value enters the browser. Ordinary defaults still map PYRA to
 Anthropic; its live smoke issue #15 remains open.
@@ -74,7 +74,8 @@ The generated `contract.json.live_smoke` addition is public metadata. It contain
 model IDs, settings and source links, never keys or real live recordings. The
 companion remains mock-only; live records are imported in the browser locally.
 Usage-origin annotations are retained when present, and old records without them
-remain supported. Rebuild the companion after profile or helper changes.
+remain supported. Rebuild the companion after profile or helper changes. Missing smoke files in
+an older checkout produce a clear compatibility mismatch without a traceback.
 
 ## Review and release alongside engine changes
 

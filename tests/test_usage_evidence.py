@@ -61,6 +61,32 @@ class UsageEvidenceTests(unittest.TestCase):
                           usage.cached_input_tokens, usage.reasoning_output_tokens), (1, 2, 3, 4))
         self.assertIsNone(getattr(usage, 'source_usage', None))
 
+    def test_counter_evidence_is_immutable_hashable_and_json_serializable(self):
+        original = {'usage.input_tokens': {'state': 'count', 'value': 3}}
+        usage = Usage(3, 4, source_usage=original)
+        original['usage.input_tokens']['value'] = 999
+        self.assertEqual(usage.source_usage['usage.input_tokens']['value'], 3)
+        with self.assertRaises(TypeError):
+            usage.source_usage['usage.input_tokens']['value'] = 999
+        with self.assertRaises(TypeError):
+            usage.source_usage.update(other={})
+        self.assertEqual(hash(usage), hash(Usage(3, 4, source_usage={
+            'usage.input_tokens': {'value': 3, 'state': 'count'}})))
+        self.assertEqual(json.loads(json.dumps(asdict(usage)))['source_usage'], {
+            'usage.input_tokens': {'state': 'count', 'value': 3}})
+
+    def test_parent_counter_states_and_nonstring_invalid_values(self):
+        for data, state in (({}, 'omitted'), ({'usage': None}, 'null'),
+                            ({'usage': {'input_tokens_details': None}}, 'null')):
+            with self.subTest(state=state, data=data):
+                usage = _decode('openai', data).usage
+                self.assertEqual(usage.source_usage['usage.input_tokens_details.cached_tokens']['state'], state)
+        for invalid in (True, False, -1, 1.5, [], {}):
+            with self.subTest(invalid=invalid):
+                usage = _decode('anthropic', {'usage': {'cache_read_input_tokens': invalid}}).usage
+                self.assertEqual(usage.source_usage['usage.cache_read_input_tokens'],
+                                 {'state': 'invalid', 'value': None})
+
     def test_recorded_null_counters_retain_estimates_without_provider_text(self):
         class InterceptedUsageAgent(ScriptedAgent):
             async def respond(self, request):
