@@ -31,8 +31,23 @@ checks passed. The existing private hosted Site has not been changed.
 
 The real helper's `--check` returned 0 without a run directory or provider calls.
 Synthetic tests exercise the real driver/recorder and cannot establish remote
-support. Live execution, final review, final-head CI and Site publication remain
-pending at this preparation checkpoint. Anthropic #15 and parent #8 stay open.
+support. The independent review found credential-file startup influence and incomplete
+record acceptance; negative regressions reproduced both before repair. The verifier
+now checks required world/role/phase/replay structure and cross-record agreement,
+decodes all required role/spectator PNGs and cross-checks embedded viewer data.
+Oversized integer costs reject safely, aborted runs retain attempt counts, and
+public status labels are allowlisted. Credential files now supply selected keys
+only; process transport settings remain available. These are validation checks,
+not artifact signatures or evidence of model intelligence.
+
+Initial workflow [43690357997](https://github.com/dhar174/Parallax-Relay-AI-Game/actions/runs/43690357997)
+passed five jobs; Windows failed a UTF-8 privacy scan and two CRLF test cases.
+The HTML read used the platform codec, and the newline test doubled existing
+CRLF into CRCRLF. Explicit UTF-8 reads and idempotent newline conversion fix those
+causes without relaxing assertions; a CRLF fixture reproduced the latter on Linux.
+The repaired local suite passed **245 Python tests** (30.807s) with no skips,
+plus **51 Node tests**, the regenerated build, compilation, normal/fast mock
+victories and diff checks. Final CI and the single live invocation remain pending. Anthropic #15 and parent #8 stay open.
 The delivery PR will record final source/CI evidence; a later merged Site release
 must distinguish game revision G from Site-source revision S.
 

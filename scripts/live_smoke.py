@@ -17,18 +17,25 @@ import subprocess
 import sys
 import tempfile
 from uuid import uuid4
+from PIL import Image
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from parallax_relay.config import ConfigError, GameConfig, load_config
 from parallax_relay.play import load_env_file
-from parallax_relay.protocol import ROLES
-from parallax_relay.provenance import read_provenance
+from parallax_relay.protocol import ROLES, parse_reply
+from parallax_relay.provenance import read_provenance, _WorldSnapshot
 from parallax_relay.providers import _source_usage
+from parallax_relay.observations import observe
+from parallax_relay.state import initial_world
 
 PROFILE = ROOT / 'configs/live_smoke.json'
 PHASES = ('broadcast', 'negotiate', 'commit')
+SAFE_STATUSES = frozenset({'ok', 'cancelled', 'timeout', 'refusal', 'incomplete',
+    'invalid_json_schema', 'stale_turn', 'response_size', 'internal_error',
+    'response_failed', 'response_too_large', 'quota_exhausted', 'http_error',
+    'invalid_provider_response', 'network_error', 'provider_error'})
 
 
 def _canonical(value) -> str:
@@ -85,16 +92,21 @@ def configuration_toml(config: GameConfig) -> str:
 
 def prepare_environment(profile: dict, environ=None, env_file: Path | None = None) -> dict:
     env = dict(os.environ if environ is None else environ)
-    if env_file is not None:
-        load_env_file(env_file, env)
     config = GameConfig.model_validate(profile['config'])
+    if env_file is not None:
+        supplied = {}
+        load_env_file(env_file, supplied)
+        if set(supplied) - {p.api_key_env for p in config.players.values()}:
+            raise ConfigError('Credential files may supply only the selected API key variables.')
+        for key, value in supplied.items():
+            env.setdefault(key, value)
     for role, player in config.players.items():
         env[player.model_env] = profile['models'][role]
     config.resolve(env)
     # Exclude Python startup/import overrides. Keep process transport settings;
     # some execution environments require a proxy/certificate configuration.
     for key in list(env):
-        if key.upper() in {'PYTHONPATH', 'PYTHONHOME', 'PYTHONSTARTUP', 'PYTHONINSPECT'}:
+        if key.upper().startswith('PYTHON'):
             del env[key]
     env['PYTHONIOENCODING'] = 'utf-8'
     return env
@@ -102,6 +114,72 @@ def prepare_environment(profile: dict, environ=None, env_file: Path | None = Non
 
 def _count(value) -> bool:
     return type(value) is int and value >= 0
+
+
+def _role_map(value) -> None:
+    if not isinstance(value, dict) or set(value) != set(ROLES):
+        raise ValueError('Incomplete role records')
+
+
+def _check_records(state, result, phases, replay) -> bool:
+    """Validate required native evidence without applying engine transitions."""
+    _WorldSnapshot.model_validate(state)
+    turn = replay[0]
+    required = {'turn', 'observations', 'communications', 'sealed_actions',
+                'private_notes', 'fallbacks', 'events', 'state_after'}
+    if not required <= set(turn) or type(turn['turn']) is not int:
+        return False
+    for key in ('observations', 'sealed_actions', 'private_notes'):
+        _role_map(turn[key])
+    if turn['fallbacks'] != {} or not isinstance(turn['fallbacks'], dict):
+        return False
+    if not isinstance(turn['events'], list) or any(type(e) is not str for e in turn['events']):
+        return False
+    if turn['events'] != state['events'] or type(result.get('energy')) is not int:
+        return False
+    communication = []
+    for phase in phases:
+        _role_map(phase['statuses'])
+        if phase['phase'] != 'commit':
+            messages = phase['messages']
+            if not isinstance(messages, list) or [m['role'] for m in messages] != list(ROLES):
+                return False
+            for message in messages:
+                if (message['phase'] != phase['phase'] or type(message['turn']) is not int
+                        or message['turn'] != 0 or message.get('fallback') is not False):
+                    return False
+                parse_reply(json.dumps({'turn': 0, 'message': message['text']}), phase['phase'], 0)
+            communication.extend(messages)
+        else:
+            _role_map(phase['sealed_actions'])
+            if phase['sealed_actions'] != turn['sealed_actions']:
+                return False
+    if turn['communications'] != communication:
+        return False
+    world = initial_world()
+    for role in ROLES:
+        observation = turn['observations'][role]
+        if (observation['image'] != f'turn_00_{role.lower()}.png'
+                or observation['hud'] != observe(world, role).hud):
+            return False
+        parse_reply(json.dumps({'turn': 0, 'action': turn['sealed_actions'][role],
+                                'notes': turn['private_notes'][role]}), 'commit', 0)
+    return True
+
+
+def _check_artifacts(directory, manifest, result, calls, replay) -> bool:
+    for name in ('turn_00_spectra.png', 'turn_00_pyra.png', 'turn_00_flux.png',
+                 'turn_00_spectator.png', 'final_spectator.png'):
+        with Image.open(directory / name) as image:
+            if image.format != 'PNG':
+                return False
+            image.load()
+    html = (directory / 'index.html').read_text(encoding='utf-8')
+    encoded = html.split('const DATA=', 1)[1]
+    viewer, end = json.JSONDecoder().raw_decode(encoded)
+    return (encoded[end:].startswith(';') and viewer['result'] == result
+            and viewer['calls'] == calls and viewer['records'] == replay
+            and all(viewer['manifest'][key] == manifest[key] for key in ('mode', 'settings', 'players')))
 
 
 def verify_run(directory: Path, profile: dict) -> dict:
@@ -120,6 +198,11 @@ def verify_run(directory: Path, profile: dict) -> dict:
         manifest, result, state, receipt = (objects[n] for n in
                                           ('manifest', 'result', 'final_state', 'smoke_launch'))
         calls, phases, replay = (records[n] for n in ('calls', 'phases', 'replay'))
+        for role in ROLES:
+            own = [c for c in calls if c.get('role') == role]
+            report['providers'][role].update(attempts=len(own), statuses=[
+                c['status'] if isinstance(c.get('status'), str) and c['status'] in SAFE_STATUSES
+                else 'unknown' for c in own])
         provenance = read_provenance(manifest)
         cfg = GameConfig.model_validate(profile['config'])
         expected_players = {r: {'provider': cfg.players[r].provider, 'model': profile['models'][r]}
@@ -159,6 +242,7 @@ def verify_run(directory: Path, profile: dict) -> dict:
                                    ('reported_input_tokens', 'reported_output_tokens', 'unknown_usage_calls')))
         checks['phases'] = (len(phases) == 3 and [p['phase'] for p in phases] == list(PHASES)
                             and all(type(p.get('turn')) is int and p['turn'] == 0 for p in phases))
+        checks['record_structure'] = len(replay) == 1 and len(phases) == 3 and _check_records(state, result, phases, replay)
         checks['lifecycle'] = (provenance['lifecycle']['stage'] == 'ended'
                                and provenance['lifecycle']['stop_reason'] == 'turn_limit'
                                and provenance['lifecycle']['execution_stop_reason'] == 'turn_limit')
@@ -195,8 +279,7 @@ def verify_run(directory: Path, profile: dict) -> dict:
                                        and p.get('statuses', {}).get(role) == 'ok']) == 1)
             report['providers'][role] = {
                 'accepted': bool(successes), 'attempts': len(own), **expected_players[role],
-                'statuses': [c['status'] if isinstance(c.get('status'), str)
-                             and re.fullmatch(r'[a-z_]{1,48}', c['status']) else 'unknown' for c in own],
+                'statuses': report['providers'][role]['statuses'],
                 'source_usage': [],
             }
             allowed = _source_usage(cfg.players[role].provider, {})
@@ -211,12 +294,10 @@ def verify_run(directory: Path, profile: dict) -> dict:
                             if (item['state'] == 'count' and _count(value)) or (item['state'] != 'count' and value is None):
                                 safe[key] = {'state': item['state'], 'value': value}
                 report['providers'][role]['source_usage'].append(safe or None)
-        # Require the role PNGs used for the resolved turn and final viewer.
-        checks['artifacts'] = (directory / 'index.html').is_file() and all(
-            (directory / f'turn_00_{role.lower()}.png').read_bytes().startswith(b'\x89PNG\r\n\x1a\n')
-            for role in ROLES)
+        checks['artifacts'] = _check_artifacts(directory, manifest, result, calls, replay)
         report['accepted'] = all(checks.values()) and all(p['accepted'] for p in report['providers'].values())
-    except (OSError, ValueError, TypeError, KeyError, IndexError, AttributeError, RecursionError):
+    except (OSError, ValueError, TypeError, KeyError, IndexError, AttributeError,
+            RecursionError, OverflowError, Image.DecompressionBombError):
         report['checks']['readable_evidence'] = False
     return report
 

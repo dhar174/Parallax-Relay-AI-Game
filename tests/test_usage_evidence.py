@@ -84,11 +84,11 @@ class UsageEvidenceTests(unittest.TestCase):
             self.assertEqual(result.budget['reported_input_tokens'], 0)
             self.assertEqual(result.budget['reported_output_tokens'], 180)
             self.assertGreater(result.budget['estimated_cost_usd'], 0)
-            calls = [json.loads(line) for line in (out / 'calls.jsonl').read_text().splitlines()]
+            calls = [json.loads(line) for line in (out / 'calls.jsonl').read_text(encoding='utf-8').splitlines()]
             self.assertEqual(len(calls), 9)
             for call in calls:
                 self.assertEqual(call['usage']['source_usage']['usage.cache_read_input_tokens'],
                                  {'state': 'null', 'value': None})
             for path in out.iterdir():
                 if path.suffix in {'.json', '.jsonl', '.html'}:
-                    self.assertNotIn('SECRET_SENTINEL', path.read_text())
+                    self.assertNotIn('SECRET_SENTINEL', path.read_text(encoding='utf-8'))

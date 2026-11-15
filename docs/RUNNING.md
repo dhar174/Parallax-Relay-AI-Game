@@ -138,7 +138,9 @@ python scripts/live_smoke.py --verify runs/<fresh-run>
 ```
 
 The helper inherits process credentials, optionally filling missing values from
-ignored `.env.smoke` or an explicit `--env-file`. Process values win. It pins all
+ignored `.env.smoke` or an explicit `--env-file`. Process values win. Credential files may contain only the selected API-key
+variables; unrelated assignments are rejected. Python startup overrides are removed
+from the child environment, while process proxy/certificate settings are retained. It pins all
 model selections in a child environment, passes the real CLI a validated temporary
 TOML and an explicit empty env file, and never loads the ordinary `.env` implicitly.
 It does not write credentials. `--check` makes no provider requests and creates no
@@ -158,7 +160,8 @@ and private; child stdout/stderr are not echoed by the helper.
 The helper preserves a nonzero CLI exit status. If CLI exit is zero but offline
 artifact verification fails, it returns 1; local preparation/launcher errors return
 2. `--verify` returns 0 only when the receipt, provenance settings/prices/models,
-three successful phases, bounded attempts, usage counters, images, and consistent
+three successful phases, complete/cross-checked replay and world records, bounded
+attempts, usage counters, decoded role/spectator PNGs, the embedded viewer, and consistent
 one-turn incomplete state agree. Healthy output is `turn_limit`, `completed=false`,
 no victory/defeat and null scores. Failed attempts may precede a valid bounded retry;
 fallback outputs cannot establish acceptance. Per-role verdicts are distinct from
