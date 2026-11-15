@@ -70,7 +70,25 @@ exponential delay and bounded provider Retry-After. Refusal is not retried. A JS
 repair request gives a fixed safe instruction without echoing raw malformed text.
 Schema-valid illegal moves go to the engine without retry. Transient network/HTTP
 failures retry, then silence/WAIT. Authentication, unsupported model/schema requests,
-and exhausted quota are fatal. No automatic SDK/transport retry is hidden.
+and recognized exhausted-quota errors are fatal. Other 429 errors retain bounded
+retries; the adapter cannot establish that every provider quota error is transient.
+No automatic SDK/transport retry is hidden.
+
+OpenAI failed/error envelopes raise sanitized `response_failed`; only documented
+`server_error`/`rate_limit_exceeded` response codes retry. Content filtering is a
+refusal; unfinished messages remain incomplete, and commentary/reasoning are not
+final JSON replies. Anthropic thinking usage is metadata within the inclusive output
+total. Invalid additive cache/thought counters leave the affected total unknown,
+retaining its budget estimate. See the [dated contract audit](API_SOURCES.md#independent-contract-audit--november-14-2026)
+for source references and the distinction between provider contracts and local policy.
+
+Explicit failure classification precedes malformed usage; optional null output
+collections do not hide refusals. All providers return empty text on refusal, and
+Gemini prompt blocking takes precedence over candidate output. Wrong-type response
+containers, corrupt compressed successful responses and excessive JSON nesting are
+sanitized retryable shape failures. Oversized successful bodies remain fatal;
+bounded error-body reads preserve the known HTTP status policy. Nonfinite or
+unsupported retry delays fall back to the driver's existing exponential backoff.
 
 The failure streak counts failed **phases**, not rounds. Three consecutive failed
 phases for one role abort by default. Any successful phase resets that role's streak.
@@ -143,5 +161,12 @@ fields and schema version remain unchanged. `Recorder.finish` returns normally o
 success and raises sanitized `RecordingFinalizationError` with ordered `failures`
 pairs on failure. The driver makes at most two finalization passes and preserves
 the original failure, even if recovery succeeds.
+Primary and secondary finalization operations use the same `finish:<artifact>`
+labels; a generic custom `finish` failure is labeled `finish:finish`.
+The built-in recorder also binds version-1 provenance to actual driver inputs;
+custom recorders need no new methods. Its manifest is now the eighth independent
+final artifact. Execution end time/original stop reason freeze before finalization,
+while writable metadata/viewers refresh the final stop reason on recovery. See
+[Run provenance](PROVENANCE.md) for hook failures, compatibility, and unknown fields.
 Fresh caller cancellation during client shutdown still propagates, retaining an
 earlier host failure diagnostically rather than converting cancellation to exit 2.

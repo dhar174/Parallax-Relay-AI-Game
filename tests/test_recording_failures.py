@@ -158,7 +158,7 @@ class RecordingFailureTests(unittest.IsolatedAsyncioTestCase):
                     with self.assertRaises(driver.MatchExecutionError) as ctx:
                         await driver.run_match({r: ScriptedAgent(r) for r in ROLES}, MatchSettings(max_turns=1), recorder=recorder)
                 self.assertIs(ctx.exception.original_error, original)
-                self.assertEqual(attempts, names * 2)
+                self.assertEqual(attempts, ['manifest.json'] + (['manifest.json'] + names) * 2)
                 self.assertEqual(ctx.exception.result.world.turn, 1)
                 for name in set(names) - {failed}: self.assertTrue((out / name).exists())
                 if failed != 'result.json':

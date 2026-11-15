@@ -8,6 +8,7 @@
 - ECHO rendering exists, but ECHO is not an active player.
 - Read README.md for onboarding and docs/ARCHITECTURE.md for module boundaries.
 - Read docs/PROTOCOL.md before changing observations, replies, or orchestration.
+- Read docs/PROVENANCE.md before changing manifests or execution identity.
 - Read docs/REVIEW.md for known defects; do not mistake a finding for a fixed behavior.
 - ROADMAP.md describes proposals, not implemented capabilities.
 - Historical docs/superpowers/ plans/specs and verification logs are evidence,
@@ -69,6 +70,7 @@ Use the actual results in your report; do not copy historical test counts.
 - providers.py owns HTTP serialization, usage normalization, and safe errors.
 - config.py and play.py own local configuration and CLI lifecycle.
 - recording.py and replay_template.html own the main spectator output.
+- provenance.py owns versioned input identities and lifecycle metadata.
 - agents.py and scripted.py are explicit offline fixtures.
 - demo.py is a separate legacy driver with an older replay format.
 - site/ holds the experiment workbench. Review docs/WORKBENCH.md when changing
@@ -99,6 +101,8 @@ Use the actual results in your report; do not copy historical test counts.
 - Default to offline verification. Billable live runs require explicit user
   authorization, selected models, local credentials, and bounded limits.
 - Never print or commit keys, populated .env files, or raw provider error bodies.
+- Fingerprint validated, allowlisted values; never hash raw config, env, or Git patches.
+- Preserve legacy manifest reading and distinguish unknown identity from verified identity.
 - The main launcher rejects existing output directories; omit --out for a fresh run.
 - The legacy demo also rejects existing paths; omit --out for a unique runs/demo_
   destination, or give it an explicit fresh ignored destination.
@@ -113,6 +117,8 @@ Use the actual results in your report; do not copy historical test counts.
 - Update protocol/running docs when changing schemas, defaults, CLI behavior,
   stop reasons, or recorded formats. Recheck provider sources for API changes.
 - Keep fixtures distinct from evidence of real model ability.
+- Follow docs/EVALUATION.md for evaluation claims; its future controls/runner/rooms
+  are specifications, not implemented capabilities or paid-run authorization.
 - Preserve historical verification logs; add dated evidence and limitations.
 - Check git diff --check and inspect the final changed-file list.
 - Report what changed, the checks actually run, and unresolved limitations.

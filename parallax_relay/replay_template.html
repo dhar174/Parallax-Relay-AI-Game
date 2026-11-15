@@ -24,10 +24,11 @@ header{display:flex;justify-content:space-between;align-items:center;gap:20px;fl
 'use strict';
 const DATA=__REPLAY_DATA__;
 const $=id=>document.getElementById(id),records=DATA.records,result=DATA.result;
-$('mode').textContent=DATA.manifest.mode==='mock'?'MOCK · SCRIPTED FIXTURE':'LIVE API RUN';
+const provenance=DATA.manifest.provenance,mode=DATA.manifest.mode??provenance?.execution?.value?.mode;
+$('mode').textContent=mode==='mock'?'MOCK · SCRIPTED FIXTURE':mode==='live'?'LIVE API RUN':mode==='programmatic'?'PROGRAMMATIC RUN':'RUN MODE UNKNOWN';
 $('outcome').textContent=result.stop_reason.replaceAll('_',' ');
 $('turnCount').textContent=result.turns;$('calls').textContent=result.budget.calls_started;$('energy').textContent=result.energy;
-$('roster').textContent=Object.entries(DATA.manifest.players||{}).map(([role,p])=>role+': '+p.provider+' / '+p.model).join('  ·  ');
+$('roster').textContent=['SPECTRA','PYRA','FLUX'].map(role=>{const p=DATA.manifest.players?.[role]??provenance?.players?.[role]??{};return role+': '+(p.provider??'unknown')+' / '+(p.model??'unknown')}).join('  ·  ');
 const slider=$('round');slider.max=Math.max(0,records.length-1);
 function line(parent,label,value){const el=document.createElement('div');el.className='entry';const key=document.createElement('b');key.textContent=label+' ';el.append(key,document.createTextNode(String(value)));parent.append(el)}
 function heading(parent,label){const el=document.createElement('div');el.className='subhead';el.textContent=label;parent.append(el)}

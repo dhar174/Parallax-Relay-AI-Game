@@ -16,6 +16,7 @@ remains independent of the provider adapters.
 | Match driver | `orchestrator.py`, `budget.py` | Phase barriers, retries, histories, reservations, stop reasons |
 | Local interface | `config.py`, `play.py` | TOML/env resolution, CLI, provider-client ownership |
 | Spectator output | `recording.py`, `replay_template.html` | Incremental logs, images, final summary, static viewer |
+| Run identity | `provenance.py` | Versioned non-secret identities, canonical hashes, lifecycle, legacy-aware reader |
 | Legacy demo | `demo.py` | Direct scripted engine driver and older replay format |
 
 All module names above are relative to `parallax_relay/`.
@@ -99,13 +100,22 @@ cooperative timeout; secondary cleanup failures never mask an active failure.
 
 The main recorder creates a new output directory, appends call/phase/turn JSONL,
 and keeps authoritative call, completed-phase, and resolved-turn records in memory.
-Finalization independently writes atomic snapshots of the three JSONL logs, result,
-final state, final spectator PNG, and HTML. This repairs partial trailing writes
+Finalization independently writes eight atomic artifacts: manifest, three JSONL
+logs, result, final state, final spectator PNG, and HTML. This repairs partial trailing writes
 without duplicating events. A failed artifact does not prevent the others; the
 driver permits one recovery pass after a failed initial pass. The HTML viewer is
 created at finalization, not streamed. Atomic replacement is per artifact, not a
 durable transaction across the run directory; storage stalls and uncooperative
 in-process code are outside the bounded-attempt/cooperative-cleanup guarantee.
+
+The built-in recorder captures source/environment identity before creating output,
+then binds provenance to the actual settings, prices, and initial world passed to
+the driver. Its execution clock ends before finalization/client teardown; a recovery
+pass refreshes the final stop reason without replacing original timing/outcome.
+Only built-in recorders receive the optional begin/end hooks; existing custom
+recorders and `run_match` calls retain their interfaces. See
+[Run provenance](PROVENANCE.md) for versioning, unknown identities, UUID grouping,
+direct `finish` limits, and persistent-storage failure semantics.
 
 ## Extension points
 

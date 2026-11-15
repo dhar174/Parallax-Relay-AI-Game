@@ -1,5 +1,194 @@
 # Verification record
 
+## PR #32 review remediation and own review — November 14, 2026
+
+Started from `fcec8df`, after merged PR #31 was incorporated. The clean combined
+baseline passed **195 tests** (26.114 seconds, no skips). Reviewed all ten inline
+comments and the comprehensive Antigravity summary, then inspected the provider
+changes and their request, budget, driver, recording and provenance boundaries.
+Re-read pinned OpenAI error/message definitions and Anthropic usage definitions;
+public-source retrieval did not contact credentialed model endpoints.
+
+Regressions reproduced malformed error/null-output classification, nonfinite
+delays, corrupt compression, deep JSON, wrong-type containers, contradictory Gemini
+blocking and refusal-text exposure before fixes. The own review additionally found
+that malformed usage could mask an explicit OpenAI failure; failure classification
+now precedes telemetry. A targeted regression also caught integer overflow in the
+new finite-delay check, which was corrected before delivery. The original contract
+tests now assert rules/content type across nine request combinations, independent
+usage totals/breakdowns, retry/fatal/status metadata and priced failed-envelope
+driver accounting with real reservations and safe artifacts.
+
+On Linux/Python 3.12.14 with the existing lock, **215 tests passed**, no skips
+(27.334 seconds), including **48 provider-focused tests** and 20 new regression
+methods. Dependency consistency, compilation, normal/fast mock CLIs, the reusable
+checker and whitespace checks passed. Mocks retain seven-turn victories, 63/42
+calls, five energy and scores 100. Verified 69 local documentation links/anchors,
+including the historical plan, and counted 11 immutable SDK file references
+(4 OpenAI, 5 Anthropic, 2 Google). Dependencies and committed fixtures are unchanged.
+
+The unchecked implementation plan is explicitly a historical snapshot. Historical
+mutable SDK pointers are labeled separately from pinned audit evidence. Anthropic
+null cache counts intentionally retain conservative estimates; #15 must establish
+their live representation under separate spending authorization. No paid requests,
+model shortlist, wire/API migration or live billing/image-understanding claim is
+included. Final independent review and exact-head hosted matrix evidence are
+reported on the PR before the conditional merge.
+
+## Slice 6 independent provider-contract audit — November 14, 2026
+
+Implemented #13 from merged-main revision `08c5048` on
+`audit/slice-6-provider-contracts`. The clean baseline passed 129 tests. The audit
+records official provider REST/guides and 11 official SDK file references pinned to
+OpenAI `3dae6090`, Anthropic `5139cf2e`, and Google `a3d04bd5`; full immutable links
+and source-to-test coverage are in [API sources](API_SOURCES.md#independent-contract-audit--november-14-2026).
+Public-source retrieval is separate from intercepted tests; no provider SDK was
+installed/executed and no credentialed model endpoint was contacted.
+
+New regressions first reproduced seven test failures comprising 27 failing cases:
+OpenAI failed/filter/incomplete/commentary handling, malformed additive usage,
+lost Anthropic thinking metadata, and premature replacement of budget estimates.
+After correction they passed. An additional refusal-precedence regression failed
+when commentary filtering hid a refusal; moving refusal detection before filtering
+fixed it. The final provider-focused run passed **28 tests**, including all 16 new
+contract tests and the existing 12 provider tests. Request expectations are literal,
+independently sourced, and cover all nine provider/phase combinations.
+
+Fresh Linux verification with hash-installed locked dependencies and pip 26.3:
+
+- Python 3.12.14: **145 tests passed**, no skips, 17.966 seconds.
+- Python 3.11.18: **145 tests passed**, no skips, 18.645 seconds.
+- Dependency consistency, compilation, actionlint and whitespace checks passed.
+- Standalone normal/fast mock CLIs and the reusable outcome checker passed: seven
+  turns, 63/42 calls, five energy, all scores 100. These are scripted fixtures.
+- Checked 48 local documentation links/anchors before this verification entry;
+  historical fixtures and all dependency files remain unchanged.
+
+The audit corroborates and retains Anthropic's `2026-10-21` header and Gemini's
+generateContent `responseJsonSchema` shape. It distinguishes local retry and omitted
+optional-counter conventions from universal provider guarantees. Model-selection
+requirements are documented; no named shortlist, model defaults, API migration,
+token-limit increase or paid execution is included. Existing interfaces/schemas,
+engine rules, budgeting, cancellation and recording recovery remain intact.
+The independent review and actual final-head hosted matrix evidence accompany the
+delivery PR. Remote access/model acceptance, billing accuracy and image understanding
+remain unverified; #14–#16 and parent #8 stay open. At that initial checkpoint,
+slice 5/PR #31 had not been merged or incorporated as a prerequisite. The later
+PR #32 review starts from `fcec8df`, which incorporates merged #31 and its fixes.
+
+## PR #31 review remediation — November 14, 2026
+
+Reproduced Antigravity's four runtime/reader findings at PR head `1acd7f5` before
+fixing them. Focused regressions cover verified-HEAD status failures, isolated Git
+probes, contradictory players and nested snapshots with recomputed hashes,
+lifecycle constraints, failed binding/reuse, end-hook errors, two-pass manifest
+divergence, context/legacy replay labels, tuple redaction and `.env` transport
+rejection. Added coverage also checks partial inventories, timestamp/schema
+strictness, pricing/condition validation, provider contracts and live-cap retention
+through an intercepted launcher. No real provider requests were made.
+
+On Linux/Python 3.12.14, all **179 tests passed**, with no skips (24.768 seconds);
+the 27 new tests augment the original 152. Dependency consistency, compilation,
+standalone normal/fast mock CLIs, the reusable mock checker and whitespace checks
+passed. Both mock modes retain seven-turn victories, 63/42 calls, five energy and
+scores 100. Verified 61 current local documentation links/anchors and synthetic
+trial/attempt counts, missing-outcome bounds, Wilson interval, Type 7 quantile
+examples and provider/model roster deduplication. Dependency files and committed
+fixtures are unchanged.
+
+Browser-extension tools were not exposed and the cloud browser reported
+`Browser runtime unavailable`. Used installed headless Chromium 156.0.8078.79 on
+localhost for six synthetic two-turn variants: mock, live label, programmatic,
+legacy, unknown and provenance fallback. Page identity, visible mode/roster,
+loaded PNGs and next/previous navigation passed, with no console/runtime errors.
+Inspected 1280×900 and 390×844 screenshots; the programmatic badge/roster rendered
+and the narrow viewport had no horizontal overflow. The live-label case still
+used scripted agents. These checks cover this replay change, not every browser,
+partial-run control or accessibility behavior. Hosted evidence for the fixing
+head is reported in the PR discussion after execution, separately from local QA.
+
+A fresh read-only review of the remediation checked all original concerns and
+independently passed all 27 new regressions and all 38 provenance tests (overlapping
+coverage). It found no runtime blockers and one wording overstatement: only a
+begin failure before successful binding leaves initialized metadata. Corrected
+that wording; post-binding failures retain known identity/timing as already covered
+by the start-write recovery test. Live providers and future #18–20 implementations
+remain outside this verification.
+
+## Slice 5 final review and local verification — November 14, 2026
+
+A fresh read-only whole-branch review independently passed 150 tests and found one
+P2 issue: the new reader checked hashes without validating every known nested
+payload. Matching hashes for malformed settings, incomplete Python identity, or a
+non-object room were accepted. The fix validates complete settings/prices,
+players/conditions, environment identities and named input payloads while preserving
+additive extensions. New regressions first reproduced 16 malformed cases with
+recomputed valid hashes, then passed after the fix; an extension-preservation test
+also passed. The final focused provenance suite has **23 passing tests**.
+
+After that fix, the complete suite passed **152 tests with no skips** on Linux/
+Python 3.12.14 (24.184 seconds) and Python 3.11.18 (24.414 seconds). Dependency
+consistency, compilation and standalone normal/fast mock CLIs plus the reusable
+checker passed; victories retain seven turns, 63/42 calls, five energy, and scores
+100. Actionlint and whitespace checks passed. Before the reader fix, standalone
+mock manifests also verified clean source revision, actual communication condition,
+distinct UUIDs and ended/victory lifecycle metadata. Historical fixtures and all
+dependency files are unchanged. The delivery PR carries actual hosted matrix
+results; local Linux testing alone does not establish Windows/macOS execution.
+
+That initial review reported no other actionable or deferred minor findings.
+Antigravity's subsequent PR review identified the additional concerns addressed
+in the dated remediation evidence added separately. The initial review
+excluded remote provider acceptance/billing/model behavior and the future runtime
+implementations of #18/#19/#20. Those remain unverified or unimplemented; no paid
+campaigns, remote compatibility, or held-out generalization is claimed.
+
+## Slice 5 evaluation protocol — November 14, 2026
+
+Specified #17 in [evaluation protocol v1](EVALUATION.md), without implementing
+future controls/agents (#18), campaigns/analysis (#19), or held-out rooms (#20).
+The selected five arms and balanced role assignments use 5 pilot plus 30
+confirmatory trials per unique assignment/condition/room. A synthetic example
+demonstrates operational versus engine outcomes, complete denominators and bounds;
+no experimental observations are reported. Standard-library arithmetic verified
+150/900 trials and 25,920/155,520 maximum attempts per room/three-model roster, plus
+the synthetic 5/10 Wilson interval of 23.7%–76.3%. Checked 59 local documentation
+links/anchors and unchanged historical fixtures/dependency files. Parent #9 stays
+open; no paid runs or live compatibility claims were introduced.
+
+## Slice 5 provenance checkpoint — November 14, 2026
+
+Implemented #10 from merged `origin/main` revision `08c5048` on
+`feat/slice-5-provenance-protocol`. Provenance version 1 is additive to manifest
+schema 2; result summaries and historical fixtures retain their formats. Source
+identity includes clean/dirty/unavailable status; effective identity binds actual
+settings/prices, role declarations and input fingerprints without raw config,
+credentials, Git patches or installation URLs. Programmatic identity may remain
+unknown; declarations do not attest model use or remote revisions.
+
+The new tests were observed failing before their corresponding implementation:
+missing provenance module, recorder hooks/metadata, UUID flags, and structural
+reader validation. After implementation, all 21 provenance tests passed. They cover
+canonical inputs and mutation, Git/archive availability, safe inventory collection,
+legacy/invalid readers, monotonic timing under wall-clock rollback, real normal/fast
+CLI runs with custom destinations and UUIDs, requested/effective tiny-cap settings,
+synthetic live launchers with changed secret/comment/path values, programmatic
+settings/prices, cancellation, hook failures, recorder reuse and manifest recovery.
+Embedded viewer and disk metadata are checked; the eight-artifact/two-pass bounds
+and primary failure/cancellation precedence retain coverage.
+
+Fresh local Python 3.12.14 verification with the hash-installed development lock:
+all **150 tests passed**, with no skips (22.991 seconds). The same full suite passed
+under Linux/Python 3.11.18 (150 tests, no skips, 21.890 seconds). Dependency
+consistency, compilation, both real mock CLI outcomes (63/42 calls, seven turns,
+five energy, scores 100), and working-diff whitespace checks passed locally.
+No provider requests or
+paid experiments were performed. Final local review is recorded above; the delivery
+PR records hosted matrix results. This checkpoint alone claims local
+Linux coverage. Dependencies, committed `example_run/` and `demo_output/` remain
+unchanged. The evaluation protocol and its future controls/runner/room dependencies
+are documented separately; passing fixtures establish no experimental outcome.
+
 Original milestone release date: November 12, 2026.
 
 The original evidence below is historical. See the dated repository import and

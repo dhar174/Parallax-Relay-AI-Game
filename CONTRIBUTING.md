@@ -4,6 +4,9 @@ Start with the [README](README.md), [architecture](docs/ARCHITECTURE.md), and
 [review](docs/REVIEW.md). Work against the current implementation, and distinguish
 bug fixes from roadmap features. A scripted victory proves infrastructure and room
 solvability, not model intelligence.
+Read the prospective [evaluation protocol](docs/EVALUATION.md) before implementing
+experimental controls, policies, campaigns, or comparative reporting. Preserve its
+information boundaries, failed-trial denominators and explicit future-work gates.
 
 ## Environment
 
@@ -118,7 +121,8 @@ and concise mock outcomes remain in job logs. Runner images and Python patch
 versions can change; the lock pins dependencies rather than the entire OS image.
 Only locked jobs use the shared pip cache; range jobs resolve without restoring
 or saving it. Superseded PR runs are cancelled; push/manual runs have unique groups.
-Diagnostics run after failures when bootstrap succeeded, but not on cancellation.
+Environment diagnostics run whenever bootstrap succeeded, including after failures,
+but not on cancellation.
 
 CI fetches full history and runs `python scripts/check_committed_diff.py`: PRs
 compare the event's base SHA to the checked-out merge commit using a merge base;
@@ -145,6 +149,10 @@ Preserve the engine's deterministic action resolution and player information
 boundaries. When changing schemas, defaults, stop reasons, CLI behavior, or output
 formats, update the relevant protocol/running documentation and affected tests.
 Changing a provider contract also requires dated source evidence in the API guide.
+Manifest changes must preserve [provenance compatibility](docs/PROVENANCE.md),
+effective driver settings/prices, and truthful unknown metadata. Keep secret-bearing
+config/environment text and Git patches out of fingerprints and output. Check both
+disk and embedded replay manifests through failure recovery.
 
 ## Fixtures and review evidence
 
