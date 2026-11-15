@@ -24,6 +24,10 @@ class SmokeWorkbenchTests(unittest.TestCase):
             self.assertEqual(contract['live_smoke'], profile)
             self.assertEqual(contract['defaults']['match']['max_turns'], 12)
             self.assertEqual(contract['defaults']['players']['PYRA']['provider'], 'anthropic')
+            for name in ('contract.json', 'fixture.json'):
+                self.assertNotIn(b'\r', (output / name).read_bytes())
+            with zipfile.ZipFile(output / 'relay-workbench.zip') as archive:
+                self.assertNotIn(b'\r', archive.read('relay-workbench/site/contract.json'))
 
     def test_stale_companion_rejects_changed_profile_or_launcher(self):
         with tempfile.TemporaryDirectory() as temp:

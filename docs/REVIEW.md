@@ -254,8 +254,10 @@ representation deferred to #15; this does not close the live-compatibility gate.
 
 **Slice 7 preparation, November 15, 2026:** a frozen one-turn profile and real-CLI
 helper select two independent `gpt-6-luna` agents and `gemini-3.5-flash-lite`, with
-bounded attempts/output and a local estimated-cost guard. PYRA's provider/model and environment-variable mapping change;
-its character/abilities/view/objective remain unchanged. Anthropic credits were
+bounded attempts/output and a local estimated-cost guard. PYRA selects
+`provider=openai`, model `gpt-6-luna`, `model_env=PYRA_MODEL` and
+`api_key_env=OPENAI_API_KEY`; its character/abilities/view/objective remain
+unchanged. Anthropic credits were
 unavailable, so #15 and parent #8 remain open. Counter-origin metadata distinguishes
 omitted/null/zero usage without changing conservative accounting. Consult the
 [verification record](VERIFICATION.md) for actual execution evidence; preparation,

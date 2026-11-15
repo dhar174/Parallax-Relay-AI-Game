@@ -1,5 +1,38 @@
 # Verification record
 
+## PR #36 comment recheck — November 15, 2026
+
+All 18 inline comments and the full Antigravity review against `8d297d5` were
+checked against `6276f0f`, rather than treating GitHub's outdated markers as proof
+of resolution. The runtime repairs in `b83d85a` and `73f7a37` remain effective in
+the covered cases. This follow-up changes tests and documentation only.
+
+Eight additional Python tests close the remaining direct coverage gaps: all 13
+provider counter paths and parent/leaf states; malformed usage/status containers;
+raw counter-metadata projection for every role; main exit/verification behavior;
+default versus explicit credential files and process precedence; fresh-output
+rejection; timeout with a generated output path; and failed atomic receipt
+replacement without relaunch. Existing tests now cover all profile container
+levels, `ModelReply` hashing, every roster source URL/note, nested property-order
+equivalence, and LF generated JSON in both the build and companion ZIP. Remaining
+launcher-test text writes explicitly use UTF-8. The review annotation spells out
+PYRA's provider/model/key-variable mapping.
+
+Local verification: **260 Python tests passed in 33.355 seconds**, with no
+unittest skips; the subsequently strengthened hashing assertions also passed in
+the focused seven-test usage suite. All **52 Node tests** passed with `PYTHON`
+explicitly selecting the worktree's virtual environment. Dependency consistency,
+compilation, JavaScript syntax, build, normal/fast mock checks (63/42 calls, seven
+turns, five energy, all scores 100), and diff whitespace checks passed. The
+broken-symlink case ran locally; Windows environments without symlink creation
+privileges still exercise existing file/directory rejection. Final-head CI
+evidence and individual comment replies are recorded on PR #36.
+
+All execution-shaped tests in this follow-up use scripted agents, fake
+credentials or intercepted subprocesses. No additional live invocation, provider
+probe, merge or Site publication occurred. The incomplete live result below and
+the open acceptance issues remain unchanged.
+
 ## Slice 7 bounded live attempt — November 15, 2026
 
 The single authorized live invocation executed clean source

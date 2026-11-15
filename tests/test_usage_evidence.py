@@ -9,7 +9,7 @@ import unittest
 from parallax_relay.agents import ScriptedAgent
 from parallax_relay.config import MatchSettings, Rates
 from parallax_relay.orchestrator import run_match
-from parallax_relay.providers import _decode
+from parallax_relay.providers import _decode, _source_usage
 from parallax_relay.protocol import ModelReply, ROLES, Usage
 from parallax_relay.recording import Recorder
 
@@ -70,8 +70,12 @@ class UsageEvidenceTests(unittest.TestCase):
             usage.source_usage['usage.input_tokens']['value'] = 999
         with self.assertRaises(TypeError):
             usage.source_usage.update(other={})
+        with self.assertRaises(TypeError):
+            usage.source_usage['usage.input_tokens'] = {'state': 'count', 'value': 999}
         self.assertEqual(hash(usage), hash(Usage(3, 4, source_usage={
             'usage.input_tokens': {'value': 3, 'state': 'count'}})))
+        self.assertEqual(hash(ModelReply('ok', usage)), hash(ModelReply('ok', Usage(3, 4,
+            source_usage={'usage.input_tokens': {'value': 3, 'state': 'count'}}))))
         self.assertEqual(json.loads(json.dumps(asdict(usage)))['source_usage'], {
             'usage.input_tokens': {'state': 'count', 'value': 3}})
 
@@ -86,6 +90,41 @@ class UsageEvidenceTests(unittest.TestCase):
                 usage = _decode('anthropic', {'usage': {'cache_read_input_tokens': invalid}}).usage
                 self.assertEqual(usage.source_usage['usage.cache_read_input_tokens'],
                                  {'state': 'invalid', 'value': None})
+
+    def test_every_allowlisted_counter_path_handles_parent_and_leaf_states(self):
+        paths = {
+            'openai': ('usage.input_tokens', 'usage.output_tokens',
+                       'usage.input_tokens_details.cached_tokens',
+                       'usage.output_tokens_details.reasoning_tokens'),
+            'anthropic': ('usage.input_tokens', 'usage.output_tokens',
+                          'usage.cache_read_input_tokens', 'usage.cache_creation_input_tokens',
+                          'usage.output_tokens_details.thinking_tokens'),
+            'gemini': ('usageMetadata.promptTokenCount', 'usageMetadata.candidatesTokenCount',
+                       'usageMetadata.cachedContentTokenCount', 'usageMetadata.thoughtsTokenCount'),
+        }
+        for provider, counters in paths.items():
+            self.assertEqual(set(_source_usage(provider, {})), set(counters))
+            for counter in counters:
+                keys = counter.split('.')
+                for depth in range(len(keys)):
+                    for parent, expected in ((None, 'null'), ([], 'invalid'), ('SECRET_SENTINEL', 'invalid')):
+                        data = parent
+                        for key in reversed(keys[:depth + 1]):
+                            data = {key: data}
+                        with self.subTest(provider=provider, counter=counter, depth=depth, parent=parent):
+                            evidence = _source_usage(provider, data)
+                            self.assertEqual(evidence[counter], {'state': expected, 'value': None})
+                            self.assertNotIn('SECRET_SENTINEL', json.dumps(evidence))
+                for value, state in ((0, 'count'), (7, 'count'), (True, 'invalid'),
+                                     (False, 'invalid'), (-1, 'invalid'), (1.5, 'invalid'),
+                                     ([], 'invalid'), ({}, 'invalid')):
+                    data = value
+                    for key in reversed(keys):
+                        data = {key: data}
+                    with self.subTest(provider=provider, counter=counter, value=value):
+                        self.assertEqual(_source_usage(provider, data)[counter],
+                                         {'state': state, 'value': value if state == 'count' else None})
+                self.assertEqual(_source_usage(provider, {})[counter], {'state': 'omitted', 'value': None})
 
     def test_recorded_null_counters_retain_estimates_without_provider_text(self):
         class InterceptedUsageAgent(ScriptedAgent):

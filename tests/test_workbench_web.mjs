@@ -31,6 +31,14 @@ test('named live preset exports Python-valid settings and exact independent role
   assert.match(app.node('panel').innerHTML, /scripts\/live_smoke\.py --check/);
   assert.match(app.node('panel').innerHTML, /href="https:\/\/developers\.openai\.com\/api\/docs\/pricing\.md"/);
   assert.match(app.node('panel').innerHTML, /free-tier eligibility\/quota unverified/);
+  for (const role of ['SPECTRA', 'PYRA', 'FLUX']) {
+    const source = smokeProfile.sources[role];
+    const escape = text => text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#39;');
+    for (const url of [source.model_url, source.pricing_url]) {
+      assert.ok(app.node('panel').innerHTML.includes(`href="${escape(url)}"`), `${role} source link missing`);
+    }
+    assert.ok(app.node('panel').innerHTML.includes(escape(source.notes)), `${role} notes missing`);
+  }
   await app.click('approve');
   assert.match(app.node('panel').innerHTML, /scripts\/live_smoke\.py --live/);
   app.input({ dataset: { match: 'max_calls' }, value: '17', valueAsNumber: 17 });
@@ -42,6 +50,8 @@ test('named live preset exports Python-valid settings and exact independent role
 test('semantically matching preset survives reordered configuration properties', async t => {
   const modified = structuredClone(contract);
   modified.defaults = Object.fromEntries(Object.entries(smokeProfile.config).reverse());
+  modified.defaults.players = Object.fromEntries(Object.entries(modified.defaults.players).reverse().map(([role, player]) =>
+    [role, Object.fromEntries(Object.entries(player).reverse())]));
   const app = await workbench(t, { contract: modified });
   await app.tab('live');
   assert.match(app.node('panel').innerHTML, /Named live-smoke roster/);

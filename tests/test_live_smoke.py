@@ -47,7 +47,7 @@ class LiveSmokeTests(unittest.TestCase):
         self.assertEqual(profile, before)
         with tempfile.TemporaryDirectory() as temp:
             file = Path(temp) / 'export.toml'
-            file.write_text(smoke.configuration_toml(GameConfig.model_validate(profile['config'])))
+            file.write_text(smoke.configuration_toml(GameConfig.model_validate(profile['config'])), encoding='utf-8')
             config = load_config(file)
         self.assertEqual(config.match.max_turns, 1)
         self.assertEqual(config.match.max_calls, 18)
@@ -84,7 +84,7 @@ class LiveSmokeTests(unittest.TestCase):
             config = GameConfig.model_validate(profile['config'])
             changed = config.model_copy(update={'match': config.match.model_copy(update={'max_calls': 19})})
             path = Path(temp) / 'changed.toml'
-            path.write_text(smoke.configuration_toml(changed))
+            path.write_text(smoke.configuration_toml(changed), encoding='utf-8')
             with patch.object(smoke.subprocess, 'run', side_effect=AssertionError('Unexpected CLI launch')):
                 with self.assertRaises(ValueError):
                     smoke.launch(profile, live=True, config_path=path,
@@ -101,7 +101,7 @@ class LiveSmokeTests(unittest.TestCase):
             rates={r: cfg.players[r].pricing for r in ROLES}, recorder=recorder))
         receipt = {'schema_version': 1, 'profile_sha256': smoke.profile_digest(profile),
                    'cli_returncode': 0}
-        (directory / 'smoke_launch.json').write_text(json.dumps(receipt))
+        (directory / 'smoke_launch.json').write_text(json.dumps(receipt), encoding='utf-8')
         return profile
 
     def test_verifier_accepts_coherent_synthetic_run_and_rejects_cli_failure(self):
@@ -114,7 +114,7 @@ class LiveSmokeTests(unittest.TestCase):
             self.assertTrue(all(p['accepted'] for p in report['providers'].values()))
             receipt = json.loads((out / 'smoke_launch.json').read_text(encoding='utf-8'))
             receipt['cli_returncode'] = 3
-            (out / 'smoke_launch.json').write_text(json.dumps(receipt))
+            (out / 'smoke_launch.json').write_text(json.dumps(receipt), encoding='utf-8')
             self.assertFalse(smoke.verify_run(out, profile)['accepted'])
 
     def test_verifier_rejects_incomplete_mismatched_or_malformed_evidence(self):
@@ -139,17 +139,17 @@ class LiveSmokeTests(unittest.TestCase):
                     original = path.read_text(encoding='utf-8')
                     data = json.loads(original)
                     mutate(data)
-                    path.write_text(json.dumps(data))
+                    path.write_text(json.dumps(data), encoding='utf-8')
                     self.assertFalse(smoke.verify_run(out, profile)['accepted'])
-                    path.write_text(original)
+                    path.write_text(original, encoding='utf-8')
             path = out / 'phases.jsonl'
             original = path.read_text(encoding='utf-8')
             data = [json.loads(line) for line in original.splitlines()]
             data[0]['statuses']['PYRA'] = 'refusal'
-            path.write_text('\n'.join(map(json.dumps, data)))
+            path.write_text('\n'.join(map(json.dumps, data)), encoding='utf-8')
             self.assertFalse(smoke.verify_run(out, profile)['providers']['PYRA']['accepted'])
-            path.write_text(original)
-            (out / 'calls.jsonl').write_text('[malformed SECRET_SENTINEL')
+            path.write_text(original, encoding='utf-8')
+            (out / 'calls.jsonl').write_text('[malformed SECRET_SENTINEL', encoding='utf-8')
             report = smoke.verify_run(out, profile)
             self.assertFalse(report['accepted'])
             self.assertNotIn('SECRET_SENTINEL', json.dumps(report))
@@ -162,7 +162,7 @@ class LiveSmokeTests(unittest.TestCase):
             path = out / 'manifest.json'
             data = json.loads(path.read_text(encoding='utf-8'))
             data['provenance']['source']['additional_note'] = 'SECRET_SENTINEL'
-            path.write_text(json.dumps(data))
+            path.write_text(json.dumps(data), encoding='utf-8')
             report = smoke.verify_run(out, profile)
             self.assertTrue(report['accepted'], report)
             self.assertNotIn('SECRET_SENTINEL', json.dumps(report))
@@ -285,13 +285,134 @@ class LiveSmokeTests(unittest.TestCase):
 
     def test_malformed_profile_container_raises_safe_configuration_error(self):
         smoke = self.smoke()
-        profile = smoke.load_profile()
-        profile['sources']['PYRA'] = ['model_url', 'pricing_url', 'notes']
+        original = smoke.load_profile()
         with tempfile.TemporaryDirectory() as temp:
             path = Path(temp) / 'profile.json'
-            path.write_text(json.dumps(profile), encoding='utf-8')
-            with self.assertRaises(ValueError):
-                smoke.load_profile(path)
+            for field in ('profile', 'models', 'sources', 'role_source'):
+                for malformed in (None, [], ['model_url', 'pricing_url', 'notes'], 'SECRET_SENTINEL'):
+                    profile = copy.deepcopy(original)
+                    if field == 'profile': profile = malformed
+                    elif field == 'role_source': profile['sources']['PYRA'] = malformed
+                    else: profile[field] = malformed
+                    path.write_text(json.dumps(profile), encoding='utf-8')
+                    with self.subTest(field=field, malformed=malformed), self.assertRaises(ValueError) as error:
+                        smoke.load_profile(path)
+                    self.assertNotIn('SECRET_SENTINEL', str(error.exception))
+
+    def test_verifier_safely_rejects_malformed_usage_and_status_containers(self):
+        smoke = self.smoke()
+        with tempfile.TemporaryDirectory() as temp:
+            out = Path(temp) / 'run'
+            profile = self.synthetic_run(smoke, out)
+            for name, field in (('calls', 'usage'), ('phases', 'statuses')):
+                path = out / (name + '.jsonl')
+                original = path.read_text(encoding='utf-8')
+                for malformed in (None, [], ['SECRET_SENTINEL'], 'SECRET_SENTINEL'):
+                    rows = [json.loads(line) for line in original.splitlines()]
+                    rows[0][field] = malformed
+                    path.write_text('\n'.join(map(json.dumps, rows)), encoding='utf-8')
+                    with self.subTest(name=name, malformed=malformed):
+                        report = smoke.verify_run(out, profile)
+                        self.assertFalse(report['accepted'])
+                        self.assertEqual({r: p['attempts'] for r, p in report['providers'].items()},
+                                         {r: 3 for r in ROLES})
+                        self.assertNotIn('SECRET_SENTINEL', json.dumps(report))
+                path.write_text(original, encoding='utf-8')
+
+    def test_verifier_projects_untrusted_counter_metadata_for_every_role(self):
+        smoke = self.smoke()
+        with tempfile.TemporaryDirectory() as temp:
+            out = Path(temp) / 'run'
+            profile = self.synthetic_run(smoke, out)
+            path = out / 'calls.jsonl'
+            calls = [json.loads(line) for line in path.read_text(encoding='utf-8').splitlines()]
+            for call in calls:
+                keys = list(smoke._source_usage(profile['config']['players'][call['role']]['provider'], {}))
+                call['usage']['source_usage'] = {
+                    keys[0]: {'state': 'count', 'value': 0, 'extra': 'SECRET_SENTINEL'},
+                    keys[1]: {'state': 'invalid', 'value': None},
+                    keys[2]: {'state': 'count', 'value': 'SECRET_SENTINEL'},
+                    keys[3]: {'state': 'null', 'value': 'SECRET_SENTINEL'},
+                    'SECRET_SENTINEL': {'state': 'count', 'value': 999},
+                }
+            path.write_text('\n'.join(map(json.dumps, calls)), encoding='utf-8')
+            viewer = out / 'index.html'
+            before, encoded = viewer.read_text(encoding='utf-8').split('const DATA=', 1)
+            data, end = json.JSONDecoder().raw_decode(encoded)
+            data['calls'] = calls
+            viewer.write_text(before + 'const DATA=' + json.dumps(data) + encoded[end:], encoding='utf-8')
+            report = smoke.verify_run(out, profile)
+            self.assertTrue(report['accepted'], report)
+            self.assertNotIn('SECRET_SENTINEL', json.dumps(report))
+            for role in ROLES:
+                keys = list(smoke._source_usage(profile['config']['players'][role]['provider'], {}))
+                self.assertEqual(report['providers'][role]['source_usage'], [{
+                    keys[0]: {'state': 'count', 'value': 0},
+                    keys[1]: {'state': 'invalid', 'value': None},
+                }] * 3)
+
+    def test_main_preserves_cli_codes_and_requires_successful_verification(self):
+        smoke = self.smoke()
+        cases = ((['--check'], 0, None, 0), (['--check'], 2, None, 2),
+                 (['--live'], 3, False, 3), (['--live'], 4, False, 4),
+                 (['--live'], 0, False, 1), (['--live'], 0, True, 0))
+        for args, code, accepted, expected in cases:
+            result = {'cli_returncode': code, 'verification': {'accepted': accepted}}
+            with self.subTest(args=args, code=code, accepted=accepted), \
+                 patch.object(smoke, 'launch', return_value=result) as launch, redirect_stdout(io.StringIO()):
+                self.assertEqual(smoke.main(args), expected)
+                launch.assert_called_once()
+        with tempfile.TemporaryDirectory() as temp, redirect_stdout(io.StringIO()):
+            self.assertEqual(smoke.main(['--verify', temp]), 1)
+
+    def test_main_selects_default_or_explicit_env_file_with_process_precedence(self):
+        smoke = self.smoke()
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            default, explicit = root / '.env.smoke', root / 'explicit.env'
+            default.write_text('OPENAI_API_KEY=DEFAULT_FAKE\nGEMINI_API_KEY=DEFAULT_FAKE\n', encoding='utf-8')
+            explicit.write_text('OPENAI_API_KEY=EXPLICIT_FAKE\nGEMINI_API_KEY=EXPLICIT_FAKE\n', encoding='utf-8')
+            for args, selected, expected in ((['--check'], default, 'DEFAULT_FAKE'),
+                                            (['--check', '--env-file', str(explicit)], explicit, 'EXPLICIT_FAKE')):
+                def launch(profile, **kwargs):
+                    self.assertEqual(kwargs['env_file'], selected)
+                    child = smoke.prepare_environment(profile, env_file=kwargs['env_file'])
+                    self.assertEqual(child['OPENAI_API_KEY'], 'PROCESS_FAKE')
+                    self.assertEqual(child['GEMINI_API_KEY'], expected)
+                    return {'cli_returncode': 0}
+                with self.subTest(args=args), patch.object(smoke, 'ROOT', root), \
+                     patch.dict(os.environ, {'OPENAI_API_KEY': 'PROCESS_FAKE'}, clear=True), \
+                     patch.object(smoke, 'launch', side_effect=launch), redirect_stdout(io.StringIO()):
+                    self.assertEqual(smoke.main(args), 0)
+            default.unlink()
+            with patch.object(smoke, 'ROOT', root), patch.dict(os.environ, {}, clear=True), \
+                 patch.object(smoke.subprocess, 'run', side_effect=AssertionError('Unexpected provider/CLI access')), \
+                 redirect_stderr(io.StringIO()):
+                self.assertEqual(smoke.main(['--check']), 2)
+
+    def test_existing_output_paths_reject_before_cli_and_report_safe_diagnostic(self):
+        smoke = self.smoke()
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            paths = [root / 'file', root / 'directory']
+            paths[0].write_text('existing', encoding='utf-8')
+            paths[1].mkdir()
+            broken = root / 'broken-link'
+            try:
+                broken.symlink_to(root / 'absent')
+            except OSError:
+                # Windows may not grant symlink creation; file/dir assertions still run.
+                pass
+            else:
+                paths.append(broken)
+            for path in paths:
+                error = io.StringIO()
+                with self.subTest(path=path.name), \
+                     patch.dict(os.environ, {'OPENAI_API_KEY': 'FAKE', 'GEMINI_API_KEY': 'FAKE'}, clear=True), \
+                     patch.object(smoke.subprocess, 'run', side_effect=AssertionError('Unexpected CLI launch')), \
+                     redirect_stderr(error):
+                    self.assertEqual(smoke.main(['--live', '--out', str(path)]), 2)
+                    self.assertIn('Use a fresh output directory', error.getvalue())
 
     def test_timeout_reports_partial_path_and_atomic_receipt_without_relaunch(self):
         smoke = self.smoke()
@@ -326,6 +447,44 @@ class LiveSmokeTests(unittest.TestCase):
                     with self.assertRaises(SystemExit) as error:
                         smoke.main(['--verify', 'run', option, 'unused'])
                     self.assertEqual(error.exception.code, 2)
+
+    def test_timeout_without_explicit_output_still_returns_generated_partial_path(self):
+        smoke = self.smoke()
+        def timeout(command, **kwargs):
+            Path(command[command.index('--out') + 1]).mkdir(parents=True)
+            raise subprocess.TimeoutExpired(command, 600)
+        with tempfile.TemporaryDirectory() as temp, patch.object(smoke, 'ROOT', Path(temp)), \
+             patch.object(smoke.subprocess, 'run', side_effect=timeout) as invocation:
+            result = smoke.launch(smoke.load_profile(), live=True,
+                                  environ={'OPENAI_API_KEY': 'FAKE', 'GEMINI_API_KEY': 'FAKE'})
+            invocation.assert_called_once()
+            out = Path(result['out'])
+            self.assertEqual(out.parent, Path(temp) / 'runs')
+            self.assertTrue(out.name.startswith('live_smoke_'))
+            self.assertTrue(result['timed_out'])
+            self.assertIsNone(result['cli_returncode'])
+            self.assertTrue(json.loads((out / 'smoke_launch.json').read_text(encoding='utf-8'))['timed_out'])
+
+    def test_receipt_replace_failure_preserves_previous_receipt_without_relaunch(self):
+        smoke = self.smoke()
+        original = '{"previous": true}\n'
+        def failed_cli(command, **kwargs):
+            out = Path(command[command.index('--out') + 1])
+            out.mkdir()
+            (out / 'smoke_launch.json').write_text(original, encoding='utf-8')
+            return subprocess.CompletedProcess(command, 3, '', '')
+        with tempfile.TemporaryDirectory() as temp, \
+             patch.object(smoke.subprocess, 'run', side_effect=failed_cli) as invocation, \
+             patch.object(Path, 'replace', side_effect=OSError('SECRET_SENTINEL')):
+            out = Path(temp) / 'run'
+            result = smoke.launch(smoke.load_profile(), live=True, out=out,
+                                  environ={'OPENAI_API_KEY': 'FAKE', 'GEMINI_API_KEY': 'FAKE'})
+            invocation.assert_called_once()
+            self.assertEqual((out / 'smoke_launch.json').read_text(encoding='utf-8'), original)
+            self.assertTrue(result['receipt_write_failed'])
+            self.assertFalse(result['verification']['accepted'])
+            self.assertEqual(result['cli_returncode'], 3)
+            self.assertNotIn('SECRET_SENTINEL', json.dumps(result))
 
     def test_valid_retry_and_unknown_usage_keep_evidence_and_estimates(self):
         smoke = self.smoke()
