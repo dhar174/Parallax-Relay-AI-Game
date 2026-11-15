@@ -15,6 +15,7 @@ from parallax_relay.budget import Budget
 from parallax_relay.observations import observe
 from parallax_relay.protocol import AgentRequest, ROLES
 from parallax_relay.providers import HTTPAgent, ProviderError
+from parallax_relay.prompts import SYSTEM_RULES
 from parallax_relay.state import initial_world
 from parallax_relay.agents import ScriptedAgent
 from parallax_relay.orchestrator import run_match
@@ -94,19 +95,25 @@ class ProviderContractTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(reply.text, TEXT)
         self.assertEqual(reply.status, 'ok')
         data['output'] = data['output'][:2]
-        self.assertEqual((await self.reply('openai', data)).status, 'incomplete')
+        reply = await self.reply('openai', data)
+        self.assertEqual(reply.status, 'incomplete')
+        self.assertEqual(reply.text, '')
 
     async def test_invalid_additive_token_counters_keep_the_aggregate_unknown(self):
         for provider, field, total in [('gemini', 'thoughtsTokenCount', 'output_tokens'),
                                        ('anthropic', 'cache_read_input_tokens', 'input_tokens'),
                                        ('anthropic', 'cache_creation_input_tokens', 'input_tokens')]:
-            for invalid in (None, True, -1, 1.5, '5'):
+            for invalid in (None, True, False, -1, 1.5, '5'):
                 with self.subTest(provider=provider, field=field, invalid=invalid):
                     data = envelope(provider)
                     data['usageMetadata' if provider == 'gemini' else 'usage'][field] = invalid
                     reply = await self.reply(provider, data)
                     self.assertIsNone(getattr(reply.usage, total))
                     self.assertEqual(reply.status, 'ok')
+                    self.assertEqual(getattr(reply.usage, 'input_tokens' if provider == 'gemini' else 'output_tokens'),
+                                     100 if provider == 'gemini' else 20)
+                    self.assertEqual(reply.usage.cached_input_tokens, 0)
+                    self.assertEqual(reply.usage.reasoning_output_tokens, 0)
 
     async def test_anthropic_thinking_usage_is_metadata_not_added_to_output(self):
         data = envelope('anthropic')
@@ -118,6 +125,7 @@ class ProviderContractTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(reply.usage.input_tokens, 110)
         self.assertEqual(reply.usage.output_tokens, 20)
         self.assertEqual(reply.usage.reasoning_output_tokens, 5)
+        self.assertEqual(reply.usage.cached_input_tokens, 20)
 
     async def test_unknown_aggregates_retain_real_budget_reservations(self):
         for provider in ('gemini', 'anthropic'):
@@ -133,6 +141,9 @@ class ProviderContractTests(unittest.IsolatedAsyncioTestCase):
                 ticket.start(); ticket.settle((await self.reply(provider, data)).usage)
                 for item in tickets.values(): item.release()
                 self.assertEqual(budget.spent, estimate)
+                self.assertGreater(budget.spent, 0)
+                self.assertEqual(budget.input_tokens, 100 if provider == 'gemini' else 0)
+                self.assertEqual(budget.output_tokens, 0 if provider == 'gemini' else 20)
                 self.assertEqual(budget.unknown_usage_calls, 1)
                 self.assertEqual(budget.calls_started, 1)
                 self.assertEqual(budget.reserved_calls, 0)
@@ -153,6 +164,7 @@ class ProviderContractTests(unittest.IsolatedAsyncioTestCase):
                         await HTTPAgent(provider, 'test-model', SECRET, client=client).respond(request)
                     req = seen[0]; body = json.loads(req.content)
                     self.assertEqual(req.method, 'POST')
+                    self.assertEqual(req.headers['content-type'], 'application/json')
                     self.assertEqual(req.url.query, b'')
                     self.assertNotIn(SECRET, json.dumps(body))
                     for key in ('tools', 'previous_response_id', 'conversation', 'temperature', 'top_p', 'seed'):
@@ -161,6 +173,7 @@ class ProviderContractTests(unittest.IsolatedAsyncioTestCase):
                         self.assertEqual(str(req.url), 'https://api.openai.com/v1/responses')
                         self.assertEqual(req.headers['authorization'], 'Bearer ' + SECRET)
                         self.assertEqual(body['model'], 'test-model')
+                        self.assertEqual(body['instructions'], SYSTEM_RULES)
                         self.assertIs(body['store'], False)
                         self.assertEqual(body['max_output_tokens'], 3072)
                         content = body['input'][0]['content']; self.assertEqual(body['input'][0]['role'], 'user')
@@ -178,18 +191,21 @@ class ProviderContractTests(unittest.IsolatedAsyncioTestCase):
                         self.assertEqual(req.headers['x-api-key'], SECRET)
                         self.assertEqual(req.headers['anthropic-version'], '2026-10-21')
                         self.assertEqual(body['model'], 'test-model')
+                        self.assertEqual(body['system'], SYSTEM_RULES)
                         self.assertEqual(body['max_tokens'], 3072)
                         content = body['messages'][0]['content']; self.assertEqual(body['messages'][0]['role'], 'user')
                         self.assertEqual(content[0]['type'], 'image')
                         self.assertEqual(content[0]['source']['type'], 'base64')
                         self.assertEqual(content[0]['source']['media_type'], 'image/png')
                         image = content[0]['source']['data']; prompt = content[1]['text']
+                        self.assertEqual(content[1]['type'], 'text')
                         self.assertEqual(body['output_config']['format']['type'], 'json_schema')
                         schema = body['output_config']['format']['schema']
                         self.assertNotIn('anthropic-beta', req.headers)
                     else:
                         self.assertEqual(str(req.url), 'https://generativelanguage.googleapis.com/v1beta/models/test-model:generateContent')
                         self.assertEqual(req.headers['x-goog-api-key'], SECRET)
+                        self.assertEqual(body['systemInstruction'], {'parts': [{'text': SYSTEM_RULES}]})
                         content = body['contents'][0]['parts']; self.assertEqual(body['contents'][0]['role'], 'user')
                         self.assertEqual(content[0]['inlineData']['mimeType'], 'image/png')
                         image = content[0]['inlineData']['data']; prompt = content[1]['text']
@@ -235,11 +251,15 @@ class ProviderContractTests(unittest.IsolatedAsyncioTestCase):
                     target[field] = stop
                     reply = await self.reply(provider, data)
                     self.assertEqual(reply.status, expected)
+                    if expected == 'refusal': self.assertEqual(reply.text, '')
         legacy = envelope('openai'); legacy['output'][0].pop('status')
-        self.assertEqual((await self.reply('openai', legacy)).text, TEXT)
+        reply = await self.reply('openai', legacy)
+        self.assertEqual(reply.text, TEXT)
+        self.assertEqual(reply.status, 'ok')
         for feedback, status in [({}, 'incomplete'), ({'blockReason': 'SAFETY'}, 'refusal')]:
             reply = await self.reply('gemini', {'promptFeedback': feedback})
             self.assertEqual(reply.status, status)
+            self.assertEqual(reply.text, '')
 
     async def test_usage_totals_do_not_double_count_breakdowns(self):
         data = envelope('openai')
@@ -258,12 +278,14 @@ class ProviderContractTests(unittest.IsolatedAsyncioTestCase):
                                            ('anthropic', 'usage', ('input_tokens', 'output_tokens')),
                                            ('gemini', 'usageMetadata', ('promptTokenCount', 'candidatesTokenCount'))]:
             for field, aggregate in zip(fields, ('input_tokens', 'output_tokens')):
-                for invalid in (None, True, -1, 1.5, '5'):
+                for invalid in (None, True, False, -1, 1.5, '5'):
                     with self.subTest(provider=provider, field=field, invalid=invalid):
                         data = envelope(provider); data[container][field] = invalid
                         self.assertIsNone(getattr((await self.reply(provider, data)).usage, aggregate))
-                data = envelope(provider); data[container].pop(field)
-                self.assertIsNone(getattr((await self.reply(provider, data)).usage, aggregate))
+                with self.subTest(provider=provider, field=field, missing=True):
+                    data = envelope(provider); data[container].pop(field)
+                    if provider == 'gemini': data[container]['totalTokenCount'] = 999
+                    self.assertIsNone(getattr((await self.reply(provider, data)).usage, aggregate))
 
     async def test_malformed_envelopes_are_safe_retryable_errors(self):
         for provider, invalid in [('openai', []), ('openai', {'output': [None]}),
@@ -283,6 +305,8 @@ class ProviderContractTests(unittest.IsolatedAsyncioTestCase):
                         await self.reply(provider, {'error': {'message': SECRET}}, status=status,
                                          headers={'retry-after': '60', 'location': 'https://example.invalid'})
                     error = caught.exception
+                    self.assertEqual(error.code, 'http_error')
+                    self.assertEqual(error.status_code, status)
                     self.assertEqual(error.retryable, status in (408, 409, 429, 500, 503, 529))
                     self.assertEqual(error.retry_after, 30)
                     self.assertNotIn(SECRET, repr(error))
@@ -310,6 +334,7 @@ class ProviderContractTests(unittest.IsolatedAsyncioTestCase):
                     await HTTPAgent('openai', 'test-model', SECRET, client=client).respond(
                         AgentRequest(observe(initial_world(), 'SPECTRA'), 'broadcast'))
             self.assertEqual(caught.exception.code, code)
+            self.assertEqual(caught.exception.retryable, code == 'invalid_provider_response')
             self.assertTrue(closed)
 
     async def test_failed_responses_have_bounded_driver_retries_and_safe_artifacts(self):
@@ -318,14 +343,17 @@ class ProviderContractTests(unittest.IsolatedAsyncioTestCase):
             with self.subTest(code=code):
                 def handle(req):
                     return httpx.Response(200, json={'status': 'failed', 'output': [],
-                        'error': {'code': code, 'message': SECRET}})
+                        'error': {'code': code, 'message': SECRET},
+                        'usage': {'input_tokens': 100, 'output_tokens': 20}})
                 async with httpx.AsyncClient(transport=httpx.MockTransport(handle)) as client:
                     agents = {r: ScriptedAgent(r) for r in ROLES}
                     agents['SPECTRA'] = HTTPAgent('openai', 'test-model', SECRET, client=client)
                     with tempfile.TemporaryDirectory() as tmp:
                         out = Path(tmp) / 'run'
                         result = await run_match(agents, MatchSettings(max_turns=1, max_consecutive_failures=20,
-                                                  retry_delay_seconds=0), recorder=Recorder(out, {'mode': 'intercepted'}))
+                                                  retry_delay_seconds=0),
+                            rates={r: Rates(input_per_million=1, output_per_million=2) for r in ROLES},
+                            recorder=Recorder(out, {'mode': 'intercepted'}))
                         self.assertEqual(result.stop_reason, stop)
                         self.assertEqual(result.world.turn, turns)
                         failures = [c for c in result.calls if c['role'] == 'SPECTRA']
@@ -333,6 +361,11 @@ class ProviderContractTests(unittest.IsolatedAsyncioTestCase):
                         self.assertTrue(all(c['status'] == 'response_failed' for c in failures))
                         self.assertEqual(result.budget['calls_started'], attempts + (6 if turns else 2))
                         self.assertEqual(result.budget['unknown_usage_calls'], attempts)
+                        self.assertTrue(all(c['usage'] is None for c in failures))
+                        # Failed envelopes retain quotes, not the reported 100/20-token price.
+                        self.assertGreater(result.budget['estimated_cost_usd'], attempts * 0.00014)
+                        self.assertEqual(result.budget['reported_input_tokens'], 0)
+                        self.assertEqual(result.budget['reported_output_tokens'], 0)
                         for file in out.iterdir():
                             if file.suffix in ('.json', '.jsonl', '.html'):
                                 self.assertNotIn(SECRET, file.read_text(encoding='utf-8'))

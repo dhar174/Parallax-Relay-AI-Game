@@ -77,6 +77,10 @@ for endpoint/schema/PNG compatibility, context/image limits, reasoning headroom 
 output bounds. No named shortlist or model defaults are supplied. The 2,048-token
 default does not guarantee a complete reply for every model; limits never increase
 automatically, and `--check` cannot establish remote capability or account access.
+Malformed/compressed provider output uses bounded retries and conservative unknown
+usage accounting. Unsupported or nonfinite `Retry-After` values use the configured
+backoff. Anthropic null cache counters intentionally retain estimates; see the
+[usage caveat](API_SOURCES.md#usage-and-unknowns) before interpreting costs.
 
 The environment reader accepts UTF-8 (including a BOM), literal `NAME=value`,
 optional matching quotes, whole-line comments, and an optional `export ` prefix.

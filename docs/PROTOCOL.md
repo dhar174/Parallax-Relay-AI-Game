@@ -82,6 +82,14 @@ total. Invalid additive cache/thought counters leave the affected total unknown,
 retaining its budget estimate. See the [dated contract audit](API_SOURCES.md#independent-contract-audit--november-14-2026)
 for source references and the distinction between provider contracts and local policy.
 
+Explicit failure classification precedes malformed usage; optional null output
+collections do not hide refusals. All providers return empty text on refusal, and
+Gemini prompt blocking takes precedence over candidate output. Wrong-type response
+containers, corrupt compressed successful responses and excessive JSON nesting are
+sanitized retryable shape failures. Oversized successful bodies remain fatal;
+bounded error-body reads preserve the known HTTP status policy. Nonfinite or
+unsupported retry delays fall back to the driver's existing exponential backoff.
+
 The failure streak counts failed **phases**, not rounds. Three consecutive failed
 phases for one role abort by default. Any successful phase resets that role's streak.
 Fatal setup/provider errors abort the unfinished round without resolving its actions.

@@ -62,14 +62,31 @@ copied into public errors or artifacts. A failed envelope raised as `ProviderErr
 does not carry usage through `ModelReply`; its attempt therefore keeps the estimate
 and records unknown usage, rather than claiming an exact charge.
 
+Explicit OpenAI failure/error signals are classified before usage extraction.
+Malformed error objects or non-string codes remain fatal `response_failed` with
+unknown cause, rather than becoming retryable shape errors. Optional response
+objects/collections may be missing or null; wrong-type values (including falsy
+strings, booleans, numbers, lists in object fields and objects in list fields)
+raise sanitized `invalid_provider_response`. Content-filter and prompt-block
+signals take precedence over absent output; Gemini prompt blocking also overrides
+a contradictory successful candidate. All providers return empty public text on
+refusal while retaining available usage, including for direct `HTTPAgent` callers.
+
 The adapter's HTTP policy retries 408/409/429 and 5xx; request/authentication errors
 and redirects are fatal, with known OpenAI `insufficient_quota` and
 `billing_hard_limit_reached` overriding 429 retries. OpenAI/Anthropic SDK retry
 classifications corroborate these status classes. Applying them to Gemini is a
 bounded local policy, not a promise that every RESOURCE_EXHAUSTED error is transient.
-Timeout/transport and malformed successful envelopes are retryable; oversized
-responses are fatal. Numeric `Retry-After` is clamped to 0–30 seconds; unsupported
-values use the existing backoff, not an unbounded wait. There are no HTTP-layer
+Timeout/transport and malformed successful envelopes are retryable. Corrupt
+compressed successful responses become retryable `invalid_provider_response`;
+deeply nested JSON cannot escape as an internal driver error. Oversized successful
+responses are fatal. Error-body reads stop at the same limit and retain the known
+HTTP status policy even for oversized proxy pages or corrupt compression; such a
+body supplies no reliable quota detail. Only complete parsed errors establish the
+quota override. Finite numeric `Retry-After` is clamped to 0–30 seconds; unsupported
+values (including HTTP dates, NaN and infinities) use the existing backoff, not an
+unbounded wait. The same finite check applies to programmatic `ProviderError`.
+There are no HTTP-layer
 automatic retries; the driver owns the attempt cap and whole-phase reservations.
 Redirects never resend credentials. The response-body ceiling remains 262,144 bytes.
 
@@ -92,6 +109,14 @@ alone does not establish complete usage. `unknown_usage_calls` and null aggregat
 identify incomplete accounting, and the budget retains the reserved estimate.
 The estimate does not implement cache tiers, hidden service charges or invoices.
 
+Anthropic's pinned `Usage` type permits explicit null cache-read/cache-creation
+counts. Null does not prove zero caching; the conservative unknown-aggregate policy
+is intentional. Under #15, separately authorized live smoke evidence must record
+whether inactive caching yields omitted, zero or null fields, the resulting
+`unknown_usage_calls`, and retained estimated cost. Repeated nulls can retain the
+quote on every call; do not relabel those estimates as known billed cost or change
+null to zero merely to make the guard more permissive. This review made no paid run.
+
 ### Independent offline coverage
 
 [Contract tests](../tests/test_provider_contracts.py) use hand-specified envelopes
@@ -105,6 +130,7 @@ sources, import SDKs, resolve credentials or send provider traffic.
 | Usage-total/invalid-counter/missing-core tests | Source-backed cache/reasoning arithmetic, known/partial/invalid values, no double-counting |
 | `test_unknown_aggregates_retain_real_budget_reservations` | Real Budget settlement retains estimates, counts attempts/unknowns, and releases reservations |
 | HTTP/transport, malformed-envelope, and stream tests | Safe bounded status policy, timeouts/network failures, redirects, invalid JSON, size ceiling, response cleanup |
+| [Review regressions](../tests/test_provider_review.py) | Malformed failure/telemetry precedence, null versus wrong-type containers, prompt blocking, finite delays, corrupt compression/deep JSON, bounded HTTP error bodies and client ownership |
 | `test_failed_responses_have_bounded_driver_retries_and_safe_artifacts` | Real driver/Recorder: transient retries stay bounded; fatal failure stops before resolution; sentinel text absent from JSON/JSONL/HTML |
 
 Existing provider, protocol, budget, cancellation, cleanup, recovery and intercepted
@@ -167,6 +193,10 @@ retention policy. Output token accounting uses reported output tokens, which alr
 include reasoning tokens; cached/reasoning counts are retained as metadata.
 
 ## Anthropic Claude
+
+The three `blob/main` SDK links below preserve the original November 13 reference
+list. They are mutable historical pointers, not immutable evidence for the current
+audit; use the pinned SDK evidence table above for the dated contract conclusions.
 
 - [Messages](https://platform.claude.com/docs/en/api/messages)
 - [Vision](https://platform.claude.com/docs/en/build-with-claude/vision)

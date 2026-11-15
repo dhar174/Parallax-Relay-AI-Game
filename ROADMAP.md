@@ -27,7 +27,8 @@ Browser and security-scan limitations must remain explicit, not implied successe
 **Status:** partially implemented. Slice 1 delivered R01/R04/R05 in PR #27,
 slice 2 delivered R02 in PR #28, and slice 3 delivered R03 in PR #29. Slice 4's
 CI/lock work (#21/#22) was delivered in merged PR #30. Slice 6's independent
-provider-contract audit (#13) adds source-backed offline coverage and corrections.
+provider-contract audit (#13) adds source-backed offline coverage and corrections;
+PR #32 review adds adversarial-envelope, retry, cleanup and priced-driver regressions.
 Credentialed provider validation (R06) and source/privacy and dependency/license audits (#23/#24) remain
 open. See the verification guide for actual hosted results.
 

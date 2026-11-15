@@ -20,6 +20,12 @@ document requirements for compatible model selection. Defer the named shortlist.
 
 ## Tasks
 
+Historical pre-execution snapshot: the unchecked boxes below preserve the original
+planning state, rather than current unfinished work. The dated slice-6 entries in
+[Verification](../../VERIFICATION.md) and the delivery PR record implementation,
+review and hosted-CI results. Later explicit merge authorization supersedes the
+original instruction to leave merging for a subsequent request.
+
 - [ ] Pin/retrieve source evidence; record dated endpoint/auth/image/schema/limits,
   completion/refusal/truncation/usage/error references and local-policy boundaries.
 - [ ] Reproduce gaps first: OpenAI failed envelopes, filtering, unfinished messages,
