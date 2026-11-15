@@ -1,8 +1,10 @@
 # Provider contract references
 
 The adapters in `parallax_relay/providers.py` use direct REST calls. This document
-separates implementation choices, source checks, and live evidence. No credentialed
-provider match has been verified for this repository.
+separates implementation choices, source checks, and live evidence. The bounded
+[November 15 attempt](#bounded-live-evidence--november-15-2026) accepted OpenAI
+phase outputs but was blocked by Gemini HTTP 429 before resolving a turn;
+complete mixed-provider match acceptance remains unverified.
 
 ## Independent contract audit — November 14, 2026
 
@@ -296,3 +298,43 @@ and reservation behavior are unchanged. Custom/scripted `Usage` defaults to no
 source evidence. Failed HTTP envelopes still have unknown usage, not invented
 counter values. This permits future #15 evidence to distinguish cache omission,
 zero and null without making an Anthropic request in this slice.
+
+## Bounded live evidence — November 15, 2026
+
+One authorized invocation ran on clean source
+`73f7a373aca0cecda3747e7b3081292a4c94a764`, with the selected one-turn profile.
+The [sanitized summary](verification/2026-11-15-slice7-live-summary.json) records
+actual settings, requested models, API namespaces, dependencies, attempts and usage.
+No second invocation, fallback model, increased limit or Anthropic request occurred.
+
+| Role / requested model | Started attempts | Observed phase output | Reported input/output tokens |
+|---|---:|---|---:|
+| SPECTRA / `gpt-6-luna` | 3 | broadcast, negotiate, commit valid on first attempts | 4,548 / 603 |
+| PYRA / `gpt-6-luna` | 3 | broadcast, negotiate, commit valid on first attempts | 4,551 / 548 |
+| FLUX / `gemini-3.5-flash-lite` | 6 | HTTP 429 on both allowed attempts in every phase | unknown / unknown |
+
+OpenAI accepted PNG-bearing Responses requests and returned parseable output for
+all three schema phases in both roles. No refusal/truncation was observed for
+those six responses. Reported output totals already include 715 reasoning tokens;
+cache-read counters were explicit zero. Backend revisions remain unknown. This is
+bounded transport/format evidence, not image comprehension or cooperative success.
+
+Gemini returned no usable reply or usage. HTTP 429 is consistent with rate/quota
+exhaustion, but sanitized logs cannot identify the specific account limit, credit
+state or whether waiting would help. Its model/schema/PNG acceptance remains
+unverified. See [Google's error guidance](https://aistudio.google.com/docs/troubleshooting#retry-strategy);
+the repository already performed only its selected bounded retries. Any further
+live invocation requires new user authorization after the account limit is checked.
+
+The driver stopped at `unreliable_agent` after FLUX failed three phases, before
+any engine transition. Exit 3, zero resolved turns, energy 6, `completed=false`,
+no win/loss and null scores are an execution abort, not engine defeat. Native
+partial records and the viewer were finalized. The total local estimate
+**$0.0903868** consists of **$0.0014854** from known OpenAI usage at configured
+rates plus **$0.0889014** retained estimates for six unknown-usage failures. These
+are not invoice amounts or a claim that failed requests incurred those charges.
+
+The healthy mixed-provider one-turn gate remains unmet. #14 retains the partial
+OpenAI evidence; #16 is blocked by the observed errors; #15 is deferred. All three
+and parent #8 remain open. A separately authorized successful follow-up can complete
+that gate without mislabeling this failed attempt as a winning or scored match.

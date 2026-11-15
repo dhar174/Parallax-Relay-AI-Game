@@ -1,5 +1,69 @@
 # Verification record
 
+## Slice 7 bounded live attempt — November 15, 2026
+
+The single authorized live invocation executed clean source
+`73f7a373aca0cecda3747e7b3081292a4c94a764` at 03:18 EST
+(08:18 UTC). It lasted 11.843 seconds. This execution revision is distinct from
+later documentation/evidence commits and any future merged Site release.
+
+**Outcome: partial provider evidence; mixed-provider acceptance blocked.**
+SPECTRA and PYRA, both independent `gpt-6-luna` agents, returned valid broadcast,
+negotiation and commitment output: six successful first attempts. FLUX requested
+`gemini-3.5-flash-lite` and returned HTTP 429 on all six bounded attempts. The
+specific account rate/quota cause is unverified; no diagnostic provider probes or
+additional live invocation were made. PYRA's character, abilities, thermal view
+and private objective remain unchanged. Anthropic was not called.
+
+The CLI and wrapper exited **3** with `unreliable_agent`, **12/18 started calls**,
+**zero resolved turns**, energy **6**, `completed=false`, no win/loss and null
+scores. The driver stopped after three failed FLUX phases, before applying any
+sealed actions. Three phase records, all attempted-call evidence, consistent
+initial final state, five PNGs and the partial viewer were finalized. An empty
+turn log is truthful here. The offline verifier returned overall acceptance false;
+its per-role OpenAI transport verdicts do not mean a resolved match succeeded.
+
+Reported usage totals are **9,099 input / 1,151 output**, including **715 reasoning
+tokens** within output, with explicit zero OpenAI cache counts. Six Gemini failures
+have unknown usage. The local estimate **$0.0903868** includes **$0.0889014** of
+retained unknown-usage quotes and **$0.0014854** from known OpenAI usage at the
+configured rates; no provider invoice was inspected. Do not treat that estimate
+as exact billing or infer zero cost from missing failed-call usage.
+
+The [sanitized JSON summary](verification/2026-11-15-slice7-live-summary.json)
+contains source/input fingerprints, environment/package versions, exact settings,
+requested models/API contracts, timing, phase statuses, attempts and usage-origin
+counts. It excludes prompts, model messages, notes, HUDs, image bytes, raw errors,
+credentials and account identifiers. Full native artifacts remain private and
+ignored. Runtime: CPython 3.12.14/Linux x86_64, locked dependencies, pip 26.3.
+OpenAI model/backend aliases remain unresolved; sampling used provider defaults.
+No general image-understanding, strategic or cooperation claim follows.
+
+The [six-job execution-head workflow](https://github.com/dhar174/Parallax-Relay-AI-Game/actions/runs/43692796768)
+passed, and every job log was inspected before the live invocation:
+
+| Job | Actual Python | Python tests | Additional frontend tests |
+|---|---|---:|---:|
+| [Ubuntu locked](https://github.com/dhar174/Parallax-Relay-AI-Game/actions/runs/43692796768/job/132746769229) | 3.11.18 | 252 | — |
+| [Ubuntu locked](https://github.com/dhar174/Parallax-Relay-AI-Game/actions/runs/43692796768/job/132746769356) | 3.12.16 | 252 | 52 |
+| [Ubuntu locked](https://github.com/dhar174/Parallax-Relay-AI-Game/actions/runs/43692796768/job/132746769081) | 3.13.18 | 252 | — |
+| [Windows locked](https://github.com/dhar174/Parallax-Relay-AI-Game/actions/runs/43692796768/job/132746769223) | 3.12.10 | 252 | — |
+| [macOS locked](https://github.com/dhar174/Parallax-Relay-AI-Game/actions/runs/43692796768/job/132746769352) | 3.12.10 | 252 | — |
+| [Ubuntu ranges](https://github.com/dhar174/Parallax-Relay-AI-Game/actions/runs/43692796768/job/132746769277) | 3.12.16 | 252 | — |
+
+There were no unittest skips. All six jobs passed pip consistency, compilation,
+normal/fast scripted victories (63/42 calls, seven turns, five energy, all scores
+100), committed diff and working-tree checks. These scripted wins remain distinct
+from the incomplete live attempt. Independent review findings and Antigravity's
+additional initial-head concerns were reproduced and corrected as described below;
+this is not an unqualified claim that the original review was clean.
+
+Issues #14/#15/#16 and parent #8 stay open pending complete live acceptance. No
+merge or hosted Site publication occurred. After a maintainer merges the code PR,
+the separately authorized private Site refresh must preserve existing access and
+record the merged game revision separately from its Site-source revision.
+
+
 ## Slice 7 preparation — November 15, 2026
 
 Implementation started from merged PR #33 at `115adddaa8f50c54fbd6054934eb66b4275dec8b`
@@ -29,7 +93,9 @@ receipt were inspected locally in `/tmp/parallax-slice7-qa-NxWAjL/`; these are
 local evidence, not hosted artifacts or proof of a paid run. Compilation and diff
 checks passed. The existing private hosted Site has not been changed.
 
-The real helper's `--check` returned 0 without a run directory or provider calls.
+The real helper's `--check` returned 0 using existing local credential variables,
+without a run directory or provider calls. Missing variables exit 2; dummy placeholders can support offline validation
+but do not establish authentication. See the running guide.
 Synthetic tests exercise the real driver/recorder and cannot establish remote
 support. The independent review found credential-file startup influence and incomplete
 record acceptance; negative regressions reproduced both before repair. The verifier

@@ -5,10 +5,12 @@ sees a different sensor image, exchanges public messages, and commits one action
 without seeing its teammates' current actions. A deterministic Python engine
 resolves the turn.
 
-**Status:** Milestone 2 is an offline-tested coordination prototype. It includes
-OpenAI, Anthropic, and Gemini REST adapters, but no credentialed provider match has
-been verified for this repository. The bundled victories use scripted players that
-already know the solution; they are not evidence of model reasoning or cooperation.
+**Status:** Milestone 2 is an offline-tested coordination prototype. A bounded live
+attempt accepted all six OpenAI outputs from two independent `gpt-6-luna` agents;
+Gemini returned HTTP 429 and blocked the first resolved turn. Anthropic remains
+untested live. See the [dated evidence](docs/VERIFICATION.md#slice-7-bounded-live-attempt--november-15-2026).
+The bundled victories use scripted players that already know the solution; they
+are not evidence of model reasoning or cooperation.
 
 ## Try it without API keys
 

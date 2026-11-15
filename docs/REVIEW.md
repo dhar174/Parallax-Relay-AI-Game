@@ -261,6 +261,14 @@ omitted/null/zero usage without changing conservative accounting. Consult the
 [verification record](VERIFICATION.md) for actual execution evidence; preparation,
 source checks, synthetic success and local --check do not establish live support.
 
+**Slice 7 live evidence, November 15, 2026:** both OpenAI roles completed all
+three phase contracts, but six Gemini HTTP 429 failures caused `unreliable_agent`
+before any resolved turn. The one invocation exited 3; it was incomplete, unscored
+and not an engine defeat. The [dated record](VERIFICATION.md#slice-7-bounded-live-attempt--november-15-2026)
+contains the sanitized evidence and retained unknown-usage estimates. Complete
+mixed-provider acceptance remains blocked; #14/#15/#16 and parent #8 remain open.
+No additional live invocation is authorized by this evidence.
+
 **Evidence:** `tests/test_providers.py` supplies its own response envelopes and
 asserts the request fields emitted by `providers.py`. The integration test intercepts
 all HTTP and drives the known script. These are useful serialization/control tests,

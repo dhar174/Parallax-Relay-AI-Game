@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Record one bounded live attempt: six valid OpenAI phase outputs, six Gemini
+  HTTP 429 failures, a consistent zero-turn abort and conservative unknown usage;
+  leave complete mixed-provider acceptance open without rerunning.
+
 - Add a frozen one-turn smoke profile, local check/live/offline-verification helper,
   and shared workbench preset with exact model selection, rates and limits.
 - Select two independent OpenAI agents plus Gemini without changing PYRA's

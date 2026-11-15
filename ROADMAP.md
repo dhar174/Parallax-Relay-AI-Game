@@ -40,8 +40,10 @@ tests (#14–#16/R06); no shortlist or billable execution is supplied by that au
 Slice 7 adds a separate dated smoke profile, single-invocation helper, native
 artifact verifier and matching workbench preset. The selected roster is two
 independent OpenAI agents and one Gemini agent; characters and abilities are
-unchanged. Anthropic #15 is deferred because credits were unavailable. Live
-acceptance still requires actual evidence; see the verification record. PR #33
+unchanged. Anthropic #15 is deferred because credits were unavailable. The single live
+attempt accepted six OpenAI phase outputs, but six Gemini HTTP 429 failures
+blocked the first resolved turn. Full mixed-provider acceptance remains open;
+see the dated verification record. #14/#15/#16 and parent #8 stay open. PR #33
 supplies the static workbench and mock-only companion; general release automation
 #34 and comprehensive browser coverage #35 remain separate.
 
