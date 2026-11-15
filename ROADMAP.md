@@ -3,8 +3,9 @@
 The goal is a reliable research game in which distinct observations and public
 communication matter to successful cooperation. This is a proposed sequence with
 completion gates, not a dated release commitment. The current implementation is
-Milestone 2: one fixed room, three roles, offline-tested infrastructure, and no
-verified real-model match.
+Milestone 2: one fixed room, three roles, offline-tested infrastructure, and one
+verified bounded live turn. A full real-model victory and benchmark results remain
+unverified.
 
 Findings referenced below are in [Review](docs/REVIEW.md). Priorities describe impact
 and dependencies; optional mechanics are not automatically defects.
@@ -29,21 +30,26 @@ slice 2 delivered R02 in PR #28, and slice 3 delivered R03 in PR #29. Slice 4's
 CI/lock work (#21/#22) was delivered in merged PR #30. Slice 6's independent
 provider-contract audit (#13) adds source-backed offline coverage and corrections;
 PR #32 review adds adversarial-envelope, retry, cleanup and priced-driver regressions.
-Credentialed provider validation (R06) and source/privacy and dependency/license audits (#23/#24) remain
-open. See the verification guide for actual hosted results.
+R06 has bounded live evidence for the selected OpenAI/Gemini roster and an explicit
+Anthropic scope exception; issue closure awaits the evidence PR. Source/privacy
+and dependency/license audits (#23/#24) remain open. See the verification guide for
+actual results.
 
 Local error handling/output recovery (R01, R03), mock cost semantics (R02), the
 non-MOVE contract (R04), and safe legacy-demo outputs (R05) have regression coverage.
-The dated API audit checks the three existing endpoint/schema contracts. Next
-select compatible models and perform explicitly authorized, bounded live smoke
-tests (#14–#16/R06); no shortlist or billable execution is supplied by that audit.
+The dated API audit checks the three existing endpoint/schema contracts; the
+offline audit itself supplies neither live evidence nor spending authorization.
 Slice 7 adds a separate dated smoke profile, single-invocation helper, native
 artifact verifier and matching workbench preset. The selected roster is two
 independent OpenAI agents and one Gemini agent; characters and abilities are
-unchanged. Anthropic #15 is deferred because credits were unavailable. The single live
-attempt accepted six OpenAI phase outputs, but six Gemini HTTP 429 failures
-blocked the first resolved turn. Full mixed-provider acceptance remains open;
-see the dated verification record. #14/#15/#16 and parent #8 stay open. PR #33
+unchanged. The initial attempt was blocked by six Gemini HTTP 429 failures; its
+historical evidence is preserved. A separately authorized retry on clean `d76be6c`
+completed all nine requests on their first attempts, resolved one turn, and stopped
+at `turn_limit` with no final score. The [acceptance record](docs/VERIFICATION.md#provider-acceptance-and-scope-decision--november-15-2026)
+supports closing #14/#16 as completed, retiring mandatory Anthropic validation #15
+as not planned (not verified), then closing #8 for the explicitly revised scope.
+All four remain open until the evidence PR merges. Anthropic remains implemented,
+tested offline and live-unverified; ordinary defaults are unchanged. PR #33
 supplies the static workbench and mock-only companion; general release automation
 #34 and comprehensive browser coverage #35 remain separate.
 
@@ -57,6 +63,29 @@ suite and mock runs pass in the declared supported matrix; provider references
 match wire tests; every claimed live-compatible provider/model has dated smoke-test
 evidence. Live results identify errors and token usage without publishing secrets.
 Document remaining limitations rather than silently switching models or contracts.
+
+### Provider and model extensibility
+
+**Status:** future work, tracked by [#37](https://github.com/dhar174/Parallax-Relay-AI-Game/issues/37).
+The direction is any combination of supported APIs and model types per role,
+starting with the existing OpenAI, Anthropic and Gemini adapters. All 27 provider
+assignments across three roles validate and resolve offline, including repeated
+providers; only the dated live roster has the recorded live evidence.
+
+Separate transport/API implementation, model identity/capabilities and game-role
+behavior before adding hosted/local APIs. Design explicit observation and response
+bridges for text-only, image, audio, video and non-chat models. Preserve role-local
+inputs, sealed commitments, budgets, provenance and authoritative engine actions;
+never silently drop unsupported inputs or substitute spectator information.
+
+Distinguish declared capabilities, offline-tested behavior, dated bounded live
+verification, unverified combinations and inputs unsupported by the current
+contract. Evidence identifies the exact API/version, model/known revision, role
+assignment, input/output contract, limits and date. Neither a provider-wide claim
+nor exhaustive Cartesian-product coverage follows from one successful roster.
+Coordinate observation ablations with #18, campaigns with #19 and rooms with #20.
+New modalities/adapters require separately reviewed slices and spending approval;
+this roadmap introduces no runtime feature, automatic fallback or paid execution.
 
 ## 3. Reproducible evaluation
 

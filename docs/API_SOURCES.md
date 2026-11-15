@@ -1,10 +1,27 @@
 # Provider contract references
 
 The adapters in `parallax_relay/providers.py` use direct REST calls. This document
-separates implementation choices, source checks, and live evidence. The bounded
-[November 15 attempt](#bounded-live-evidence--november-15-2026) accepted OpenAI
-phase outputs but was blocked by Gemini HTTP 429 before resolving a turn;
-complete mixed-provider match acceptance remains unverified.
+separates implementation choices, source checks, and live evidence. The separately
+authorized [November 15 retry](#successful-bounded-live-retry--november-15-2026)
+completed all nine OpenAI/Gemini requests and resolved one turn. The earlier
+[HTTP 429 abort](#bounded-live-evidence--november-15-2026) remains historical
+evidence. A full-game victory and general model capability remain unverified.
+
+## Current live-acceptance scope — November 15, 2026
+
+| Adapter / requested model | Dated live evidence | Status |
+|---|---|---|
+| OpenAI v1 Responses / `gpt-6-luna` | SPECTRA and PYRA, three first-attempt phase replies each, one-turn roster | Bounded live-verified for this recorded configuration. |
+| Gemini v1beta generateContent / `gemini-3.5-flash-lite` | FLUX, three first-attempt phase replies, same one-turn roster | Bounded live-verified for this recorded configuration. |
+| Anthropic v1 Messages / no live-selected model | Independent contract audit and intercepted tests only | Implemented/offline-tested; live-unverified. Mandatory #15 retired by scope decision, not by a successful test. |
+
+The [acceptance disposition](VERIFICATION.md#provider-acceptance-and-scope-decision--november-15-2026)
+supports closing #14/#16 and scoped parent #8 after the evidence PR merges, and
+closing #15 as not planned. None is closed by this document alone. Configuration
+already allows independent/repeated choices among the three adapters; that does
+not verify all providers/models/assignments. Additional hosted/local APIs and
+text-only, audio/video and non-chat bridges are future
+[#37](https://github.com/dhar174/Parallax-Relay-AI-Game/issues/37) work.
 
 ## Independent contract audit — November 14, 2026
 
@@ -162,8 +179,10 @@ test, consult the exact model's official documentation and confirm:
 Image/schema combinations, model-specific minima/maxima, backend revisions, access,
 retention and billing remain unverified until checked for the selected model and
 account. Never raise limits, select a replacement model, or switch APIs automatically
-to make a failed smoke run pass. #14–#16 own bounded live evidence; parent #8 stays
-open. This audit neither uses credentials nor authorizes spend.
+to make a failed smoke run pass. The [scoped acceptance](#current-live-acceptance-scope--november-15-2026)
+is limited to its recorded models/APIs, roles and input/output contracts; other
+combinations remain unverified. This audit neither uses credentials nor authorizes
+spend. New compatibility claims require their own dated evidence.
 
 ## Historical reference check: November 13, 2026
 
@@ -269,8 +288,10 @@ The [named run sheet](../configs/live_smoke.json) assigns `gpt-6-luna` to two
 independent agents (SPECTRA and PYRA), and `gemini-3.5-flash-lite` to FLUX. A second
 OpenAI agent replaces the planned Claude slot because Anthropic credits were
 unavailable; PYRA's character, thermal observation, abilities and objective remain
-unchanged. Anthropic #15 and parent #8 stay open. This selection does not change
-ordinary defaults or establish remote compatibility.
+unchanged. The [scope decision](VERIFICATION.md#acceptance-disposition-and-future-scope)
+retires mandatory Anthropic task #15 without marking it verified; issue closure
+awaits the evidence PR. This selection does not change ordinary defaults or itself
+establish remote compatibility; the successful retry below supplies separate evidence.
 
 | Model | Official model/pricing sources | Checked standard input/output USD per million |
 |---|---|---:|
@@ -296,16 +317,21 @@ values are never copied. This is additive schema-v2 metadata; old records remain
 readable and normalized totals, conservative unknown aggregates, retained estimates
 and reservation behavior are unchanged. Custom/scripted `Usage` defaults to no
 source evidence. Failed HTTP envelopes still have unknown usage, not invented
-counter values. This permits future #15 evidence to distinguish cache omission,
-zero and null without making an Anthropic request in this slice.
+counter values. This permits any future separately authorized Anthropic evidence
+to distinguish cache omission, zero and null. No Anthropic request was made.
 
 ## Bounded live evidence — November 15, 2026
+
+**Historical first-attempt snapshot.** The separately authorized
+[successful retry](#successful-bounded-live-retry--november-15-2026) supersedes this
+attempt's blocked status without changing its recorded outcome or unknown usage.
 
 One authorized invocation ran on clean source
 `73f7a373aca0cecda3747e7b3081292a4c94a764`, with the selected one-turn profile.
 The [sanitized summary](verification/2026-11-15-slice7-live-summary.json) records
 actual settings, requested models, API namespaces, dependencies, attempts and usage.
-No second invocation, fallback model, increased limit or Anthropic request occurred.
+At that checkpoint no second invocation, fallback model, increased limit or
+Anthropic request had occurred.
 
 | Role / requested model | Started attempts | Observed phase output | Reported input/output tokens |
 |---|---:|---|---:|
@@ -334,7 +360,42 @@ partial records and the viewer were finalized. The total local estimate
 rates plus **$0.0889014** retained estimates for six unknown-usage failures. These
 are not invoice amounts or a claim that failed requests incurred those charges.
 
-The healthy mixed-provider one-turn gate remains unmet. #14 retains the partial
-OpenAI evidence; #16 is blocked by the observed errors; #15 is deferred. All three
-and parent #8 remain open. A separately authorized successful follow-up can complete
-that gate without mislabeling this failed attempt as a winning or scored match.
+At that checkpoint the healthy mixed-provider one-turn gate remained unmet. #14
+retained partial OpenAI evidence; #16 was blocked by the observed errors; #15 was
+deferred. All three and parent #8 remained open. The successful retry below later
+completed the one-turn gate without relabeling this failed attempt as a winning or
+scored match.
+
+## Successful bounded live retry — November 15, 2026
+
+A second, separately authorized invocation ran on clean merged source
+`d76be6c086b25569baf308e5530f9875a9cd9da7` at 22:10 UTC (17:10 EST). The profile,
+model IDs, API families, rates and one-turn/18-attempt/4,096-output-token/
+60-second/$1-local-estimate limits were retained. Local `--check` returned 0 before
+execution; official model/rate pages were rechecked then. That preflight made no
+provider requests and did not itself prove authentication or model access.
+
+All nine PNG-bearing requests returned valid phase contracts on their first
+attempts: six OpenAI Responses outputs across SPECTRA/PYRA and three Gemini
+generateContent outputs for FLUX. Both the wrapper and CLI exited 0. One turn
+resolved and ended normally at `turn_limit`, `completed=false`, energy 4, no
+win/loss and null scores. Native JSON/JSONL, decoded role/spectator PNGs and the
+embedded viewer passed the existing offline structural verifier.
+
+The [sanitized summary](verification/2026-11-15-slice7-live-retry-summary.json)
+records source/environment/API/model identities, exact settings/prices,
+prompt/schema/room fingerprints, phase/attempt statuses and usage. Reported totals
+are **16,016 input / 1,095 output**, with **zero unknown-usage calls**. OpenAI's
+469 reasoning tokens are already included in output; cache-read counters were
+explicit zero. Gemini cache/thought counters were omitted and retain that origin
+state. The **$0.0038577 estimate** is not an inspected invoice or billing guarantee.
+
+No refusal/truncation occurred; their handling is covered by the independent
+offline contract tests, not extra live probes. The result supports #14/#16 for
+these model/API/role conditions only. Anthropic was not called and remains
+live-unverified; mandatory #15 is retired through the explicit scope exception.
+Parent #8 can close for this revised scope after evidence merge. Requested aliases
+do not resolve backend revisions; one successful turn does not establish general
+image understanding, strategy, cooperation or other combinations. Additional
+provider/model types require future bridges and bounded evidence under #37, with
+separate spending authorization. Full spectator artifacts remain private.

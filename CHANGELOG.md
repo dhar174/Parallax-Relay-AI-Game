@@ -2,9 +2,18 @@
 
 ## Unreleased
 
-- Record one bounded live attempt: six valid OpenAI phase outputs, six Gemini
+- Publish a separately authorized successful live retry: nine first-attempt
+  responses, one resolved turn, zero unknown usage and a $0.0038577 local estimate
+  (not an invoice total), with sanitized provenance and native-artifact checks.
+- Record scoped OpenAI/Gemini acceptance and retirement of mandatory Anthropic
+  validation as not planned; retain its implemented/offline-tested/live-unverified
+  adapter and ordinary defaults. Issue closure awaits the evidence PR merge.
+- Track independent API/model selection and future hosted/local, text/image/audio/
+  video/non-chat bridges in #37 without claiming those features are implemented.
+
+- Preserve the initial bounded live attempt: six valid OpenAI phase outputs, six Gemini
   HTTP 429 failures, a consistent zero-turn abort and conservative unknown usage;
-  leave complete mixed-provider acceptance open without rerunning.
+  its historical failure remains distinct from the later successful retry.
 
 - Add a frozen one-turn smoke profile, local check/live/offline-verification helper,
   and shared workbench preset with exact model selection, rates and limits.

@@ -234,6 +234,20 @@ covered by the slice 1 resolution merged in PR #27.
 
 ## R06: Live provider compatibility is unverified
 
+**Current scoped acceptance, November 15, 2026:** a separately authorized retry on
+clean `d76be6c` completed all nine first attempts for two independent `gpt-6-luna`
+agents and `gemini-3.5-flash-lite`, resolved one turn, and exited 0 at `turn_limit`
+with no final score. The [acceptance record](VERIFICATION.md#provider-acceptance-and-scope-decision--november-15-2026)
+supports #14/#16 completion. The maintainer explicitly retired mandatory Anthropic
+task #15 as not planned; its adapter remains implemented/offline-tested/live-unverified.
+#8 may close for this revised scope after the evidence PR merges; it does not certify
+all providers/models or image understanding. [#37](https://github.com/dhar174/Parallax-Relay-AI-Game/issues/37)
+tracks future independent API/model/modality combinations. All four issues remain
+open pending that merge; original criteria are retained with the scope exception.
+
+**Historical entries below:** the open/blocked statuses describe their dated
+checkpoints, before the successful retry and revised acceptance scope.
+
 **Slice 6 offline-contract status (#13), November 14, 2026:** the independent
 [contract audit](API_SOURCES.md#independent-contract-audit--november-14-2026) records
 official sources and immutable SDK references, verifies request formats, schema
