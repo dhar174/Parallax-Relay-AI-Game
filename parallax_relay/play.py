@@ -9,7 +9,7 @@ import os
 from pathlib import Path
 import re
 import sys
-from uuid import uuid4
+from uuid import UUID, uuid4
 from pydantic import ValidationError
 
 from .agents import ScriptedAgent
@@ -18,9 +18,13 @@ from .orchestrator import MatchExecutionError, run_match
 from .protocol import ROLES
 from .providers import HTTPAgent
 from .recording import Recorder
+from .provenance import PlayerIdentity, ProvenanceContext
 
 ROOT = Path(__file__).resolve().parent.parent
 CLEANUP_TIMEOUT_SECONDS = 5
+TRANSPORT_ENV_KEYS = frozenset({
+    'HTTP_PROXY', 'HTTPS_PROXY', 'ALL_PROXY', 'NO_PROXY', 'SSL_CERT_FILE', 'SSL_CERT_DIR',
+})
 
 
 def load_env_file(path: Path, environ: dict | None = None) -> None:
@@ -28,6 +32,7 @@ def load_env_file(path: Path, environ: dict | None = None) -> None:
 
     Existing process environment wins. Supports whole-line comments and single
     or double quoted values. Does not support multiline values or inline comments.
+    HTTP proxy/certificate settings must come from the process, not this file.
     """
     env = os.environ if environ is None else environ
     try:
@@ -49,6 +54,8 @@ def load_env_file(path: Path, environ: dict | None = None) -> None:
         key, value = key.strip(), value.strip()
         if not sep or not re.fullmatch(r'[A-Z_][A-Z0-9_]{0,127}', key):
             raise ConfigError(f'Invalid environment assignment at line {index}')
+        if key in TRANSPORT_ENV_KEYS:
+            raise ConfigError(f'HTTP transport settings must come from the process environment (line {index})')
         if value.startswith(('"', "'")):
             if len(value) < 2 or value[-1] != value[0]:
                 raise ConfigError(f'Unclosed environment value at line {index}')
@@ -56,6 +63,13 @@ def load_env_file(path: Path, environ: dict | None = None) -> None:
         pending[key] = value
     for key, value in pending.items():
         env.setdefault(key, value)
+
+
+def _uuid(value: str) -> UUID:
+    try:
+        return UUID(value)
+    except (ValueError, AttributeError):
+        raise argparse.ArgumentTypeError('Use a UUID identifier') from None
 
 
 def parser() -> argparse.ArgumentParser:
@@ -71,6 +85,8 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument('--max-calls', type=int)
     p.add_argument('--fast', action='store_true', help='One communication pass instead of two.')
     p.add_argument('--quiet', action='store_true', help='Only print the result and replay path.')
+    p.add_argument('--experiment-id', type=_uuid, help='Optional experiment UUID; does not start a campaign.')
+    p.add_argument('--trial-id', type=_uuid, help='Optional trial UUID; does not resume a match.')
     return p
 
 
@@ -88,8 +104,11 @@ async def _run(args, cfg, settings, runtime) -> int:
                 'settings':settings.model_dump(), 'room':'The Split Span'}
     if args.mock:
         manifest['requested_settings'] = requested_settings
+    context = ProvenanceContext(mode=mode, experiment_id=args.experiment_id, trial_id=args.trial_id,
+                                players={r: PlayerIdentity(**p) for r, p in players.items()},
+                                requested_settings=MatchSettings.model_validate(requested_settings))
     try:
-        recorder = Recorder(out, manifest)
+        recorder = Recorder(out, manifest, context=context)
     except FileExistsError:
         # Windows also uses EEXIST for a nonexistent path below a regular file.
         try:

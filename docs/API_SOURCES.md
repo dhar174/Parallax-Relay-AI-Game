@@ -78,6 +78,12 @@ API adapter, not a Vertex AI or Interactions adapter.
 
 ## Maintenance and evidence requirements
 
+Run provenance records the adapters' fixed endpoint/API namespace and the actual
+Anthropic version-header constant alongside requested model IDs. It does not pin
+remote model revisions or make provider-default sampling deterministic. See
+[Run provenance](PROVENANCE.md). These declarations add identity evidence without
+establishing remote access, model capability, or credentialed compatibility.
+
 Keep direct httpx serialization tests, but verify their expectations against dated
 external sources rather than deriving both code and fixture from the same guess.
 Check schema subsets, required headers, image handling, refusal/truncation states,

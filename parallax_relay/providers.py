@@ -19,6 +19,17 @@ ENDPOINTS = {
     'gemini': 'https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent',
 }
 MAX_BODY_BYTES = 262144
+ANTHROPIC_API_VERSION = '2026-10-21'
+
+
+def provider_contract(provider: str) -> dict | None:
+    """Safe implemented contract, not evidence of remote/model compatibility."""
+    if provider not in ENDPOINTS:
+        return None
+    return {'endpoint': ENDPOINTS[provider],
+            'family': {'openai': 'responses', 'anthropic': 'messages', 'gemini': 'generateContent'}[provider],
+            'namespace': 'v1beta' if provider == 'gemini' else 'v1',
+            'version_header': ANTHROPIC_API_VERSION if provider == 'anthropic' else None}
 
 
 class ProviderError(RuntimeError):
@@ -111,7 +122,7 @@ class HTTPAgent:
                                     'schema': schema, 'strict': True}},
             }
         elif self.provider == 'anthropic':
-            headers.update({'x-api-key': self._key, 'anthropic-version': '2026-10-21'})
+            headers.update({'x-api-key': self._key, 'anthropic-version': ANTHROPIC_API_VERSION})
             body = {
                 'model': self.model, 'system': SYSTEM_RULES, 'max_tokens': request.max_output_tokens,
                 'messages': [{'role': 'user', 'content': [

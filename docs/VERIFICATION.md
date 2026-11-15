@@ -1,5 +1,118 @@
 # Verification record
 
+## PR #31 review remediation — November 14, 2026
+
+Reproduced Antigravity's four runtime/reader findings at PR head `1acd7f5` before
+fixing them. Focused regressions cover verified-HEAD status failures, isolated Git
+probes, contradictory players and nested snapshots with recomputed hashes,
+lifecycle constraints, failed binding/reuse, end-hook errors, two-pass manifest
+divergence, context/legacy replay labels, tuple redaction and `.env` transport
+rejection. Added coverage also checks partial inventories, timestamp/schema
+strictness, pricing/condition validation, provider contracts and live-cap retention
+through an intercepted launcher. No real provider requests were made.
+
+On Linux/Python 3.12.14, all **179 tests passed**, with no skips (24.768 seconds);
+the 27 new tests augment the original 152. Dependency consistency, compilation,
+standalone normal/fast mock CLIs, the reusable mock checker and whitespace checks
+passed. Both mock modes retain seven-turn victories, 63/42 calls, five energy and
+scores 100. Verified 61 current local documentation links/anchors and synthetic
+trial/attempt counts, missing-outcome bounds, Wilson interval, Type 7 quantile
+examples and provider/model roster deduplication. Dependency files and committed
+fixtures are unchanged.
+
+Browser-extension tools were not exposed and the cloud browser reported
+`Browser runtime unavailable`. Used installed headless Chromium 156.0.8078.79 on
+localhost for six synthetic two-turn variants: mock, live label, programmatic,
+legacy, unknown and provenance fallback. Page identity, visible mode/roster,
+loaded PNGs and next/previous navigation passed, with no console/runtime errors.
+Inspected 1280×900 and 390×844 screenshots; the programmatic badge/roster rendered
+and the narrow viewport had no horizontal overflow. The live-label case still
+used scripted agents. These checks cover this replay change, not every browser,
+partial-run control or accessibility behavior. Hosted evidence for the fixing
+head is reported in the PR discussion after execution, separately from local QA.
+
+A fresh read-only review of the remediation checked all original concerns and
+independently passed all 27 new regressions and all 38 provenance tests (overlapping
+coverage). It found no runtime blockers and one wording overstatement: only a
+begin failure before successful binding leaves initialized metadata. Corrected
+that wording; post-binding failures retain known identity/timing as already covered
+by the start-write recovery test. Live providers and future #18–20 implementations
+remain outside this verification.
+
+## Slice 5 final review and local verification — November 14, 2026
+
+A fresh read-only whole-branch review independently passed 150 tests and found one
+P2 issue: the new reader checked hashes without validating every known nested
+payload. Matching hashes for malformed settings, incomplete Python identity, or a
+non-object room were accepted. The fix validates complete settings/prices,
+players/conditions, environment identities and named input payloads while preserving
+additive extensions. New regressions first reproduced 16 malformed cases with
+recomputed valid hashes, then passed after the fix; an extension-preservation test
+also passed. The final focused provenance suite has **23 passing tests**.
+
+After that fix, the complete suite passed **152 tests with no skips** on Linux/
+Python 3.12.14 (24.184 seconds) and Python 3.11.18 (24.414 seconds). Dependency
+consistency, compilation and standalone normal/fast mock CLIs plus the reusable
+checker passed; victories retain seven turns, 63/42 calls, five energy, and scores
+100. Actionlint and whitespace checks passed. Before the reader fix, standalone
+mock manifests also verified clean source revision, actual communication condition,
+distinct UUIDs and ended/victory lifecycle metadata. Historical fixtures and all
+dependency files are unchanged. The delivery PR carries actual hosted matrix
+results; local Linux testing alone does not establish Windows/macOS execution.
+
+That initial review reported no other actionable or deferred minor findings.
+Antigravity's subsequent PR review identified the additional concerns addressed
+in the dated remediation evidence added separately. The initial review
+excluded remote provider acceptance/billing/model behavior and the future runtime
+implementations of #18/#19/#20. Those remain unverified or unimplemented; no paid
+campaigns, remote compatibility, or held-out generalization is claimed.
+
+## Slice 5 evaluation protocol — November 14, 2026
+
+Specified #17 in [evaluation protocol v1](EVALUATION.md), without implementing
+future controls/agents (#18), campaigns/analysis (#19), or held-out rooms (#20).
+The selected five arms and balanced role assignments use 5 pilot plus 30
+confirmatory trials per unique assignment/condition/room. A synthetic example
+demonstrates operational versus engine outcomes, complete denominators and bounds;
+no experimental observations are reported. Standard-library arithmetic verified
+150/900 trials and 25,920/155,520 maximum attempts per room/three-model roster, plus
+the synthetic 5/10 Wilson interval of 23.7%–76.3%. Checked 59 local documentation
+links/anchors and unchanged historical fixtures/dependency files. Parent #9 stays
+open; no paid runs or live compatibility claims were introduced.
+
+## Slice 5 provenance checkpoint — November 14, 2026
+
+Implemented #10 from merged `origin/main` revision `08c5048` on
+`feat/slice-5-provenance-protocol`. Provenance version 1 is additive to manifest
+schema 2; result summaries and historical fixtures retain their formats. Source
+identity includes clean/dirty/unavailable status; effective identity binds actual
+settings/prices, role declarations and input fingerprints without raw config,
+credentials, Git patches or installation URLs. Programmatic identity may remain
+unknown; declarations do not attest model use or remote revisions.
+
+The new tests were observed failing before their corresponding implementation:
+missing provenance module, recorder hooks/metadata, UUID flags, and structural
+reader validation. After implementation, all 21 provenance tests passed. They cover
+canonical inputs and mutation, Git/archive availability, safe inventory collection,
+legacy/invalid readers, monotonic timing under wall-clock rollback, real normal/fast
+CLI runs with custom destinations and UUIDs, requested/effective tiny-cap settings,
+synthetic live launchers with changed secret/comment/path values, programmatic
+settings/prices, cancellation, hook failures, recorder reuse and manifest recovery.
+Embedded viewer and disk metadata are checked; the eight-artifact/two-pass bounds
+and primary failure/cancellation precedence retain coverage.
+
+Fresh local Python 3.12.14 verification with the hash-installed development lock:
+all **150 tests passed**, with no skips (22.991 seconds). The same full suite passed
+under Linux/Python 3.11.18 (150 tests, no skips, 21.890 seconds). Dependency
+consistency, compilation, both real mock CLI outcomes (63/42 calls, seven turns,
+five energy, scores 100), and working-diff whitespace checks passed locally.
+No provider requests or
+paid experiments were performed. Final local review is recorded above; the delivery
+PR records hosted matrix results. This checkpoint alone claims local
+Linux coverage. Dependencies, committed `example_run/` and `demo_output/` remain
+unchanged. The evaluation protocol and its future controls/runner/room dependencies
+are documented separately; passing fixtures establish no experimental outcome.
+
 Original milestone release date: November 12, 2026.
 
 The original evidence below is historical. See the dated repository import and

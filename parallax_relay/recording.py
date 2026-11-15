@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from .render import render_png
+from .provenance import ProvenanceContext, RunProvenance
 
 
 def _safe_metadata(value):
@@ -11,7 +12,7 @@ def _safe_metadata(value):
         secret_keys = {'api_key', 'authorization', 'x-api-key', 'x-goog-api-key', 'access_token', 'password'}
         return {k: '[REDACTED]' if str(k).lower() in secret_keys else _safe_metadata(v)
                 for k, v in value.items()}
-    if isinstance(value, list):
+    if isinstance(value, (list, tuple)):
         return [_safe_metadata(v) for v in value]
     return value
 
@@ -23,16 +24,51 @@ class RecordingFinalizationError(RuntimeError):
 
 
 class Recorder:
-    def __init__(self, out: Path, manifest: dict):
+    def __init__(self, out: Path, manifest: dict, *, context: ProvenanceContext | None = None):
         self.out = out
+        # Capture source state before newly generated output can make it dirty.
+        self._provenance = RunProvenance(context)
+        self._match_attempted = False
         # An existing directory is never silently overwritten, even if empty.
         out.mkdir(parents=True, exist_ok=False)
         self.viewer_ready = False
         self.manifest = _safe_metadata(manifest)
+        self.manifest['schema_version'] = 2
+        self.manifest['provenance'] = self._provenance.snapshot()
+        players = {role: {key: player[key] for key in ('provider', 'model')}
+                   for role, player in self.manifest['provenance']['players'].items()}
+        if context is not None:
+            self.manifest.update(mode=context.mode, players=players)
+        else:
+            # Legacy spectator labels remain caller declarations; they do not
+            # infer the execution identity of arbitrary in-process agents.
+            self.manifest.setdefault('mode', 'programmatic')
+            self.manifest.setdefault('players', players)
         self.manifest['privacy'] = 'Privileged spectator files: all goals, views and notes. Never send to a player.'
         self._json('manifest.json', self.manifest)
         for filename in ('calls.jsonl', 'phases.jsonl', 'replay.jsonl'):
             (out / filename).touch()
+
+    @property
+    def match_started(self):
+        return self._match_attempted or self._provenance.bound
+
+    def _claim_match(self):
+        if self.match_started:
+            raise ValueError('Recorder already bound to a match')
+        self._match_attempted = True
+
+    def begin_match(self, settings, rates, initial_snapshot):
+        self._match_attempted = True
+        self._provenance.begin(settings, rates, initial_snapshot)
+        self.manifest['settings'] = settings.model_dump()
+        self.manifest['provenance'] = self._provenance.snapshot()
+        self._json('manifest.json', self.manifest)
+
+    def end_match(self, result):
+        if self._provenance.bound:
+            self._provenance.end(result)
+        self.manifest['provenance'] = self._provenance.snapshot()
 
     def _json(self, filename: str, data) -> None:
         self._bytes(filename, json.dumps(data, indent=2, ensure_ascii=True).encode('utf-8'))
@@ -71,10 +107,15 @@ class Recorder:
 
     def finish(self, result) -> None:
         self.viewer_ready = False
+        if not self.match_started:
+            self._provenance.end(result)  # External result: no invented execution times.
+        self._provenance.refresh(result)
+        self.manifest['provenance'] = self._provenance.snapshot()
         failures = []
         def snapshot(rows):
             return ''.join(json.dumps(row, ensure_ascii=True) + '\n' for row in rows).encode('utf-8')
         artifacts = [
+            ('manifest.json', lambda: self._json('manifest.json', self.manifest)),
             ('calls.jsonl', lambda: self._bytes('calls.jsonl', snapshot(result.calls))),
             ('phases.jsonl', lambda: self._bytes('phases.jsonl', snapshot(result.phases))),
             ('replay.jsonl', lambda: self._bytes('replay.jsonl', snapshot(result.records))),

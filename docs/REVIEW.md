@@ -4,7 +4,7 @@ Reviewed **2026-11-13**, against runtime baseline
 [`719c7696c4bfe50934fc936bbccfb62812633164`](https://github.com/dhar174/Parallax-Relay-AI-Game/commit/719c7696c4bfe50934fc936bbccfb62812633164).
 This is a documentation and source review with offline reproductions. Runtime code,
 tests, dependencies, and committed fixtures were not changed during that review.
-Subsequent slice 1–4 resolutions are annotated below; in those sections the original
+Subsequent slice 1–5 resolutions are annotated below; in those sections the original
 evidence, suggested remedies, and reproductions are historical baseline records.
 
 ## Method and coverage
@@ -47,8 +47,8 @@ review; that is not a security assurance.
 | R04 | P3 | Documentation mismatch | Non-MOVE zero fields are requested but unenforced | Fixed in PR #27 |
 | R05 | P2 | Documentation mismatch | Legacy demo overwrites existing output | Fixed in PR #27 |
 | R06 | P1 | Unverified assumption | Offline wire tests do not establish live compatibility | Open validation gate |
-| R07 | P1 | Future enhancement | Fixed room cannot establish general cooperative ability | Open research gate |
-| R08 | P2 | Future enhancement | Run artifacts lack full experiment provenance | Open |
+| R07 | P1 | Future enhancement | Fixed room cannot establish general cooperative ability | Protocol specified (#17); #9 research gate remains open |
+| R08 | P2 | Future enhancement | Run artifacts lack full experiment provenance | Run provenance implemented (#10); runner #19 pending |
 | R09 | P2 | Test gap | CI, reproducibility, and missing audit coverage | Partially addressed; audits open |
 | R10 | P3 | Test gap / future enhancement | Replay browser coverage and partial-run inspection | Open |
 
@@ -255,6 +255,14 @@ adapters with offline coverage rather than verified model compatibility.
 
 ## R07: A fixed scripted room is insufficient research evidence
 
+**Slice 5 status (#17), November 14, 2026:** [evaluation protocol v1](EVALUATION.md)
+defines trial identity, balanced rotations, five arms, baseline policies, 5 pilot
+plus 30 confirmatory repetitions per assignment/condition, room-split gates,
+operational versus engine outcomes, failed-trial denominators, uncertainty and
+campaign budgets. This is prospective design, not experimental evidence. Controls
+and policies (#18), the campaign runner (#19), held-out rooms (#20), and the parent
+#9 research gate remain open. The fixed-room limitation below still applies.
+
 **Evidence:** `state.py:13–27,64–69` fixes geometry, initial conditions, and goals;
 `scripted.py` contains the successful plan. The fixture does not need to interpret
 its images or adapt to teammates. Compatible private goals and a fixed room allow
@@ -269,6 +277,17 @@ This is a planned research capability, not a malfunction of the current demo.
 conditions, report all trial outcomes and assignments, and test held-out variants.
 
 ## R08: Run manifests lack reproducibility metadata
+
+**Slice 5 resolution (#10), November 14, 2026:** new main-recorder manifests carry
+version-1 provenance inside schema 2. CLI and programmatic paths record actual
+driver settings/prices, source and environment availability, canonical input
+identities, safe declared model/API identity, optional grouping UUIDs, and UTC plus
+monotonic execution timing. Bounded recovery includes the manifest and preserves
+original timing/outcome. Legacy fixtures stay unchanged and readable. Unknown
+backend revisions, provider-default sampling, dirty source and unavailable metadata
+remain explicit limits. See [provenance](PROVENANCE.md) and dated verification.
+The campaign runner/aggregation requirement remains open under #19; #10 does not
+close the whole research gate. The baseline evidence below is historical.
 
 **Evidence:** `play.py:81–82` records mode, assignments, settings, room, and schema
 version. `recording.py:20–28` adds privacy metadata. The manifest has no source
