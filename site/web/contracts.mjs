@@ -22,7 +22,78 @@ export function toml(c){
  return rows.join('\n')+'\n';
 }
 export function checkRun(data){
- if(data.manifest?.schema_version!==2||data.result?.schema_version!==2||!['mock','live'].includes(data.manifest.mode)||!Array.isArray(data.calls)||!Array.isArray(data.replay)||!Array.isArray(data.phases)||!data.result.budget)throw Error('Select a complete schema-version-2 run directory or workbench export.');
- for(const turn of data.replay)if(!Number.isInteger(turn.turn)||!turn.observations||!turn.state_after||!Array.isArray(turn.communications))throw Error('Malformed turn record');
+ const field=(value,path,test,expected)=>{
+  if(!test(value))throw Error('Invalid '+path+': expected '+expected+'.');
+ };
+ const object=(value,path)=>field(value,path,v=>v!==null&&typeof v==='object'&&!Array.isArray(v),'an object');
+ const string=(value,path)=>field(value,path,v=>typeof v==='string','a string');
+ const boolean=(value,path)=>field(value,path,v=>typeof v==='boolean','a boolean');
+ const count=(value,path,min=0)=>field(value,path,v=>Number.isSafeInteger(v)&&v>=min,'an integer >= '+min);
+ const array=(value,path)=>field(value,path,Array.isArray,'an array');
+
+ object(data,'run');
+ object(data.manifest,'manifest');
+ field(data.manifest.schema_version,'manifest.schema_version',v=>v===2,'schema version 2');
+ field(data.manifest.mode,'manifest.mode',v=>['mock','live'].includes(v),'mock or live');
+ string(data.manifest.room,'manifest.room');
+ object(data.result,'result');
+ const result=data.result;
+ field(result.schema_version,'result.schema_version',v=>v===2,'schema version 2');
+ for(const key of ['win','loss','completed'])boolean(result[key],'result.'+key);
+ count(result.turns,'result.turns');
+ string(result.stop_reason,'result.stop_reason');
+ if(!result.completed){
+  field(result.scores,'result.scores',v=>v===null,'null for an incomplete run');
+ }else{
+  object(result.scores,'result.scores');
+  for(const role of roles)field(result.scores[role],'result.scores.'+role,Number.isFinite,'a finite number');
+ }
+ object(result.budget,'result.budget');
+ for(const key of ['calls_started','max_calls','reported_input_tokens','reported_output_tokens','unknown_usage_calls']){
+  count(result.budget[key],'result.budget.'+key);
+ }
+ field(result.budget.estimated_cost_usd,'result.budget.estimated_cost_usd',
+  v=>v===null||(Number.isFinite(v)&&v>=0),'null or a nonnegative finite number');
+
+ object(data.final_state,'final_state');
+ array(data.calls,'calls');
+ data.calls.forEach((call,i)=>{
+  const path='calls['+i+']';
+  object(call,path);
+  for(const key of ['role','phase','status'])string(call[key],path+'.'+key);
+  count(call.turn,path+'.turn');
+  count(call.attempt,path+'.attempt',1);
+ });
+ array(data.phases,'phases');
+ data.phases.forEach((phase,i)=>object(phase,'phases['+i+']'));
+ array(data.replay,'replay');
+ data.replay.forEach((turn,i)=>{
+  const path='replay['+i+']';
+  object(turn,path);
+  count(turn.turn,path+'.turn',1);
+  object(turn.state_after,path+'.state_after');
+  count(turn.state_after.energy,path+'.state_after.energy');
+  object(turn.observations,path+'.observations');
+  for(const role of roles){
+   const observation=turn.observations[role],where=path+'.observations.'+role;
+   object(observation,where);
+   if(observation.image!==undefined)string(observation.image,where+'.image');
+  }
+  array(turn.communications,path+'.communications');
+  turn.communications.forEach((message,j)=>{
+   const where=path+'.communications['+j+']';
+   object(message,where);
+   for(const key of ['role','phase','text'])string(message[key],where+'.'+key);
+  });
+  array(turn.events,path+'.events');
+ });
+ if(data.images!==undefined){
+  object(data.images,'images');
+  for(const value of Object.values(data.images)){
+   // Do not include imported names or values in validation errors.
+   string(value,'images entry');
+  }
+ }
+ // Validate without projecting: retain optional records and provenance metadata.
  return data;
 }

@@ -17,6 +17,21 @@ The build regenerates the ignored `build/workbench/dist/` directory. It contains
 
 Generated runs use temporary storage. Download **Export complete JSON** from Evaluation to keep the record, including images. To keep the native files separately, export the workbench TOML and invoke the CLI as described in the running guide. Import its output folder with **Evaluation → Import run folder**.
 
+Imports require well-formed schema-version-2 records. Invalid fields are reported before replacing the selected run, so its evaluation and exported data remain available after a rejected import. Empty logs, incomplete runs, missing optional images and additional metadata such as provenance remain supported. Folder imports preserve `final_spectator.png` along with turn images and reject duplicate accepted image filenames. The final image is retained in exports; the current workbench does not display a separate final-state view.
+
+## Focused frontend verification
+
+With the repository's Python environment activated and Node.js 24 available:
+
+```bash
+python site/build_workbench.py
+node --check site/web/app.js
+node --check site/web/contracts.mjs
+node --test --test-concurrency=1 tests/test_workbench_web.mjs
+```
+
+No npm packages are needed. The Node tests execute the production modules and import/click handlers with minimal browser I/O substitutes. They check validation and preservation of the selected run, image roundtrips and native CLI incomplete output. They do not establish browser layout, accessibility or console behavior. The Ubuntu/Python 3.12 locked CI job runs these checks; the other matrix jobs retain their Python checks. Continue to verify actual browser interaction separately when changing the frontend.
+
 ## Source and contract map
 
 | Project source | Workbench surface | What to review when it changes |
