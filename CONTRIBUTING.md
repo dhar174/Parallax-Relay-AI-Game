@@ -56,7 +56,7 @@ Run commands from the repository root with the environment activated:
 ```bash
 python -m pip check
 python -m unittest discover -s tests -v
-python -m compileall -q parallax_relay tests scripts
+python -m compileall -q parallax_relay tests scripts site
 python -m parallax_relay.play --mock
 python -m parallax_relay.play --mock --fast
 python scripts/check_mock_runs.py
@@ -104,6 +104,11 @@ result and replay path. For an independent compatibility check, bootstrap pip in
 fresh environment, then run `python -m pip install --only-binary=:all: -r requirements.txt`
 without the project lock and run the same checks. The floating job tests
 the latest compatible resolution for Python 3.12, not every historical combination.
+
+The Ubuntu/Python 3.12 locked job additionally installs Node 24 and runs the
+workbench JavaScript syntax and offline import/configuration checks described in
+[the workbench guide](docs/WORKBENCH.md#focused-frontend-verification). No npm
+packages are needed. The other five matrix jobs retain their Python checks.
 
 Offline here means no real provider/model calls: providers are intercepted in
 tests and CLI smoke runs use `--mock`. Registry access is still needed for installs.

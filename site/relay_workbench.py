@@ -1,15 +1,17 @@
 """Run from the Parallax Relay checkout using its activated Python environment."""
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 from pathlib import Path
 import secrets
+import re
 import subprocess
 import sys
 import tempfile
+from threading import Lock
 from urllib.parse import urlparse
 
 from run_records import read_run
-from runtime_contract import checkout_revision, runtime_fingerprint
+from runtime_contract import checkout_source, runtime_fingerprint
 
 ROOT = Path.cwd().resolve()
 HERE = Path(__file__).resolve().parent
@@ -72,11 +74,24 @@ def execute(config: dict) -> dict:
         )
         # The CLI can exit nonzero with useful partial or budget-stop records.
         data = read_run(output)
-        data["source_commit"] = checkout_revision(ROOT)
+        source = checkout_source(ROOT)
+        data["source_commit"] = source["revision"] or "unavailable"
+        data["source_status"] = source["status"]
         return data
 
 
+class WorkbenchServer(ThreadingHTTPServer):
+    daemon_threads = True
+    allow_reuse_address = True
+
+    def __init__(self, *args, **kwargs):
+        self.run_lock = Lock()
+        super().__init__(*args, **kwargs)
+
+
 class Handler(BaseHTTPRequestHandler):
+    timeout = 10
+
     def log_message(self, *args):
         pass
 
@@ -86,8 +101,14 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(payload)))
         self.send_header("Cache-Control", "no-store")
         self.send_header("X-Content-Type-Options", "nosniff")
+        if content_type == "text/html":
+            self.send_header("X-Frame-Options", "DENY")
+            self.send_header("Content-Security-Policy", "frame-ancestors 'none'; base-uri 'none'; object-src 'none'")
         self.end_headers()
-        self.wfile.write(payload)
+        try:
+            self.wfile.write(payload)
+        except (BrokenPipeError, ConnectionResetError, TimeoutError):
+            pass  # A closed browser must not produce an unhandled write traceback.
 
     def send_json(self, code: int, body: dict) -> None:
         self.send_bytes(code, json.dumps(body).encode("utf-8"), "application/json")
@@ -95,7 +116,9 @@ class Handler(BaseHTTPRequestHandler):
     def allowed(self) -> bool:
         host = f"127.0.0.1:{self.server.server_port}"
         origin = f"http://{host}"
-        return self.headers.get("Host") == host and self.headers.get("Origin", origin) == origin
+        hosts = self.headers.get_all("Host", [])
+        origins = self.headers.get_all("Origin", [])
+        return hosts == [host] and (not origins or origins == [origin])
 
     def do_GET(self):
         if not self.allowed():
@@ -112,19 +135,33 @@ class Handler(BaseHTTPRequestHandler):
         self.send_bytes(200, file.read_bytes(), MIME_TYPES.get(file.suffix, "application/octet-stream"))
 
     def do_POST(self):
-        if not self.allowed() or self.headers.get("X-Relay-Token") != TOKEN:
+        tokens = self.headers.get_all("X-Relay-Token", [])
+        valid_token = len(tokens) == 1 and tokens[0].isascii() and secrets.compare_digest(tokens[0], TOKEN)
+        if not self.allowed() or not valid_token:
             self.send_json(403, {"error": "Session rejected"})
             return
         if self.path != "/api/mock":
             self.send_json(404, {"error": "Only offline execution is available"})
             return
         try:
-            length = int(self.headers.get("Content-Length", "0"))
+            lengths = self.headers.get_all("Content-Length", [])
+            if len(lengths) != 1 or not re.fullmatch(r"[0-9]+", lengths[0]) or self.headers.get_all("Transfer-Encoding"):
+                raise ValueError("Invalid body length")
+            length = int(lengths[0])
             if not 0 < length < 65536:
                 raise ValueError("Invalid body length")
-            config = json.loads(self.rfile.read(length))
-            data = execute(config)
-        except (OSError, ValueError, subprocess.SubprocessError):
+            body = self.rfile.read(length)
+            if len(body) != length:
+                raise ValueError("Incomplete body")
+            config = json.loads(body)
+            if not self.server.run_lock.acquire(blocking=False):
+                self.send_json(409, {"error": "An offline run is already in progress."})
+                return
+            try:
+                data = execute(config)
+            finally:
+                self.server.run_lock.release()
+        except (OSError, ValueError, RecursionError, subprocess.SubprocessError):
             self.send_json(400, {"error": "Run failed. Check the checkout, build and match settings."})
             return
         self.send_json(200, data)
@@ -133,7 +170,7 @@ class Handler(BaseHTTPRequestHandler):
 if __name__ == "__main__":
     if runtime_fingerprint(ROOT) != CONTRACT["runtime_fingerprint"]:
         raise SystemExit("Checkout runtime differs from this build. Rebuild or use the matching checkout.")
-    with HTTPServer(("127.0.0.1", 0), Handler) as server:
+    with WorkbenchServer(("127.0.0.1", 0), Handler) as server:
         print(f"Open http://127.0.0.1:{server.server_port} in your browser.", flush=True)
         try:
             server.serve_forever()

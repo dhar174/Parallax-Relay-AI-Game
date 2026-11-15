@@ -6,6 +6,38 @@ The original evidence below is historical. See the dated repository import and
 documentation-review sections for subsequent checks. A passed offline suite does
 not establish live model compatibility or browser behavior in a new environment.
 
+## PR #33 independent-review follow-up — November 15, 2026
+
+Antigravity's review against `8a84080` was investigated with offline reproductions.
+New regressions reproduced malformed numeric input handling, pricing/container
+validation gaps, empty-MIME PNG loss, overlapping load intents, file retry state,
+programmatic recording rejection, stalled HTTP bodies, nested JSON failure,
+unrelated-parent Git attribution and nondeterministic ZIP metadata before fixes.
+
+The updated exact-head worktree passed **139 Python tests** and **49 Node tests**
+on Linux/Python 3.12.14 and Node 24.22.1, using the locked isolated environment.
+The frontend tests include 177 configuration cases compared with Python validation,
+accepted TOML roundtrips through `load_config()`, approval invalidation, real
+programmatic output, unknown usage, PNG byte preservation, escaped model content,
+and stale-load/error handling. Nine backend review tests cover socket/HTTP bounds,
+single-run admission, native record/image validation, source identity, Git-less
+build/execution, and ZIP metadata reproducibility with a root license.
+
+A disposable integration with `main` at `685681f` passed **225 Python tests** and
+the same **49 Node tests**, including actual programmatic recordings with no room
+label. Normal/fast mock checks produced seven-turn victories with 63/42 calls,
+five energy and scores of 100. A real loopback HTTP smoke returned nine calls,
+`turn_limit`, null terminal scores, all role images and explicit dirty-source
+status. Dependency consistency, Python compilation including `site/`, JavaScript
+syntax, actionlint 1.7.12 and whitespace checks passed.
+
+The approved browser tool still failed initialization with
+`the gaas-browser node_repl sandbox cannot be disabled`. Browser version, viewport,
+focus rendering, console behavior and 390px overflow were not verified in this
+follow-up. Wrapping/focus/ARIA/error-style fixes and removal of external font
+loading were checked in source and handler tests; they are not browser evidence.
+All game execution used scripted mock agents; no paid provider calls were made.
+
 ## Original milestone evidence summary
 
 | Check | Result |

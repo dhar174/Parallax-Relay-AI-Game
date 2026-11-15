@@ -2,11 +2,12 @@
 import json
 from pathlib import Path
 import shutil
+import stat
 import sys
 import zipfile
 
 from run_records import read_run
-from runtime_contract import checkout_revision, runtime_fingerprint
+from runtime_contract import checkout_source, runtime_fingerprint
 
 SITE = Path(__file__).resolve().parent
 ROOT = SITE.parent
@@ -26,8 +27,10 @@ def build(output: Path = OUTPUT) -> Path:
     if output.exists():
         shutil.rmtree(output)
     shutil.copytree(SITE / "web", output)
+    source = checkout_source(ROOT)
     contract = {
-        "commit": checkout_revision(ROOT),
+        "commit": source["revision"] or "unavailable",
+        "source_status": source["status"],
         "runtime_fingerprint": runtime_fingerprint(ROOT),
         "schema": GameConfig.model_json_schema(),
         "defaults": load_config(ROOT / "configs" / "three_models.toml").model_dump(),
@@ -39,13 +42,20 @@ def build(output: Path = OUTPUT) -> Path:
     shutil.copyfile(ROOT / "LICENSE", output / "UPSTREAM_LICENSE.txt")
 
     with zipfile.ZipFile(output / "relay-workbench.zip", "w", zipfile.ZIP_DEFLATED) as archive:
+        def add(path: Path, name: str) -> None:
+            entry = zipfile.ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0))
+            entry.create_system = 3
+            entry.external_attr = (stat.S_IFREG | 0o644) << 16
+            entry.compress_type = zipfile.ZIP_DEFLATED
+            archive.writestr(entry, path.read_bytes())
         for name in ("relay_workbench.py", "runtime_contract.py", "run_records.py"):
-            archive.write(SITE / name, f"relay-workbench/{name}")
-        archive.write(ROOT / "docs" / "WORKBENCH.md", "relay-workbench/README.md")
-        for path in sorted(output.rglob("*")):
+            add(SITE / name, f"relay-workbench/{name}")
+        add(ROOT / "docs" / "WORKBENCH.md", "relay-workbench/README.md")
+        add(ROOT / "LICENSE", "relay-workbench/LICENSE")
+        for path in sorted(output.rglob("*"), key=lambda path: path.relative_to(output).as_posix()):
             if path.is_file() and path.name != "relay-workbench.zip":
                 relative = path.relative_to(output).as_posix()
-                archive.write(path, f"relay-workbench/site/{relative}")
+                add(path, f"relay-workbench/site/{relative}")
     return output
 
 

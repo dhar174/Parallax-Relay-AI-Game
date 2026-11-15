@@ -109,6 +109,7 @@ separates original milestone evidence from subsequent checks.
 
 | Document | Use it for |
 |---|---|
+| [Workbench guide](docs/WORKBENCH.md) | Browser configuration, native imports, and local companion |
 | [Running guide](docs/RUNNING.md) | Configuration, limits, troubleshooting, and replay files |
 | [Architecture](docs/ARCHITECTURE.md) | Modules, data flow, and extension boundaries |
 | [Protocol](docs/PROTOCOL.md) | Player inputs, reply contracts, phases, and outcomes |

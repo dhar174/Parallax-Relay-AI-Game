@@ -37,11 +37,15 @@ Verification commands:
 ```bash
 python -m pip check
 python -m unittest discover -s tests -v
-python -m compileall -q parallax_relay tests scripts
+python -m compileall -q parallax_relay tests scripts site
 python -m parallax_relay.play --mock
 python -m parallax_relay.play --mock --fast
 python scripts/check_mock_runs.py
 ```
+
+The Ubuntu/Python 3.12 locked CI job also uses Node 24 for workbench JavaScript
+syntax and offline import/configuration regressions; see docs/WORKBENCH.md.
+The other five jobs retain their Python checks.
 
 For a focused test module:
 

@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import test from 'node:test';
-import { checkRun } from '../site/web/contracts.mjs';
+import { checkRun, validate, toml } from '../site/web/contracts.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const dist = join(root, 'build/workbench/dist');
@@ -15,46 +15,49 @@ let appInstance = 0;
 
 // Execute the unmodified application module and its real event handlers. This
 // harness supplies only browser I/O; it does not establish browser/layout coverage.
-async function workbench(t) {
+async function workbench(t, overrides = {}) {
   const nodes = new Map();
   const listeners = new Map();
   const downloads = [];
   const node = id => {
     if (!nodes.has(id)) nodes.set(id, {
-      textContent: '', innerHTML: '', click() {}, classList: { toggle() {} },
+      textContent: '', innerHTML: '', value: '', click() {},
+      classList: {
+        values: new Set(),
+        toggle(name, enabled) { if (enabled) this.values.add(name); else this.values.delete(name); },
+        contains(name) { return this.values.has(name); },
+      },
+      setAttribute(name, value) { this[name] = value; },
+      removeAttribute(name) { delete this[name]; },
     });
     return nodes.get(id);
   };
   const io = {
     contract: structuredClone(contract), fixture: structuredClone(fixture),
-    mock: structuredClone(fixture),
+    mock: structuredClone(fixture), ...overrides,
   };
   const globals = {
     document: {
       getElementById: node,
       querySelector: () => node('footer'),
-      querySelectorAll: () => [],
+      querySelectorAll: () => ['scenario', 'offline', 'live', 'evaluation'].map(tab => {
+        const button = node('nav-' + tab);
+        button.dataset = { tab };
+        return button;
+      }),
       createElement: () => ({ click() {} }),
       addEventListener: (type, handler) => listeners.set(type, handler),
     },
     location: { hostname: '127.0.0.1' },
     fetch: async url => {
-      if (url === 'contract.json') return { json: async () => io.contract };
-      if (url === 'fixture.json') return { json: async () => io.fixture };
+      if (url === 'contract.json') return { ok: !io.contractError, json: async () => io.contract };
+      if (url === 'fixture.json') return { ok: !io.fixtureError, json: async () => io.fixture };
       if (url === '/api/status') return {
         ok: true, json: async () => ({ commit: contract.commit, token: 'offline-test' }),
       };
       assert.equal(url, '/api/mock');
       if (io.mockError) throw io.mockError;
       return { ok: true, json: async () => io.mock };
-    },
-    FileReader: class {
-      readAsDataURL(file) {
-        file.arrayBuffer().then(bytes => {
-          this.result = 'data:image/png;base64,' + Buffer.from(bytes).toString('base64');
-          this.onload();
-        }).catch(error => this.onerror(error));
-      }
     },
   };
   for (const [key, value] of Object.entries(globals)) {
@@ -77,7 +80,11 @@ async function workbench(t) {
   const tab = name => listeners.get('click')({
     target: { closest: () => ({ dataset: { tab: name } }) },
   });
-  const select = (id, files) => listeners.get('change')({ target: { id, files } });
+  const select = async (id, files) => {
+    const target = { id, files, value: 'selected-path' };
+    await listeners.get('change')({ target });
+    return target;
+  };
   const importJSON = data => select('json', [
     new File([JSON.stringify(data)], 'run.json', { type: 'application/json' }),
   ]);
@@ -88,7 +95,13 @@ async function workbench(t) {
     return JSON.parse(await downloads.at(-1).text());
   };
   await tab('evaluation');
-  return { node, io, click, tab, select, importJSON, exportJSON };
+  const input = target => listeners.get('input')({ target });
+  const exportConfig = async () => {
+    const count = downloads.length;
+    await click('export-config');
+    return downloads.length === count ? null : downloads.at(-1).text();
+  };
+  return { node, io, click, tab, select, importJSON, exportJSON, input, exportConfig, downloads };
 }
 
 async function nativeFiles(directory) {
@@ -184,15 +197,14 @@ test('pending mock navigation and fetch failures retain working controls and run
     if (!valid) candidate.calls = [null];
     release(candidate);
     await pending;
-    assert.equal(app.node('title').textContent,
-      valid ? 'Recorded-run evaluation' : 'Match configuration');
-    if (!valid) assert.match(app.node('status').textContent, /^Invalid calls\[0\]:/);
+    assert.equal(app.node('title').textContent, 'Match configuration');
+    assert.equal(app.node('status').textContent, '');
     await app.tab('offline');
     assert.doesNotMatch(app.node('panel').innerHTML, /<button id="mock"[^>]*disabled/);
   }
   app.io.mockError = Error('Offline test connection failed');
   await app.click('mock');
-  assert.equal(app.node('status').textContent, 'Offline test connection failed');
+  assert.equal(app.node('status').textContent, 'Offline execution failed. Check the local companion.');
   assert.doesNotMatch(app.node('panel').innerHTML, /Running…/);
   await app.tab('evaluation');
   assert.deepEqual(await app.exportJSON(), fixture);
@@ -218,6 +230,7 @@ test('native folder export/reimport preserves every PNG byte including the final
   const files = await nativeFiles(join(root, 'example_run'));
   await app.select('directory', files);
   const exported = await app.exportJSON();
+  assert.match(app.node('panel').innerHTML, /<img /);
   const images = files.filter(file => file.name.endsWith('.png'));
   assert.equal(Object.keys(exported.images).length, images.length);
   assert.equal(images.length, 29);
@@ -227,6 +240,258 @@ test('native folder export/reimport preserves every PNG byte including the final
   }
   await app.importJSON(exported);
   assert.deepEqual(await app.exportJSON(), exported);
+});
+
+test('badInput cannot silently remove a spending guard or a pricing rate', async t => {
+  const app = await workbench(t);
+  app.input({ dataset: { match: 'max_estimated_cost_usd' }, value: '', valueAsNumber: NaN, validity: { badInput: true } });
+  assert.equal(await app.exportConfig(), null);
+  app.input({ dataset: { match: 'max_estimated_cost_usd' }, value: '', valueAsNumber: NaN, validity: { badInput: false } });
+  assert(await app.exportConfig());
+  app.input({ dataset: { role: 'SPECTRA', rate: 'input_per_million' }, value: '', valueAsNumber: NaN, validity: { badInput: true } });
+  assert.equal(await app.exportConfig(), null);
+});
+
+test('cleared required numbers render safely and smoke repairs non-finite limits', async t => {
+  const app = await workbench(t);
+  for (const key of ['communication_rounds', 'max_attempts', 'max_output_tokens']) {
+    app.input({ dataset: { match: key }, value: '', valueAsNumber: NaN });
+  }
+  await app.tab('live');
+  assert.doesNotMatch(app.node('panel').innerHTML, /NaN|Infinity/);
+  await app.tab('scenario');
+  assert.doesNotMatch(app.node('panel').innerHTML, /value="NaN"/);
+  await app.click('smoke');
+  const config = await app.exportConfig();
+  assert(config);
+  assert.match(config, /max_calls = 18/);
+});
+
+test('configuration shapes reject incomplete pricing and unknown keys without TypeError', () => {
+  const changes = [
+    c => { c.match = null; },
+    c => { c.players.SPECTRA.pricing = {}; },
+    c => { c.players.SPECTRA.pricing = []; },
+    c => { c.players.SPECTRA.pricing = { input_per_million: 1 }; },
+    c => { c.extra = 1; },
+    c => { c.match.extra = 1; },
+    c => { c.players.extra = {}; },
+    c => { c.players.SPECTRA.extra = 1; },
+    c => { c.players.SPECTRA.pricing = { input_per_million: 1, output_per_million: 1, extra: 1 }; },
+  ];
+  for (const change of changes) {
+    const config = structuredClone(contract.defaults);
+    change(config);
+    assert.throws(() => validate(config, contract), error => error instanceof Error && !(error instanceof TypeError));
+  }
+  const config = structuredClone(contract.defaults);
+  config.match.max_estimated_cost_usd = undefined;
+  assert.doesNotMatch(toml(config), /undefined/);
+});
+
+test('programmatic and missing mode/room labels remain importable without inventing live execution', async t => {
+  const app = await workbench(t);
+  for (const mode of ['programmatic', 'unknown', undefined]) {
+    const data = structuredClone(fixture);
+    data.manifest.mode = mode;
+    delete data.manifest.room;
+    await app.importJSON(data);
+    assert.equal(app.node('status').textContent, 'Imported native run records.');
+    assert.match(app.node('panel').innerHTML, /Room unspecified/);
+    assert.doesNotMatch(app.node('panel').innerHTML, /LIVE API RUN/);
+    assert.deepEqual(await app.exportJSON(), JSON.parse(JSON.stringify(data)));
+  }
+});
+
+test('newer fixture/import intent wins over a pending mock response or error', async t => {
+  const app = await workbench(t);
+  for (const rejected of [false, true]) {
+    let resolve, reject;
+    app.io.mock = new Promise((ok, bad) => { resolve = ok; reject = bad; });
+    await app.tab('offline');
+    const pending = app.click('mock');
+    const newer = structuredClone(fixture);
+    newer.manifest.room = 'Latest selected recording';
+    await app.tab('evaluation');
+    await app.importJSON(newer);
+    const panel = app.node('panel').innerHTML, status = app.node('status').textContent;
+    if (rejected) reject(Error('Stale failure must stay hidden')); else resolve(fixture);
+    await pending;
+    assert.equal(app.node('panel').innerHTML, panel);
+    assert.equal(app.node('status').textContent, status);
+    assert.deepEqual(await app.exportJSON(), newer);
+  }
+});
+
+test('mock completion after navigation leaves the active form DOM and status alone', async t => {
+  const app = await workbench(t);
+  let reject;
+  app.io.mock = new Promise((_, bad) => { reject = bad; });
+  await app.tab('offline');
+  const pending = app.click('mock');
+  await app.tab('scenario');
+  app.node('panel').innerHTML = 'ACTIVE FORM WITH USER FOCUS';
+  reject(Error('Background error'));
+  await pending;
+  assert.equal(app.node('panel').innerHTML, 'ACTIVE FORM WITH USER FOCUS');
+  assert.equal(app.node('status').textContent, '');
+});
+
+test('failed imports reset file inputs so the same path can be retried', async t => {
+  const app = await workbench(t);
+  for (const id of ['json', 'directory']) {
+    const target = await app.select(id, [new File(['invalid'], 'run.json')]);
+    assert.equal(target.value, '');
+  }
+});
+
+test('fixture HTTP errors preserve the current run and bootstrap failure is visible', async t => {
+  const app = await workbench(t);
+  await app.importJSON(fixture);
+  app.io.fixtureError = true;
+  const panel = app.node('panel').innerHTML;
+  await app.click('fixture');
+  assert.match(app.node('status').textContent, /Could not load/);
+  assert.equal(app.node('panel').innerHTML, panel);
+  assert.deepEqual(await app.exportJSON(), fixture);
+});
+
+test('contract HTTP failure displays a recoverable error without exposing controls', async t => {
+  const app = await workbench(t, { contractError: true });
+  assert.match(app.node('status').textContent, /Could not load the configuration contract/);
+  assert.equal(app.node('nav-scenario').disabled, true);
+  assert.equal(app.node('panel').innerHTML, '');
+});
+
+test('a delayed fixture cannot replace a newer imported run', async t => {
+  const app = await workbench(t);
+  let resolve;
+  app.io.fixture = new Promise(ok => { resolve = ok; });
+  const pending = app.click('fixture');
+  const data = structuredClone(fixture);
+  data.manifest.room = 'Newer import';
+  await app.importJSON(data);
+  resolve(fixture);
+  await pending;
+  assert.deepEqual(await app.exportJSON(), data);
+});
+
+test('empty MIME metadata keeps observations visible and corrupt PNGs are rejected', async t => {
+  const app = await workbench(t);
+  const files = await nativeFiles(join(root, 'example_run'));
+  assert(files.filter(file => file.name.endsWith('.png')).every(file => file.type === ''));
+  await app.select('directory', files);
+  assert.equal((app.node('panel').innerHTML.match(/<img /g) || []).length, 21);
+  const previous = await app.exportJSON();
+  const invalid = files.filter(file => file.name !== 'final_spectator.png');
+  invalid.push(new File(['invalid PNG'], 'final_spectator.png', { type: 'image/png' }));
+  await app.select('directory', invalid);
+  assert.match(app.node('status').textContent, /Invalid PNG image/);
+  assert.deepEqual(await app.exportJSON(), previous);
+});
+
+test('navigation exposes its active page and status distinguishes errors', async t => {
+  const app = await workbench(t);
+  await app.tab('offline');
+  assert.equal(app.node('nav-offline')['aria-current'], 'page');
+  assert.equal(app.node('nav-evaluation')['aria-current'], undefined);
+  await app.select('json', [new File(['invalid'], 'run.json')]);
+  assert(app.node('status').classList.contains('warn'));
+  await app.click('fixture');
+  assert(!app.node('status').classList.contains('warn'));
+});
+
+function python(code, input) {
+  const result = spawnSync(process.env.PYTHON || 'python', ['-c', code], {
+    cwd: root, encoding: 'utf8', timeout: 30_000, input,
+  });
+  assert.ifError(result.error);
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stderr, '');
+  return JSON.parse(result.stdout);
+}
+
+test('configuration bounds and pricing shapes agree with Python and accepted TOML roundtrips', () => {
+  const configs = [structuredClone(contract.defaults)];
+  for (const key of Object.keys(contract.defaults.match)) {
+    for (const value of [null, -1, 0, 0.5, 1, 2, 3, 12, 30, 256, 600, 10000, 16384, 1000000, 1000001]) {
+      const config = structuredClone(contract.defaults);
+      config.match[key] = value;
+      configs.push(config);
+    }
+  }
+  for (const pricing of [{}, [], { input_per_million: 1 }, { input_per_million: 1, output_per_million: 2 },
+    { input_per_million: 1, output_per_million: 2, extra: 3 }]) {
+    const config = structuredClone(contract.defaults);
+    config.players.SPECTRA.pricing = pricing;
+    configs.push(config);
+  }
+  for (const mutate of [c => { delete c.match; }, c => { c.match = {}; }, c => { c.match.extra = 1; },
+    c => { c.extra = 1; }, c => { c.players.SPECTRA.extra = 1; }, c => { c.players.extra = {}; }]) {
+    const config = structuredClone(contract.defaults); mutate(config); configs.push(config);
+  }
+  const cases = configs.map(config => {
+    try { const normalized = validate(config, contract); return { config, accepted: true, toml: toml(normalized) }; }
+    catch { return { config, accepted: false }; }
+  });
+  const results = python(`
+import json,sys,tempfile
+from pathlib import Path
+from parallax_relay.config import GameConfig,load_config
+results=[]
+for case in json.load(sys.stdin):
+    try:
+        config=GameConfig.model_validate(case['config']); accepted=True
+    except ValueError:
+        accepted=False
+    if case['accepted']:
+        with tempfile.TemporaryDirectory() as temp:
+            path=Path(temp)/'config.toml';path.write_text(case['toml'],encoding='utf-8')
+            assert path.read_text(encoding='utf-8')==case['toml']
+            assert load_config(path)==config
+    results.append(accepted)
+print(json.dumps(results))
+`, JSON.stringify(cases));
+  assert.deepEqual(cases.map(item => item.accepted), results);
+});
+
+test('live approval requires a guard/rates and resets after every editable setting changes', async t => {
+  const app = await workbench(t);
+  await app.tab('live'); await app.click('approve');
+  assert.match(app.node('status').textContent, /spending guard/);
+  app.input({ dataset: { match: 'max_estimated_cost_usd' }, value: '1', valueAsNumber: 1 });
+  await app.click('approve'); assert.match(app.node('status').textContent, /pricing/);
+  for (const role of ['SPECTRA', 'PYRA', 'FLUX']) for (const rate of ['input_per_million', 'output_per_million']) {
+    app.input({ dataset: { role, rate }, value: '1', valueAsNumber: 1 });
+  }
+  const edits = Object.keys(contract.defaults.match).map(key => ({ dataset: { match: key },
+    value: String(key === 'max_estimated_cost_usd' ? 1 : contract.defaults.match[key]),
+    valueAsNumber: key === 'max_estimated_cost_usd' ? 1 : contract.defaults.match[key] }));
+  for (const role of ['SPECTRA', 'PYRA', 'FLUX']) {
+    for (const key of ['provider', 'model_env', 'api_key_env']) edits.push({ dataset: { role, player: key }, value: contract.defaults.players[role][key] });
+    for (const rate of ['input_per_million', 'output_per_million']) edits.push({ dataset: { role, rate }, value: '1', valueAsNumber: 1 });
+  }
+  for (const edit of edits) {
+    await app.click('approve'); assert.match(app.node('panel').innerHTML, /Download approved TOML/);
+    app.input(edit);
+    const count = app.downloads.length;
+    await app.click('approved-download'); assert.equal(app.downloads.length, count);
+  }
+});
+
+test('model text and non-PNG image references remain data', async t => {
+  const app = await workbench(t);
+  const data = structuredClone(fixture), text = '<img src=x onerror="alert(1)">';
+  data.manifest.room = text;
+  data.replay[0].communications[0].text = text;
+  data.replay[0].events = [text, { nested: text }];
+  data.calls[0].status = text;
+  data.images[data.replay[0].observations.SPECTRA.image] = 'https://invalid.example/tracker.png';
+  await app.importJSON(data);
+  assert.equal(app.node('status').textContent, 'Imported native run records.');
+  assert.doesNotMatch(app.node('panel').innerHTML, /<img src=x|src="https:/);
+  assert.match(app.node('panel').innerHTML, /&lt;img src=x/);
+  assert.equal(Object.prototype.polluted, undefined);
 });
 
 for (const name of ['final_spectator.png', 'turn_00_spectra.png']) {
@@ -323,4 +588,30 @@ test('actual one-turn and zero-turn CLI records remain importable', async t => {
     await app.importJSON(exported);
     assert.deepEqual(await app.exportJSON(), exported);
   }
+});
+
+test('actual programmatic Recorder output without a room is importable', async t => {
+  const directory = await mkdtemp(join(tmpdir(), 'parallax-programmatic-test-'));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const output = join(directory, 'run');
+  python(`
+import asyncio,json,sys
+from pathlib import Path
+from parallax_relay.agents import ScriptedAgent
+from parallax_relay.config import MatchSettings
+from parallax_relay.orchestrator import run_match
+from parallax_relay.protocol import ROLES
+from parallax_relay.recording import Recorder
+out=Path(json.load(sys.stdin))
+recorder=Recorder(out,{'schema_version':2,'mode':'programmatic'})
+asyncio.run(run_match({r:ScriptedAgent(r) for r in ROLES},MatchSettings(max_turns=1),recorder=recorder))
+print('{}')
+`, JSON.stringify(output));
+  const app = await workbench(t);
+  await app.select('directory', await nativeFiles(output));
+  assert.equal(app.node('status').textContent, 'Imported native run records.');
+  const exported = await app.exportJSON();
+  assert.equal(exported.manifest.mode, 'programmatic');
+  assert.equal(exported.manifest.room, undefined);
+  assert.match(app.node('panel').innerHTML, /Room unspecified · programmatic/);
 });

@@ -87,7 +87,7 @@ jobs:
       - name: Run complete offline unittest suite
         run: python -m unittest discover -s tests -v
       - name: Compile Python sources
-        run: python -m compileall -q parallax_relay tests scripts
+        run: python -m compileall -q parallax_relay tests scripts site
       - name: Check normal and fast mock outcomes
         run: python scripts/check_mock_runs.py
       - name: Set up Node for workbench regression tests
