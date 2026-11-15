@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- Address PR #32 review: preserve failed/refused response classifications across
+  malformed/null payloads, reject wrong-type containers, use finite retry delays,
+  and sanitize compressed/deep-JSON errors with bounded HTTP error-body reads.
+- Expand provider request/accounting/cleanup coverage and clarify null-cache and
+  historical audit evidence without making live-provider or billing claims.
+- Independently audit all three provider contracts against official references and
+  pinned SDK source, retaining Anthropic's version and Gemini's generateContent format.
+- Correct OpenAI failed/filter/incomplete/final-message handling; retain unknown
+  additive token aggregates and Anthropic thinking metadata without double-counting.
+- Expand intercepted request/response/error/budget/privacy coverage and document
+  model-selection requirements; defer named models and paid validation.
 - Address PR #31 review: retain source revisions after status failures, isolate Git
   probes, validate provenance consistency, preserve failed-start/end-hook semantics,
   and correct programmatic replay labels and tuple metadata redaction.

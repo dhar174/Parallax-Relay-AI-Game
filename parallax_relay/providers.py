@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import base64
 import json
+import math
 import re
 import httpx
 
@@ -34,10 +35,11 @@ def provider_contract(provider: str) -> dict | None:
 
 class ProviderError(RuntimeError):
     def __init__(self, code: str, retryable: bool, status_code: int | None = None, retry_after: float = 0):
-        self.code = code if re.fullmatch(r'[a-z_]{1,48}', code) else 'provider_error'
+        self.code = code if isinstance(code, str) and re.fullmatch(r'[a-z_]{1,48}', code) else 'provider_error'
         self.retryable = retryable
         self.status_code = status_code
-        self.retry_after = max(0, min(30, retry_after))
+        finite = isinstance(retry_after, int) or math.isfinite(retry_after)
+        self.retry_after = max(0, min(30, retry_after)) if finite else 0
         super().__init__(self.code + (f' (HTTP {status_code})' if status_code else ''))
 
 
@@ -45,48 +47,90 @@ def _tokens(value) -> int | None:
     return value if type(value) is int and value >= 0 else None
 
 
+def _optional_tokens(usage: dict, name: str) -> int | None:
+    # Omitted optional breakdowns retain legacy zero semantics. Explicit null or
+    # malformed values cannot establish a complete sum for conservative pricing.
+    return _tokens(usage[name]) if name in usage else 0
+
+
+def _object(value) -> dict:
+    if value is None:
+        return {}
+    if not isinstance(value, dict):
+        raise ValueError('Expected provider object')
+    return value
+
+
+def _items(value) -> list[dict]:
+    if value is None:
+        return []
+    if not isinstance(value, list) or any(not isinstance(item, dict) for item in value):
+        raise ValueError('Expected provider object list')
+    return value
+
+
+def _error_code(value) -> str | None:
+    code = value.get('code') if isinstance(value, dict) else None
+    return code if isinstance(code, str) else None
+
+
 def _usage(provider: str, data: dict) -> Usage:
     if provider == 'gemini':
-        u = data.get('usageMetadata') or {}
+        u = _object(data.get('usageMetadata'))
         inp, out = _tokens(u.get('promptTokenCount')), _tokens(u.get('candidatesTokenCount'))
-        thought = _tokens(u.get('thoughtsTokenCount')) or 0
-        return Usage(inp, None if out is None else out + thought,
-                     _tokens(u.get('cachedContentTokenCount')) or 0, thought)
-    u = data.get('usage') or {}
+        thought = _optional_tokens(u, 'thoughtsTokenCount')
+        return Usage(inp, None if out is None or thought is None else out + thought,
+                     _tokens(u.get('cachedContentTokenCount')) or 0, thought or 0)
+    u = _object(data.get('usage'))
     inp, out = _tokens(u.get('input_tokens')), _tokens(u.get('output_tokens'))
     if provider == 'anthropic':
-        cached = _tokens(u.get('cache_read_input_tokens')) or 0
-        written = _tokens(u.get('cache_creation_input_tokens')) or 0
-        return Usage(None if inp is None else inp + cached + written, out, cached)
-    cached = _tokens((u.get('input_tokens_details') or {}).get('cached_tokens')) or 0
-    thought = _tokens((u.get('output_tokens_details') or {}).get('reasoning_tokens')) or 0
+        cached = _optional_tokens(u, 'cache_read_input_tokens')
+        written = _optional_tokens(u, 'cache_creation_input_tokens')
+        thought = _tokens(_object(u.get('output_tokens_details')).get('thinking_tokens')) or 0
+        return Usage(None if any(n is None for n in (inp, cached, written)) else inp + cached + written,
+                     out, cached or 0, thought)
+    cached = _tokens(_object(u.get('input_tokens_details')).get('cached_tokens')) or 0
+    thought = _tokens(_object(u.get('output_tokens_details')).get('reasoning_tokens')) or 0
     return Usage(inp, out, cached, thought)  # OpenAI output already includes reasoning.
 
 
 def _decode(provider: str, data: dict) -> ModelReply:
+    # Explicit failure is authoritative even when accompanying telemetry is bad.
+    if provider == 'openai' and (data.get('status') == 'failed' or data.get('error') is not None):
+        raise ProviderError('response_failed', _error_code(data.get('error')) in {'server_error', 'rate_limit_exceeded'})
     usage = _usage(provider, data)
     if provider == 'openai':
-        parts = [p for item in data.get('output', []) if item.get('type') == 'message'
-                 for p in item.get('content', [])]
-        if any(p.get('type') == 'refusal' for p in parts):
+        if _object(data.get('incomplete_details')).get('reason') == 'content_filter':
             return ModelReply('', usage, 'refusal')
+        messages = [item for item in _items(data.get('output')) if item.get('type') == 'message']
+        if any(p.get('type') == 'refusal' for item in messages for p in _items(item.get('content'))):
+            return ModelReply('', usage, 'refusal')
+        messages = [item for item in messages if item.get('phase') in (None, 'final_answer')]
+        parts = [p for item in messages for p in _items(item.get('content'))]
         text = ''.join(p.get('text', '') for p in parts if p.get('type') == 'output_text')
-        return ModelReply(text, usage, 'ok' if data.get('status') == 'completed' else 'incomplete')
+        complete = data.get('status') == 'completed' and bool(messages) and all(
+            item.get('status', 'completed') == 'completed' for item in messages)
+        return ModelReply(text, usage, 'ok' if complete else 'incomplete')
     if provider == 'anthropic':
         stop = data.get('stop_reason')
-        text = ''.join(p.get('text', '') for p in data.get('content', []) if p.get('type') == 'text')
-        status = 'refusal' if stop == 'refusal' else 'ok' if stop == 'end_turn' else 'incomplete'
+        if stop == 'refusal':
+            return ModelReply('', usage, 'refusal')
+        text = ''.join(p.get('text', '') for p in _items(data.get('content')) if p.get('type') == 'text')
+        status = 'ok' if stop == 'end_turn' else 'incomplete'
         return ModelReply(text, usage, status)
-    candidates = data.get('candidates') or []
+    if _object(data.get('promptFeedback')).get('blockReason'):
+        return ModelReply('', usage, 'refusal')
+    candidates = _items(data.get('candidates'))
     if not candidates:
-        status = 'refusal' if (data.get('promptFeedback') or {}).get('blockReason') else 'incomplete'
-        return ModelReply('', usage, status)
+        return ModelReply('', usage, 'incomplete')
     candidate = candidates[0]
     reason = candidate.get('finishReason')
     status = ('ok' if reason == 'STOP' else 'refusal' if reason in {
         'SAFETY', 'RECITATION', 'BLOCKLIST', 'PROHIBITED_CONTENT', 'SPII', 'IMAGE_SAFETY'
     } else 'incomplete')
-    text = ''.join(p.get('text', '') for p in (candidate.get('content') or {}).get('parts', [])
+    if status == 'refusal':
+        return ModelReply('', usage, status)
+    text = ''.join(p.get('text', '') for p in _items(_object(candidate.get('content')).get('parts'))
                    if not p.get('thought', False))
     return ModelReply(text, usage, status)
 
@@ -149,18 +193,31 @@ class HTTPAgent:
         try:
             async with self._client.stream('POST', url, headers=headers, json=body,
                                            follow_redirects=False) as response:
-                content = bytearray()
-                async for chunk in response.aiter_bytes():
-                    content.extend(chunk)
-                    if len(content) > MAX_BODY_BYTES:
-                        raise ProviderError('response_too_large', False)
                 status = response.status_code
-                if not 200 <= status < 300:
+                successful = 200 <= status < 300
+                content = bytearray()
+                try:
+                    async for chunk in response.aiter_bytes():
+                        if len(content) + len(chunk) > MAX_BODY_BYTES:
+                            if successful:
+                                raise ProviderError('response_too_large', False)
+                            # Error-body details are optional. Stop reading an
+                            # oversized proxy page and retain its HTTP policy.
+                            content.clear()
+                            break
+                        content.extend(chunk)
+                except httpx.DecodingError:
+                    if successful:
+                        raise
+                    content.clear()  # A corrupt error body cannot change its status.
+                if not successful:
                     # Only allowlisted metadata; never include provider error text.
                     quota = False
                     try:
-                        quota = json.loads(content).get('error', {}).get('code') in {'insufficient_quota', 'billing_hard_limit_reached'}
-                    except (ValueError, AttributeError, TypeError):
+                        data = json.loads(content)
+                        quota = _error_code(data.get('error') if isinstance(data, dict) else None) in {
+                            'insufficient_quota', 'billing_hard_limit_reached'}
+                    except (ValueError, RecursionError):
                         pass
                     retryable = (status in {408, 409, 429} or status >= 500) and not quota
                     try:
@@ -173,10 +230,12 @@ class HTTPAgent:
                     if not isinstance(data, dict):
                         raise ValueError('expected object')
                     return _decode(self.provider, data)
-                except (ValueError, TypeError, AttributeError, KeyError):
+                except (ValueError, TypeError, AttributeError, KeyError, RecursionError):
                     raise ProviderError('invalid_provider_response', True) from None
         except httpx.TimeoutException:
             raise ProviderError('timeout', True) from None
+        except httpx.DecodingError:
+            raise ProviderError('invalid_provider_response', True) from None
         except httpx.TransportError:
             raise ProviderError('network_error', True) from None
 

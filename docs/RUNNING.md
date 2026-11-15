@@ -72,6 +72,15 @@ then contain only ASCII letters, digits, `.`, `_`, or `-`, up to 128 characters.
 Do not use URLs, `models/` prefixes, or provider routing strings. There are no
 default model IDs, custom endpoints, OpenRouter, Ollama, or Vertex AI adapters.
 See [API references](API_SOURCES.md) for checked and unresolved contract assumptions.
+Follow its [model-selection requirements](API_SOURCES.md#selecting-a-compatible-model)
+for endpoint/schema/PNG compatibility, context/image limits, reasoning headroom and
+output bounds. No named shortlist or model defaults are supplied. The 2,048-token
+default does not guarantee a complete reply for every model; limits never increase
+automatically, and `--check` cannot establish remote capability or account access.
+Malformed/compressed provider output uses bounded retries and conservative unknown
+usage accounting. Unsupported or nonfinite `Retry-After` values use the configured
+backoff. Anthropic null cache counters intentionally retain estimates; see the
+[usage caveat](API_SOURCES.md#usage-and-unknowns) before interpreting costs.
 
 The environment reader accepts UTF-8 (including a BOM), literal `NAME=value`,
 optional matching quotes, whole-line comments, and an optional `export ` prefix.

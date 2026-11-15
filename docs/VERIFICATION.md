@@ -1,5 +1,81 @@
 # Verification record
 
+## PR #32 review remediation and own review — November 14, 2026
+
+Started from `fcec8df`, after merged PR #31 was incorporated. The clean combined
+baseline passed **195 tests** (26.114 seconds, no skips). Reviewed all ten inline
+comments and the comprehensive Antigravity summary, then inspected the provider
+changes and their request, budget, driver, recording and provenance boundaries.
+Re-read pinned OpenAI error/message definitions and Anthropic usage definitions;
+public-source retrieval did not contact credentialed model endpoints.
+
+Regressions reproduced malformed error/null-output classification, nonfinite
+delays, corrupt compression, deep JSON, wrong-type containers, contradictory Gemini
+blocking and refusal-text exposure before fixes. The own review additionally found
+that malformed usage could mask an explicit OpenAI failure; failure classification
+now precedes telemetry. A targeted regression also caught integer overflow in the
+new finite-delay check, which was corrected before delivery. The original contract
+tests now assert rules/content type across nine request combinations, independent
+usage totals/breakdowns, retry/fatal/status metadata and priced failed-envelope
+driver accounting with real reservations and safe artifacts.
+
+On Linux/Python 3.12.14 with the existing lock, **215 tests passed**, no skips
+(27.334 seconds), including **48 provider-focused tests** and 20 new regression
+methods. Dependency consistency, compilation, normal/fast mock CLIs, the reusable
+checker and whitespace checks passed. Mocks retain seven-turn victories, 63/42
+calls, five energy and scores 100. Verified 69 local documentation links/anchors,
+including the historical plan, and counted 11 immutable SDK file references
+(4 OpenAI, 5 Anthropic, 2 Google). Dependencies and committed fixtures are unchanged.
+
+The unchecked implementation plan is explicitly a historical snapshot. Historical
+mutable SDK pointers are labeled separately from pinned audit evidence. Anthropic
+null cache counts intentionally retain conservative estimates; #15 must establish
+their live representation under separate spending authorization. No paid requests,
+model shortlist, wire/API migration or live billing/image-understanding claim is
+included. Final independent review and exact-head hosted matrix evidence are
+reported on the PR before the conditional merge.
+
+## Slice 6 independent provider-contract audit — November 14, 2026
+
+Implemented #13 from merged-main revision `08c5048` on
+`audit/slice-6-provider-contracts`. The clean baseline passed 129 tests. The audit
+records official provider REST/guides and 11 official SDK file references pinned to
+OpenAI `3dae6090`, Anthropic `5139cf2e`, and Google `a3d04bd5`; full immutable links
+and source-to-test coverage are in [API sources](API_SOURCES.md#independent-contract-audit--november-14-2026).
+Public-source retrieval is separate from intercepted tests; no provider SDK was
+installed/executed and no credentialed model endpoint was contacted.
+
+New regressions first reproduced seven test failures comprising 27 failing cases:
+OpenAI failed/filter/incomplete/commentary handling, malformed additive usage,
+lost Anthropic thinking metadata, and premature replacement of budget estimates.
+After correction they passed. An additional refusal-precedence regression failed
+when commentary filtering hid a refusal; moving refusal detection before filtering
+fixed it. The final provider-focused run passed **28 tests**, including all 16 new
+contract tests and the existing 12 provider tests. Request expectations are literal,
+independently sourced, and cover all nine provider/phase combinations.
+
+Fresh Linux verification with hash-installed locked dependencies and pip 26.3:
+
+- Python 3.12.14: **145 tests passed**, no skips, 17.966 seconds.
+- Python 3.11.18: **145 tests passed**, no skips, 18.645 seconds.
+- Dependency consistency, compilation, actionlint and whitespace checks passed.
+- Standalone normal/fast mock CLIs and the reusable outcome checker passed: seven
+  turns, 63/42 calls, five energy, all scores 100. These are scripted fixtures.
+- Checked 48 local documentation links/anchors before this verification entry;
+  historical fixtures and all dependency files remain unchanged.
+
+The audit corroborates and retains Anthropic's `2026-10-21` header and Gemini's
+generateContent `responseJsonSchema` shape. It distinguishes local retry and omitted
+optional-counter conventions from universal provider guarantees. Model-selection
+requirements are documented; no named shortlist, model defaults, API migration,
+token-limit increase or paid execution is included. Existing interfaces/schemas,
+engine rules, budgeting, cancellation and recording recovery remain intact.
+The independent review and actual final-head hosted matrix evidence accompany the
+delivery PR. Remote access/model acceptance, billing accuracy and image understanding
+remain unverified; #14–#16 and parent #8 stay open. At that initial checkpoint,
+slice 5/PR #31 had not been merged or incorporated as a prerequisite. The later
+PR #32 review starts from `fcec8df`, which incorporates merged #31 and its fixes.
+
 ## PR #31 review remediation — November 14, 2026
 
 Reproduced Antigravity's four runtime/reader findings at PR head `1acd7f5` before

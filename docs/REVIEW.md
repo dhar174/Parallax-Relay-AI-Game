@@ -234,6 +234,24 @@ covered by the slice 1 resolution merged in PR #27.
 
 ## R06: Live provider compatibility is unverified
 
+**Slice 6 offline-contract status (#13), November 14, 2026:** the independent
+[contract audit](API_SOURCES.md#independent-contract-audit--november-14-2026) records
+official sources and immutable SDK references, verifies request formats, schema
+subsets, stop/error handling and usage normalization, and links intercepted coverage.
+Regressions correct OpenAI response states and invalid additive usage; Anthropic
+thinking metadata is retained without double-counting. The existing version header
+and Gemini generateContent format are corroborated and retained. Model-selection
+requirements are documented; the named shortlist is deferred. This completes only
+the offline contract task: no remote model acceptance is established. #14–#16 and
+parent #8 remain open. The original evidence below is historical.
+
+**PR #32 follow-up:** malformed failure metadata, nullable output collections,
+nonfinite delays, compressed/deep-JSON errors and contradictory Gemini blocking
+signals now have focused regressions and sanitized classifications. Request-rule,
+usage, retry/fatal, stream/client cleanup and priced-driver assertions are expanded.
+Anthropic explicit null cache counts remain conservatively unknown, with their live
+representation deferred to #15; this does not close the live-compatibility gate.
+
 **Evidence:** `tests/test_providers.py` supplies its own response envelopes and
 asserts the request fields emitted by `providers.py`. The integration test intercepts
 all HTTP and drives the known script. These are useful serialization/control tests,
