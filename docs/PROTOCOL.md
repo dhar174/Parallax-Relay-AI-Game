@@ -153,5 +153,12 @@ fields and schema version remain unchanged. `Recorder.finish` returns normally o
 success and raises sanitized `RecordingFinalizationError` with ordered `failures`
 pairs on failure. The driver makes at most two finalization passes and preserves
 the original failure, even if recovery succeeds.
+Primary and secondary finalization operations use the same `finish:<artifact>`
+labels; a generic custom `finish` failure is labeled `finish:finish`.
+The built-in recorder also binds version-1 provenance to actual driver inputs;
+custom recorders need no new methods. Its manifest is now the eighth independent
+final artifact. Execution end time/original stop reason freeze before finalization,
+while writable metadata/viewers refresh the final stop reason on recovery. See
+[Run provenance](PROVENANCE.md) for hook failures, compatibility, and unknown fields.
 Fresh caller cancellation during client shutdown still propagates, retaining an
 earlier host failure diagnostically rather than converting cancellation to exit 2.

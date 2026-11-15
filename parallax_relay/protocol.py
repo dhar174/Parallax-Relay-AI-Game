@@ -17,6 +17,7 @@ Phase = Literal['broadcast', 'negotiate', 'commit']
 MAX_MESSAGE_CHARS = 400
 MAX_NOTES_CHARS = 1000
 MAX_REPLY_CHARS = 16384
+REQUEST_FORMAT_VERSION = 1
 
 
 @dataclass(frozen=True)
