@@ -189,6 +189,7 @@ async def run_match(agents: Mapping[str, Agent], settings: MatchSettings | None 
     recorder = output if recorder is not None else None
     try:
         if isinstance(output.recorder, Recorder):
+            output.recorder._claim_match()
             recorder.begin_match(settings, rates or {}, world.snapshot())
         while world.turn < settings.max_turns and not (world.win or world.loss):
             observations = {r: observe(world, r) for r in ROLES}
@@ -303,7 +304,7 @@ async def run_match(agents: Mapping[str, Agent], settings: MatchSettings | None 
                         primary = ('finish:' + operation, cause)
                         result.stop_reason = 'local_error'
                     else:
-                        secondary.append((operation, cause))
+                        secondary.append(('finish:' + operation, cause))
     if cancelled is not None:
         # Preserve the cancellation instance/type, even if cleanup failed.
         cancelled.result = result

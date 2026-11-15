@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Address PR #31 review: retain source revisions after status failures, isolate Git
+  probes, validate provenance consistency, preserve failed-start/end-hook semantics,
+  and correct programmatic replay labels and tuple metadata redaction.
+- Reject HTTP proxy/certificate overrides in `.env` while retaining process-level
+  transport settings; clarify evaluation implementation gates and analysis rules.
 - Specify prospective cooperative evaluation: five arms, balanced role rotations,
   5 pilot/30 confirmatory trials per cell, policy baselines, failed-trial reporting,
   uncertainty, room-split and budget gates; conduct no campaigns.

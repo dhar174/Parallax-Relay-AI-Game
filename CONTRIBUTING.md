@@ -116,7 +116,8 @@ and concise mock outcomes remain in job logs. Runner images and Python patch
 versions can change; the lock pins dependencies rather than the entire OS image.
 Only locked jobs use the shared pip cache; range jobs resolve without restoring
 or saving it. Superseded PR runs are cancelled; push/manual runs have unique groups.
-Diagnostics run after failures when bootstrap succeeded, but not on cancellation.
+Environment diagnostics run whenever bootstrap succeeded, including after failures,
+but not on cancellation.
 
 CI fetches full history and runs `python scripts/check_committed_diff.py`: PRs
 compare the event's base SHA to the checked-out merge commit using a merge base;

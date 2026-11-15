@@ -136,7 +136,7 @@ class ProvenanceRecordingTests(unittest.IsolatedAsyncioTestCase):
         self.assertIs(ctx.exception.original_error, original)
         self.assertEqual(attempts.count('manifest.json'), 2)
         self.assertEqual(len(attempts), 16)
-        self.assertEqual([error for op, error in ctx.exception.secondary_errors if op == 'manifest.json'],
+        self.assertEqual([error for op, error in ctx.exception.secondary_errors if op == 'finish:manifest.json'],
                          [secondary, secondary])
         self.assertEqual(self.saved()['provenance']['lifecycle']['stage'], 'running')
         html = (self.out / 'index.html').read_text(encoding='utf-8')

@@ -109,6 +109,7 @@ separates original milestone evidence from subsequent checks.
 | [Evaluation protocol](docs/EVALUATION.md) | Prospective trials, controls, denominators, uncertainty, and claim limits |
 | [Provider references](docs/API_SOURCES.md) | API assumptions and external sources |
 | [Review](docs/REVIEW.md) | Prioritized defects, evidence, and improvement opportunities |
+| [Verification record](docs/VERIFICATION.md) | Dated checks, hosted evidence, and validation limits |
 | [Roadmap](ROADMAP.md) | Future milestones and completion gates |
 | [Contributing](CONTRIBUTING.md) | Development and verification workflow |
 | [Agent instructions](AGENTS.md) | Repository-specific instructions for coding agents |

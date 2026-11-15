@@ -14,7 +14,7 @@ it includes room/objective identities and never belongs in a player request.
 | `source` | Git revision and `clean`, `dirty`, or `unavailable` status with a fixed availability reason |
 | `environment` | Fingerprinted Python implementation/version, OS/release/architecture, and sorted distribution names/versions |
 | `players` | Per-role declared provider/model, identity availability, implemented API contract, unknown model revision, sampling/seed status |
-| `requested_settings` | Declared settings before the CLI mock dollar-cap override, or null when not supplied |
+| `requested_settings` | Declared settings after CLI overrides but before the mock dollar-cap override; populated for both CLI modes, or null when not supplied programmatically |
 | `execution` | Fingerprinted configuration supplied by the driver: actual settings/pricing, declared players/mode, effective input conditions |
 | `inputs` | Fingerprinted system prompt, request/response/local validation contracts, and room definition/initial state/objectives |
 | `lifecycle` | Creation/start/end UTC times, execution duration, stage, original execution stop, and current final stop |
@@ -27,6 +27,8 @@ credential values, credential-variable names, and configuration file paths are n
 part of effective identity. Requested settings are distinct from effective settings:
 a valid priced CLI mock can request a dollar cap but execute with that cap null.
 All other limits and prices remain intact.
+The legacy top-level `manifest.requested_settings` is still mock-only; the
+provenance field also records live requested settings, with its dollar cap intact.
 
 The room fingerprint covers named geometry/item/deadline constants, sorted gap
 coordinates, private objective definitions, and the actual initial world snapshot.
@@ -40,7 +42,9 @@ implementation code; these fingerprints alone do not attest every line of code.
 Git is probed at the package checkout root before creating output. An unrelated
 parent repository is not used as source identity. Read-only probes have a one-second
 timeout each. Missing Git, failed probes, and archives are represented as unavailable;
-known revision information is retained when only status collection fails. A dirty
+known revision information is retained when only status collection fails, including
+a timeout. Probe environments discard inherited `GIT_*` overrides, restore only
+`GIT_OPTIONAL_LOCKS=0`, and disable filesystem-monitor commands. A dirty
 run records its base revision and dirty status, not its patch or an exact dirty-code
 snapshot. No remote URL, branch name, author, hostname, or absolute local path is
 recorded. Installed package metadata contributes only names and versions, never
@@ -88,6 +92,12 @@ does not disable a programmatic dollar guard. A Recorder belongs to one match;
 reusing it through `run_match` is rejected before earlier output can be overwritten.
 Custom recorders using only the previous call/phase/turn/finish interface still work.
 
+Explicit context also supplies top-level display mode/player labels, overriding
+stale legacy labels. Without context, supplied legacy labels remain display-only;
+missing labels default to programmatic/unknown without inferring agent identity.
+The viewer distinguishes mock, live, programmatic and unknown modes, and displays
+unknown provider/model values explicitly instead of an empty roster.
+
 HTTP provenance records requested bare model IDs, fixed endpoint/API namespaces,
 and Anthropic's actual version header from shared wire constants. `model_revision`
 is null: aliases and remote revisions are not resolved. Sampling is
@@ -107,8 +117,19 @@ Stages are `initialized`, `running`, `ended`, and `external_result`. Constructio
 without a started match leaves execution timestamps null. Calling `finish(result)`
 on an unrelated already-computed result records `external_result`, with unknown
 execution configuration and no invented start/end/duration. Stage means the last
-observed lifecycle hook, not a liveness assertion. If an end hook fails, its endpoint
-can remain unknown while the final stop reason records the actual interruption.
+observed lifecycle hook, not a liveness assertion. Binding publishes execution and
+input identities together only after collection succeeds. A failed begin hook or
+collector leaves `initialized` with null identities, execution times and lifecycle
+stop reasons; result/HTML output still records the local failure. The recorder is
+claimed before the begin hook and cannot be reused after failed setup.
+
+Initialized records have no stop reasons. External results have both stop reasons
+but no execution/input identities or execution times. Ordinary running records
+have no stop reasons. If an end hook fails, recovery may leave stage `running`
+with unknown end/duration/original execution stop, while final `stop_reason` is
+`local_error`, `internal_error` or `cancelled`. This narrow exception preserves the
+actual interruption without fabricating a successful end hook. Ended records
+require complete end metadata and both stop reasons.
 
 Finalization independently attempts eight atomic artifacts: manifest, three JSONL
 snapshots, result, final state, final PNG, and HTML. At most two passes occur.
@@ -130,6 +151,12 @@ match-resume guarantee. Pre-match setup failure may leave only initialized metad
 records after structural, timestamp, and fingerprint validation. Validation covers
 known nested settings/prices, environment, request contracts, and room
 snapshots; matching a digest alone does not make an arbitrary payload valid.
+Known player fields must agree with fingerprinted execution players. Provider,
+sampling, declared-identity and API-contract fields must be consistent; historical
+Anthropic version headers remain valid independently of the current wire version.
+Robot roles match their keys, counters are nonnegative, coordinates fit the
+recorded room width, and win/loss flags cannot both be true. Additive annotations
+are preserved and do not participate in known-field player comparisons.
 Fingerprints are identity/checksum evidence, not signatures or authenticity proofs.
 Legacy manifests without the block return `None`; absent provenance means unknown identity, not a
 clean or fully reproducible run. Unsupported versions and malformed records raise

@@ -22,6 +22,9 @@ from .provenance import PlayerIdentity, ProvenanceContext
 
 ROOT = Path(__file__).resolve().parent.parent
 CLEANUP_TIMEOUT_SECONDS = 5
+TRANSPORT_ENV_KEYS = frozenset({
+    'HTTP_PROXY', 'HTTPS_PROXY', 'ALL_PROXY', 'NO_PROXY', 'SSL_CERT_FILE', 'SSL_CERT_DIR',
+})
 
 
 def load_env_file(path: Path, environ: dict | None = None) -> None:
@@ -29,6 +32,7 @@ def load_env_file(path: Path, environ: dict | None = None) -> None:
 
     Existing process environment wins. Supports whole-line comments and single
     or double quoted values. Does not support multiline values or inline comments.
+    HTTP proxy/certificate settings must come from the process, not this file.
     """
     env = os.environ if environ is None else environ
     try:
@@ -50,6 +54,8 @@ def load_env_file(path: Path, environ: dict | None = None) -> None:
         key, value = key.strip(), value.strip()
         if not sep or not re.fullmatch(r'[A-Z_][A-Z0-9_]{0,127}', key):
             raise ConfigError(f'Invalid environment assignment at line {index}')
+        if key in TRANSPORT_ENV_KEYS:
+            raise ConfigError(f'HTTP transport settings must come from the process environment (line {index})')
         if value.startswith(('"', "'")):
             if len(value) < 2 or value[-1] != value[0]:
                 raise ConfigError(f'Unclosed environment value at line {index}')

@@ -1,5 +1,36 @@
 # Verification record
 
+## PR #31 review remediation — November 14, 2026
+
+Reproduced Antigravity's four runtime/reader findings at PR head `1acd7f5` before
+fixing them. Focused regressions cover verified-HEAD status failures, isolated Git
+probes, contradictory players and nested snapshots with recomputed hashes,
+lifecycle constraints, failed binding/reuse, end-hook errors, two-pass manifest
+divergence, context/legacy replay labels, tuple redaction and `.env` transport
+rejection. Added coverage also checks partial inventories, timestamp/schema
+strictness, pricing/condition validation, provider contracts and live-cap retention
+through an intercepted launcher. No real provider requests were made.
+
+On Linux/Python 3.12.14, all **179 tests passed**, with no skips (24.768 seconds);
+the 27 new tests augment the original 152. Dependency consistency, compilation,
+standalone normal/fast mock CLIs, the reusable mock checker and whitespace checks
+passed. Both mock modes retain seven-turn victories, 63/42 calls, five energy and
+scores 100. Verified 61 current local documentation links/anchors and synthetic
+trial/attempt counts, missing-outcome bounds, Wilson interval, Type 7 quantile
+examples and provider/model roster deduplication. Dependency files and committed
+fixtures are unchanged.
+
+Browser-extension tools were not exposed and the cloud browser reported
+`Browser runtime unavailable`. Used installed headless Chromium 156.0.8078.79 on
+localhost for six synthetic two-turn variants: mock, live label, programmatic,
+legacy, unknown and provenance fallback. Page identity, visible mode/roster,
+loaded PNGs and next/previous navigation passed, with no console/runtime errors.
+Inspected 1280×900 and 390×844 screenshots; the programmatic badge/roster rendered
+and the narrow viewport had no horizontal overflow. The live-label case still
+used scripted agents. These checks cover this replay change, not every browser,
+partial-run control or accessibility behavior. Hosted evidence for the fixing
+head is reported in the PR discussion after execution, separately from local QA.
+
 ## Slice 5 final review and local verification — November 14, 2026
 
 A fresh read-only whole-branch review independently passed 150 tests and found one
@@ -7,7 +38,7 @@ P2 issue: the new reader checked hashes without validating every known nested
 payload. Matching hashes for malformed settings, incomplete Python identity, or a
 non-object room were accepted. The fix validates complete settings/prices,
 players/conditions, environment identities and named input payloads while preserving
-additive extensions. New regressions first reproduced 15 malformed cases with
+additive extensions. New regressions first reproduced 16 malformed cases with
 recomputed valid hashes, then passed after the fix; an extension-preservation test
 also passed. The final focused provenance suite has **23 passing tests**.
 
@@ -21,7 +52,9 @@ distinct UUIDs and ended/victory lifecycle metadata. Historical fixtures and all
 dependency files are unchanged. The delivery PR carries actual hosted matrix
 results; local Linux testing alone does not establish Windows/macOS execution.
 
-No other actionable findings or deferred minor findings were reported. The review
+That initial review reported no other actionable or deferred minor findings.
+Antigravity's subsequent PR review identified the additional concerns addressed
+in the dated remediation evidence added separately. The initial review
 excluded remote provider acceptance/billing/model behavior and the future runtime
 implementations of #18/#19/#20. Those remain unverified or unimplemented; no paid
 campaigns, remote compatibility, or held-out generalization is claimed.
@@ -66,8 +99,8 @@ under Linux/Python 3.11.18 (150 tests, no skips, 21.890 seconds). Dependency
 consistency, compilation, both real mock CLI outcomes (63/42 calls, seven turns,
 five energy, scores 100), and working-diff whitespace checks passed locally.
 No provider requests or
-paid experiments were performed. Cross-platform CI evidence and final review are
-recorded below after delivery verification; this checkpoint alone claims local
+paid experiments were performed. Final local review is recorded above; the delivery
+PR records hosted matrix results. This checkpoint alone claims local
 Linux coverage. Dependencies, committed `example_run/` and `demo_output/` remain
 unchanged. The evaluation protocol and its future controls/runner/room dependencies
 are documented separately; passing fixtures establish no experimental outcome.

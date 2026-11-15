@@ -4,7 +4,7 @@ Reviewed **2026-11-13**, against runtime baseline
 [`719c7696c4bfe50934fc936bbccfb62812633164`](https://github.com/dhar174/Parallax-Relay-AI-Game/commit/719c7696c4bfe50934fc936bbccfb62812633164).
 This is a documentation and source review with offline reproductions. Runtime code,
 tests, dependencies, and committed fixtures were not changed during that review.
-Subsequent slice 1–4 resolutions are annotated below; in those sections the original
+Subsequent slice 1–5 resolutions are annotated below; in those sections the original
 evidence, suggested remedies, and reproductions are historical baseline records.
 
 ## Method and coverage

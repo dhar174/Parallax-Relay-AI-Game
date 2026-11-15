@@ -80,6 +80,15 @@ interpret inline comments. Existing process variables win over file assignments;
 within the file, the last assignment to a name wins. Use a file no larger than
 65,536 bytes.
 
+HTTP proxy/certificate settings (`HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY`,
+`NO_PROXY`, `SSL_CERT_FILE`, `SSL_CERT_DIR`) must come from the process environment.
+Putting them in `.env` rejects the entire file with exit 2 before applying any
+assignments or creating output, even when a process value already exists. Owned
+HTTP clients still honor process-level settings; caller-supplied clients retain
+their caller's policy. Custom credential/model variable names remain supported.
+Treat `.env` as trusted local configuration; this restriction is not a general
+sandbox for arbitrary environment variables.
+
 For `--check` and `--live`, an explicit `--env-file` is loaded; otherwise `.env` in
 the working directory is loaded if present. Process variables can supply all values
 without a file. Blank or missing required values fail local validation.

@@ -67,11 +67,10 @@ def _utc_now() -> str:
 def collect_source(root: Path) -> dict:
     unavailable = {'status': 'unavailable', 'revision': None, 'reason': 'git_unavailable'}
     # Honor the package root, not caller overrides pointing Git at another tree.
-    env = {k: v for k, v in os.environ.items()
-           if k not in {'GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_COMMON_DIR'}}
+    env = {k: v for k, v in os.environ.items() if not k.upper().startswith('GIT_')}
     env['GIT_OPTIONAL_LOCKS'] = '0'
     def git(*args):
-        return subprocess.run(['git', '-C', str(root), *args], env=env,
+        return subprocess.run(['git', '-c', 'core.fsmonitor=', '-C', str(root), *args], env=env,
                               capture_output=True, text=True, encoding='utf-8',
                               errors='replace', timeout=1)
     try:
@@ -83,6 +82,7 @@ def collect_source(root: Path) -> dict:
             return {**unavailable, 'reason': 'not_project_root'}
         if not re.fullmatch(r'(?:[0-9a-f]{40}|[0-9a-f]{64})', lines[1]):
             return unavailable
+        unavailable = {**unavailable, 'revision': lines[1]}
         status = git('status', '--porcelain=v1', '--untracked-files=normal')
         if status.returncode:
             return {**unavailable, 'revision': lines[1], 'reason': 'status_unavailable'}
@@ -90,7 +90,7 @@ def collect_source(root: Path) -> dict:
     except subprocess.TimeoutExpired:
         return {**unavailable, 'reason': 'git_timeout'}
     except (OSError, ValueError):
-        return unavailable
+        return {**unavailable, 'reason': 'status_unavailable'} if unavailable['revision'] else unavailable
 
 
 def collect_environment() -> dict:
@@ -179,10 +179,14 @@ class RunProvenance:
                   'players': self._data['players'],
                   'conditions': {'communication': 'full' if settings.communication_rounds == 2 else 'reduced',
                                  'observations': 'role_png_and_hud'}}
-        self._data['execution'] = _fingerprint(config)
-        self._data['inputs'] = input_identities(initial_snapshot)
-        self._tick = monotonic()
-        self._data['lifecycle'].update(stage='running', started_at=_utc_now())
+        # Publish a complete binding only after every fallible input collector
+        # succeeds. Failed setup must not look like an external/partial match.
+        execution = _fingerprint(config)
+        inputs = input_identities(initial_snapshot)
+        tick, started_at = monotonic(), _utc_now()
+        self._data['execution'], self._data['inputs'] = execution, inputs
+        self._tick = tick
+        self._data['lifecycle'].update(stage='running', started_at=started_at)
         self.bound = True
 
     def end(self, result):
@@ -198,7 +202,9 @@ class RunProvenance:
         life['stop_reason'] = result.stop_reason
 
     def refresh(self, result):
-        self._data['lifecycle']['stop_reason'] = result.stop_reason
+        life = self._data['lifecycle']
+        if life['stage'] != 'initialized':
+            life['stop_reason'] = result.stop_reason
 
     def snapshot(self):
         return deepcopy(self._data)
@@ -247,6 +253,15 @@ class _Lifecycle(_RecordModel):
             raise ValueError('Missing end metadata')
         if self.stage == 'running' and (self.ended_at is not None or self.elapsed_seconds is not None):
             raise ValueError('Unexpected end metadata')
+        if self.stage == 'initialized' and (self.execution_stop_reason is not None or self.stop_reason is not None):
+            raise ValueError('Unexpected stop metadata')
+        if self.stage == 'external_result' and (self.execution_stop_reason is None or self.stop_reason is None):
+            raise ValueError('Missing external outcome')
+        if self.stage == 'running' and (self.execution_stop_reason is not None or
+                self.stop_reason not in (None, 'local_error', 'internal_error', 'cancelled')):
+            # A failed end hook leaves timing unknown; recovery still records
+            # the interruption. It cannot certify a successful execution end.
+            raise ValueError('Unexpected running outcome')
         return self
 
 
@@ -287,14 +302,43 @@ class _EnvironmentValue(_RecordModel):
     packages: list[_Distribution]
 
 
+class _APIContract(_RecordModel):
+    endpoint: str
+    family: str
+    namespace: str
+    version_header: str | None = Field(pattern=r'^\d{4}-\d{2}-\d{2}$')
+
+
 class _PlayerRecord(_RecordModel):
     provider: Literal['openai', 'anthropic', 'gemini', 'mock', 'unknown']
     model: str | None = Field(pattern=r'^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$')
     identity_source: Literal['declared', 'unavailable']
-    model_revision: str | None
-    api_contract: dict | None
+    model_revision: None
+    api_contract: _APIContract | None
     sampling: Literal['provider_default', 'not_applicable', 'unavailable']
     seed: None
+
+    @model_validator(mode='after')
+    def consistent_identity(self):
+        known = self.provider != 'unknown'
+        contract = provider_contract(self.provider)
+        sampling = ('provider_default' if contract else
+                    'not_applicable' if self.provider == 'mock' else 'unavailable')
+        if self.identity_source != ('declared' if known else 'unavailable') or self.sampling != sampling:
+            raise ValueError('Inconsistent player identity')
+        if contract is None:
+            if self.api_contract is not None:
+                raise ValueError('Unexpected API contract')
+        else:
+            if self.api_contract is None or any(
+                    getattr(self.api_contract, key) != contract[key]
+                    for key in ('endpoint', 'family', 'namespace')):
+                raise ValueError('Inconsistent API contract')
+            # Historical records retain their recorded Anthropic version, not
+            # the current checkout's version header.
+            if (self.api_contract.version_header is not None) != (self.provider == 'anthropic'):
+                raise ValueError('Inconsistent API version')
+        return self
 
 
 def _complete_config(model, value):
@@ -377,22 +421,25 @@ class _RoomValue(_RecordModel):
         _require_roles(self.objectives)
         # Validate the recorded snapshot, without requiring it to equal this
         # checkout's room values or constructing/mutating an engine world.
-        _WorldSnapshot.model_validate(self.initial_state)
+        world = _WorldSnapshot.model_validate(self.initial_state)
+        width = self.constants['WIDTH']
+        if width <= 0 or any(robot.x >= width for robot in world.robots.values()):
+            raise ValueError('Invalid recorded coordinates')
         return self
 
 
 class _RobotSnapshot(_RecordModel):
     role: str
-    x: int
-    damage: int
+    x: int = Field(ge=0)
+    damage: int = Field(ge=0)
 
 
 class _WorldSnapshot(_RecordModel):
-    turn: int
+    turn: int = Field(ge=0)
     robots: dict[str, _RobotSnapshot]
-    energy: int
-    coolant: int
-    motor_heat: int
+    energy: int = Field(ge=0)
+    coolant: int = Field(ge=0)
+    motor_heat: int = Field(ge=0)
     bridge_extended: bool
     exit_unlocked: bool
     shard_collected: bool
@@ -404,7 +451,16 @@ class _WorldSnapshot(_RecordModel):
     @field_validator('robots')
     @classmethod
     def robot_roles(cls, value):
-        return _require_roles(value)
+        _require_roles(value)
+        if any(role != robot.role for role, robot in value.items()):
+            raise ValueError('Inconsistent robot role')
+        return value
+
+    @model_validator(mode='after')
+    def exclusive_outcome(self):
+        if self.win and self.loss:
+            raise ValueError('Contradictory world outcome')
+        return self
 
 
 class ProvenanceRecord(_RecordModel):
@@ -429,8 +485,12 @@ class ProvenanceRecord(_RecordModel):
         if self.lifecycle.stage in ('running', 'ended'):
             if self.execution is None or self.inputs is None or not {'prompt', 'schemas', 'room'} <= set(self.inputs):
                 raise ValueError('Missing execution identity')
+        elif self.execution is not None or self.inputs is not None:
+            raise ValueError('Unexpected execution identity')
         if self.execution is not None:
-            _ExecutionValue.model_validate(self.execution.value)
+            execution = _ExecutionValue.model_validate(self.execution.value)
+            if self.players != execution.players:
+                raise ValueError('Contradictory player identities')
         if self.inputs is not None:
             if not {'prompt', 'schemas', 'room'} <= set(self.inputs):
                 raise ValueError('Missing input identity')

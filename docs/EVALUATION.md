@@ -53,9 +53,28 @@ added. For `no_images`, remove image attachments for every role, preserving the 
 own-HUD projection and schemas; do not substitute descriptions/OCR or expose a
 hidden-state text representation. Other arms retain their role-specific images.
 
+#18 must introduce an explicit request-level image-inclusion flag (default true).
+Set it false for every `no_images` request and retry; each provider must then omit
+the image content part, and budget quotes must omit `image_token_reserve`. Keep
+valid role PNGs in observations and spectator recording. Emptying `image_png` is
+not an implementation: current adapters attach it unconditionally, the recorder
+saves it, and the current budget always reserves image tokens.
+
+The current driver stores public messages in each role's history, so withholding
+only the current request's message list is insufficient. #18 must filter that
+history at construction and test later turns. Its explicit condition configuration
+and provenance reader/writer must support all five arms; today's settings and
+provenance support only full/reduced communication and `role_png_and_hud` inputs.
+Apply the documented provenance versioning rules when extending those contracts.
+
 Use a minimal, versioned public condition notice so prompts do not falsely promise
 messages or images that are absent. Freeze/hash each prompt variant; disclose this
-framing difference as a limitation. No provider tools or cross-trial memory are
+framing difference as a limitation. Use the same notice template in all arms,
+stating only the phase schedule, message availability and image availability.
+Do not add effort instructions, replacement scratchpads or additional thinking
+prompts for withheld inputs. The full/withheld contrast includes removal of the
+role's public scratchpad and any effort change induced by that factual notice.
+No provider tools or cross-trial memory are
 allowed. Before campaigning, #18 must test the actual serialized requests for every
 arm, including later turns, retries, histories, notes and fallbacks. Future controls
 must record actual conditions rather than reuse current full/reduced provenance
@@ -73,7 +92,7 @@ Implement two simple policies under #18 before comparative campaigns:
   empty private notes. This is a deterministic floor, not a competent agent.
 - **Seeded uniform:** empty messages/notes and one uniformly sampled canonical
   action per commitment from the ordered role list below. Each role has its own
-  deterministic pseudorandom stream, independent of reply timing and other roles.
+  deterministic draws keyed by turn, independent of reply timing and other roles.
 
 The common ordered list is `WAIT`, `MOVE(-1,1)`, `MOVE(-1,2)`, `MOVE(+1,1)`,
 `MOVE(+1,2)`. Append `COLLECT` for SPECTRA; `VENT` for PYRA; `REROUTE`, `COLLECT`,
@@ -83,20 +102,24 @@ movement, missing items, unavailable resources, or invalid locations receive the
 normal engine consequences. Policies never retry a schema-valid illegal move or
 consult the world to improve a draw.
 
-For uniform-policy version 1, derive each role's integer seed from the first eight
+For uniform-policy version 1, derive each commitment's integer seed from the first eight
 bytes, big-endian, of SHA-256 over UTF-8 canonical JSON
-`["uniform-v1", "<canonical trial UUID>", "<ROLE>"]`, using the canonicalization in
+`["uniform-v1", "<canonical trial UUID>", "<ROLE>", <zero-based integer turn>]`, using the canonicalization in
 [Run provenance](PROVENANCE.md). Use a local `random.Random(seed)` and `randrange`
-over the fixed ordered list; record the seed, policy version and Python version.
-Do not consume draws in communication phases or retries. This is a local policy
+over the fixed ordered list exactly once for that key; record the derivation,
+per-turn seeds, policy version and Python version. Reconstructing or retrying a
+commitment must return the same action for its key; it must not advance a mutable
+cross-turn stream. Communication phases consume no draws. This is a local policy
 seed, not a provider seed. Record fixture-specific context explicitly when #18
 adds these policies; current provenance does not infer them from arbitrary agents.
 
 Run deterministic controls once per distinct room/condition/policy configuration,
 deduplicating meaningless provider-role labels. Repeated identical executions are
 verification repeats, not independent experimental samples. Uniform teams use the
-same 5-pilot/30-confirmatory repetition rule per meaningful condition/configuration,
-with distinct trial seeds. Baseline trials are additional to the model-roster
+same 5-pilot/30-confirmatory repetition rule **per room/condition/policy configuration**,
+with distinct trial UUIDs. Across five arms this is 25 pilot and 150 confirmatory
+uniform-team trials per room, without multiplying by model-roster permutations.
+Baseline trials are additional to the model-roster
 counts below and must be listed in the registered campaign budget.
 
 ## Trial identity, assignment, and repetitions
@@ -115,7 +138,8 @@ Report operational reruns separately. No outcome-dependent retries at trial leve
 
 Enumerate every unique permutation of the roster across SPECTRA/PYRA/FLUX, with
 equal repetitions in each assignment. Deduplicate identical assignments when model
-identities repeat; distinguish model identity from provider name. Different models
+identities repeat, using the `(provider, requested model ID)` tuple as identity.
+The same model-ID string from different providers is distinct. Different models
 from one provider remain distinct roster entries. Freeze requested models, known
 revisions, provider contracts and sampling support; record unknown remote revisions
 and omitted/provider-default sampling explicitly. Provider seeds, when unsupported,
@@ -204,6 +228,16 @@ campaign stopped by budget or infrastructure before its planned cohort completes
 is incomplete: report descriptive estimates/bounds, not a complete confirmatory
 comparison or a selectively completed-pairs result.
 
+A recorded pre-match setup failure is a known **zero operational success**, even
+if it leaves no manifest or recoverable engine state. It does not enter the unknown
+operational group merely because the engine axis is unknown. If `S` successes and
+`U` genuinely unknown operational outcomes occur among `L` launches out of `P`
+planned trials, launched bounds are `S/L` to `(S+U)/L`, and all-planned bounds are
+`S/P` to `(S+U+P-L)/P`. Report undefined rates for zero denominators. Known setup
+failures stay zero in both bounds; missing operational outcomes alone can widen
+the launched upper bound. The ledger, rather than manifest presence, determines
+whether a setup failure is known.
+
 Synthetic accounting example (not an experiment): 12 planned, 10 launched, 2
 unlaunched; the launched trials comprise 5 ordinary victories, 1 engine win with
 `local_error`, 1 defeat, 1 turn limit, 1 provider abort, and 1 cancellation. Assuming
@@ -227,7 +261,9 @@ paired-block bootstrap**, 10,000 resamples, analysis seed 0. Within each role
 assignment for a given room/roster, sample its 30 repetition blocks with replacement,
 keep all arms together, compute arm-rate differences, then average assignments
 equally. Report the observed absolute difference in percentage points and the 2.5th/
-97.5th percentiles of bootstrap differences (linear quantile interpolation). Record
+97.5th percentiles of bootstrap differences using **Hyndman–Fan Type 7** linear
+interpolation: for sorted zero-indexed values, interpolate at `h=(n-1)*p` between
+`floor(h)` and `ceil(h)` for `p=0.025` and `0.975`. Record
 the analysis code/version and PRNG implementation. The analysis seed is not a model
 seed. Independent trials do not become matched remote random draws by being paired.
 
@@ -267,6 +303,15 @@ Mocks with complete pricing report known zero usage/cost; unpriced mocks retain
 null. Report cost per launched trial and successful completion with explicit
 denominators and coverage; do not silently drop unknown-cost or failed trials.
 
+#19 needs additional accounting instrumentation before it can produce that split.
+Today's `estimated_cost_usd` merges known-usage prices and retained quotes, and
+`calls.jsonl` does not store each quote. Record the per-attempt reservation quote,
+whether settlement used complete usage or retained the estimate, and the settled
+amount; expose separate known-usage and retained-estimate totals in budget output.
+Their sum must reconcile with the existing estimate when fully priced. Preserve
+partial token coverage independently, and use null monetary amounts when unpriced.
+These are future runner/accounting requirements, not fields supplied by this PR.
+
 ## Registration and campaign budgets
 
 Before any launch, register experiment UUID, protocol version, hypothesis/arms,
@@ -278,6 +323,13 @@ phase/image treatments differ. The current defaults are 12 turns, 216 call ceili
 2 attempts, 60-second request timeout, 2,048 output tokens and 4 history turns;
 freeze all actual settings, not only these examples. Complete pricing is required
 for a dollar guard. Record seed/sampling only when supported and effective.
+
+Choose one common per-match dollar cap that the pilot and conservative worst-case
+quotes support as nonbinding across all arms, then freeze it. A tight common cap
+can stop expensive arms earlier and create differential censoring despite equal
+numeric limits. Retain and cross-tabulate those stops; a comparison with binding
+caps estimates success under those caps, not an uncensored communication effect.
+Do not raise a cap after observing confirmatory outcomes or drop capped trials.
 
 The future runner must reserve/check that a full next block fits registered
 remaining exposure before starting it, using the applicable per-arm maximum
