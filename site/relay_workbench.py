@@ -127,12 +127,16 @@ class Handler(BaseHTTPRequestHandler):
         if self.path == "/api/status":
             self.send_json(200, {"token": TOKEN, "commit": CONTRACT["commit"]})
             return
-        relative = urlparse(self.path).path.lstrip("/") or "index.html"
-        file = (ASSETS / relative).resolve()
-        if not file.is_relative_to(ASSETS.resolve()) or not file.is_file():
+        try:
+            relative = urlparse(self.path).path.lstrip("/") or "index.html"
+            file = (ASSETS / relative).resolve()
+            if not file.is_relative_to(ASSETS.resolve()) or not file.is_file():
+                raise ValueError("Not a workbench file")
+            payload = file.read_bytes()
+        except (OSError, ValueError):
             self.send_json(404, {"error": "Not found"})
             return
-        self.send_bytes(200, file.read_bytes(), MIME_TYPES.get(file.suffix, "application/octet-stream"))
+        self.send_bytes(200, payload, MIME_TYPES.get(file.suffix, "application/octet-stream"))
 
     def do_POST(self):
         tokens = self.headers.get_all("X-Relay-Token", [])

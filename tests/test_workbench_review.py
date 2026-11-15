@@ -86,6 +86,19 @@ class WorkbenchReviewTests(unittest.TestCase):
             self.assertIn("error", json.loads(body))
         self.assertNotIn("Traceback", errors.getvalue())
 
+    def test_malformed_get_path_returns_404_without_traceback(self):
+        errors = io.StringIO()
+        with redirect_stderr(errors), self.server() as server:
+            with socket.create_connection(server.server_address, timeout=2) as connection:
+                request = (b"GET /index.html\x00.png HTTP/1.1\r\nHost: 127.0.0.1:"
+                           + str(server.server_port).encode("ascii") + b"\r\n\r\n")
+                connection.sendall(request)
+                response = http.client.HTTPResponse(connection)
+                response.begin()
+                self.assertEqual(response.status, 404)
+                self.assertEqual(json.loads(response.read()), {"error": "Not found"})
+        self.assertNotIn("Traceback", errors.getvalue())
+
     def test_strict_headers_html_protection_and_path_boundaries(self):
         with self.server() as server:
             status, headers, _ = self.request(server, path="/")
