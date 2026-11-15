@@ -1,5 +1,42 @@
 # Verification record
 
+## Slice 7 preparation — November 15, 2026
+
+Implementation started from merged PR #33 at `115adddaa8f50c54fbd6054934eb66b4275dec8b`
+in `validation/slice-7-live-smoke`, with an isolated locked Python environment.
+The clean baseline passed 226 Python tests. The first implementation suite passed
+239 Python tests (30.466s), with 51 Node tests passing and no unittest skips.
+`pip check` reported no broken requirements. Usage-origin and smoke/preset tests
+were observed failing before their implementation; malformed/mismatched artifacts,
+changed exports and copied secret sentinels have negative coverage.
+
+The user replaced the planned Claude slot with a second independent OpenAI
+`gpt-6-luna` agent due to unavailable Anthropic credits. SPECTRA and PYRA share a
+key, with separate model selections and role-local inputs/history. PYRA's character,
+abilities, thermal observation and objective remain unchanged. FLUX uses
+`gemini-3.5-flash-lite`. The one-turn/18-attempt/4,096-output-token/60-second/$1-local-
+estimate limits remain selected. Official model/pricing sources were retrieved
+November 15; no provider SDK, dependency or historical fixture was changed.
+
+Focused rendered verification used isolated Playwright 1.57.0 with system
+Chromium 156.0.8078.79 because no connected Browser control tool was exposed.
+At `http://127.0.0.1:40275/`, 1440×1000 and 390×844 checks passed: named roster,
+exported TOML independently parsed by Python, approval invalidation, actual mock
+one-turn/nine-call execution, synthetic live-shaped record import, and actual
+zero-turn/zero-call call-budget output. No page/console errors or external requests
+were observed; the narrow viewport had no horizontal overflow. Screenshots and
+receipt were inspected locally in `/tmp/parallax-slice7-qa-NxWAjL/`; these are
+local evidence, not hosted artifacts or proof of a paid run. Compilation and diff
+checks passed. The existing private hosted Site has not been changed.
+
+The real helper's `--check` returned 0 without a run directory or provider calls.
+Synthetic tests exercise the real driver/recorder and cannot establish remote
+support. Live execution, final review, final-head CI and Site publication remain
+pending at this preparation checkpoint. Anthropic #15 and parent #8 stay open.
+The delivery PR will record final source/CI evidence; a later merged Site release
+must distinguish game revision G from Site-source revision S.
+
+
 ## PR #33 independent-review follow-up — November 15, 2026
 
 Final integration merged `main` at `685681f` into the PR branch without conflicts.

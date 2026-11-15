@@ -139,7 +139,8 @@ local contract handling, not remote model acceptance.
 
 ### Selecting a compatible model
 
-No model shortlist or default ID is supplied. Before a separately authorized smoke
+Ordinary defaults supply no model IDs. A separate [named smoke profile](../configs/live_smoke.json)
+saves selected IDs and dated sources. Before a separately authorized smoke
 test, consult the exact model's official documentation and confirm:
 
 1. The account can access that bare ID on this exact endpoint/API version; it accepts
@@ -259,3 +260,39 @@ Live compatibility requires separately authorized smoke tests with selected mode
 and sanitized evidence. Record provider, model, date, result, usage, and limitations;
 never record keys or raw provider errors. [R06](REVIEW.md#r06-live-provider-compatibility-is-unverified)
 tracks this open validation gate.
+
+## Slice 7 selected profile — November 15, 2026
+
+The [named run sheet](../configs/live_smoke.json) assigns `gpt-6-luna` to two
+independent agents (SPECTRA and PYRA), and `gemini-3.5-flash-lite` to FLUX. A second
+OpenAI agent replaces the planned Claude slot because Anthropic credits were
+unavailable; PYRA's character, thermal observation, abilities and objective remain
+unchanged. Anthropic #15 and parent #8 stay open. This selection does not change
+ordinary defaults or establish remote compatibility.
+
+| Model | Official model/pricing sources | Checked standard input/output USD per million |
+|---|---|---:|
+| `gpt-6-luna` | [Model, PNG/structured output and reasoning](https://developers.openai.com/api/docs/models/gpt-6-luna.md), [pricing](https://developers.openai.com/api/docs/pricing.md) | $0.10 / $0.50 |
+| `gemini-3.5-flash-lite` | [Model, modalities and schema support](https://aistudio.google.com/docs/models/gemini-3.5-flash-lite), [pricing](https://aistudio.google.com/docs/pricing#gemini-3.5-flash-lite) | $0.30 / $2.50 |
+
+OpenAI uses Responses with provider-default medium reasoning; the documented ID
+has no separately pinned backend revision. Gemini retains generateContent and its
+current structured-output fields, with thinking included in normalized output.
+The 4,096-token output allowance can still truncate reasoning-heavy responses;
+there is no automatic increase or model substitution. Rates exclude long-context,
+regional, cache-write/read tiers and invoice adjustments. Gemini documents a free
+tier, but this account's eligibility and quota are unverified; retain configured
+paid rates for the conservative local estimate. Actual execution evidence belongs
+in the [verification record](VERIFICATION.md), separately from source retrieval.
+
+HTTP-adapter usage now adds optional `source_usage` evidence inside call usage.
+Only fixed input/output/cache/reasoning counter paths are retained, each with
+`state` (`omitted`, `null`, `count`, `invalid`) and `value` (valid nonnegative integer
+only for `count`, otherwise null). Missing or null parent containers produce the
+corresponding state for their counter paths. Unknown fields and malformed raw
+values are never copied. This is additive schema-v2 metadata; old records remain
+readable and normalized totals, conservative unknown aggregates, retained estimates
+and reservation behavior are unchanged. Custom/scripted `Usage` defaults to no
+source evidence. Failed HTTP envelopes still have unknown usage, not invented
+counter values. This permits future #15 evidence to distinguish cache omission,
+zero and null without making an Anthropic request in this slice.

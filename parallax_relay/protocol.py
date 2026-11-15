@@ -79,6 +79,7 @@ class Usage:
     output_tokens: int | None = None
     cached_input_tokens: int = 0
     reasoning_output_tokens: int = 0
+    source_usage: dict[str, dict] | None = None
 
 
 @dataclass(frozen=True)

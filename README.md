@@ -91,8 +91,10 @@ python -m parallax_relay.play --check --env-file .env
 ```
 
 `--check` makes no provider requests and cannot verify remote access or model
-capabilities. `--live` explicitly enables potentially billable requests. Model IDs
-and prices are not supplied by default. Current validation limits and open issues
+capabilities. `--live` explicitly enables potentially billable requests. Ordinary model IDs
+and prices are not supplied by default. A separate [named one-turn smoke profile](docs/RUNNING.md#named-one-turn-live-smoke)
+selects two independent OpenAI agents and one Gemini agent, preserving all characters
+and abilities; it requires explicit spending authorization. Current validation limits and open issues
 are documented in the [review](docs/REVIEW.md).
 
 ## Current limits and direction

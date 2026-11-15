@@ -193,7 +193,7 @@ class WorkbenchReviewTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp) / "game"
             root.mkdir()
-            for name in ("parallax_relay", "configs", "example_run", "site", "docs"):
+            for name in ("parallax_relay", "configs", "example_run", "site", "docs", "scripts"):
                 shutil.copytree(ROOT / name, root / name, ignore=shutil.ignore_patterns("__pycache__"))
             shutil.copyfile(ROOT / "LICENSE", root / "LICENSE")
             completed = subprocess.run([sys.executable, "site/build_workbench.py"], cwd=root,

@@ -107,6 +107,13 @@ usage is recorded as unknown, not zero. A configured dollar guard uses user-supp
 prices plus conservative text/image/output reservations. It is not a billing guarantee
 and should not be represented as a hard external spending cap.
 
+Call usage may contain optional `source_usage` counter-origin metadata. HTTP
+adapters record only allowlisted counter paths with an omitted/null/count/invalid
+state and a valid count or null. This never changes normalized accounting or copies
+raw invalid values. Existing `Usage(input, output, cached, reasoning)` constructors
+remain valid, with source metadata defaulting to null. Existing schema-v2 records
+without the field remain readable. See [API sources](API_SOURCES.md#slice-7-selected-profile--november-15-2026).
+
 ## Outcomes and exit codes
 
 `victory` and `defeat` are engine-terminal outcomes. `turn_limit` means a shorter
