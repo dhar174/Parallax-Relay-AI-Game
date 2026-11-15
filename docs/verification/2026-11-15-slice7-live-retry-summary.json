@@ -1,0 +1,530 @@
+{
+  "schema_version": 1,
+  "evidence_type": "single_separately_authorized_bounded_live_retry",
+  "overall_acceptance": true,
+  "scope": "Observed one-turn provider transport/schema execution only; no image-understanding or cooperation claim.",
+  "source": {
+    "status": "clean",
+    "revision": "d76be6c086b25569baf308e5530f9875a9cd9da7",
+    "reason": null
+  },
+  "profile_sha256": "1d9725fb66aaf39ef0555cb1ecf33275f5d6d1ad413556a06dfc269d1028ad2a",
+  "environment": {
+    "status": "complete",
+    "python": {
+      "implementation": "CPython",
+      "version": "3.12.14"
+    },
+    "os": {
+      "system": "Linux",
+      "release": "6.18.57",
+      "machine": "x86_64"
+    },
+    "packages": [
+      {
+        "name": "annotated-types",
+        "version": "0.8.0"
+      },
+      {
+        "name": "anyio",
+        "version": "4.16.0"
+      },
+      {
+        "name": "certifi",
+        "version": "2026.10.23"
+      },
+      {
+        "name": "h11",
+        "version": "0.16.0"
+      },
+      {
+        "name": "httpcore",
+        "version": "1.0.9"
+      },
+      {
+        "name": "httpx",
+        "version": "0.28.1"
+      },
+      {
+        "name": "idna",
+        "version": "3.20"
+      },
+      {
+        "name": "pillow",
+        "version": "12.3.0"
+      },
+      {
+        "name": "pip",
+        "version": "26.3"
+      },
+      {
+        "name": "pydantic",
+        "version": "2.14.3"
+      },
+      {
+        "name": "pydantic-core",
+        "version": "2.50.4"
+      },
+      {
+        "name": "typing-extensions",
+        "version": "4.16.0"
+      },
+      {
+        "name": "typing-inspection",
+        "version": "0.4.5"
+      }
+    ]
+  },
+  "input_fingerprints": {
+    "prompt": "b5c123cbcdf6d8ba137ee81c2ab20dc4dd557e0d9927356323b2ae825952e1d6",
+    "schemas": "18850a7415a7a41e16c1b76c17565a9e6ea3588c840eaf2ef9a7eb277df7a1b6",
+    "room": "b8911d76da284628483566c872cf1a93efddf8ca964863cac82d41245b874b99"
+  },
+  "lifecycle": {
+    "stage": "ended",
+    "created_at": "2026-11-15T22:10:17.655791Z",
+    "started_at": "2026-11-15T22:10:17.798862Z",
+    "ended_at": "2026-11-15T22:10:39.911813Z",
+    "elapsed_seconds": 22.112969216001147,
+    "execution_stop_reason": "turn_limit",
+    "stop_reason": "turn_limit"
+  },
+  "cli_returncode": 0,
+  "settings": {
+    "communication_rounds": 2,
+    "max_turns": 1,
+    "max_calls": 18,
+    "max_attempts": 2,
+    "timeout_seconds": 60.0,
+    "max_output_tokens": 4096,
+    "history_turns": 4,
+    "retry_delay_seconds": 0.5,
+    "max_consecutive_failures": 3,
+    "max_estimated_cost_usd": 1.0,
+    "image_token_reserve": 8192
+  },
+  "pricing": {
+    "SPECTRA": {
+      "input_per_million": 0.1,
+      "output_per_million": 0.5
+    },
+    "PYRA": {
+      "input_per_million": 0.1,
+      "output_per_million": 0.5
+    },
+    "FLUX": {
+      "input_per_million": 0.3,
+      "output_per_million": 2.5
+    }
+  },
+  "players": {
+    "SPECTRA": {
+      "provider": "openai",
+      "model": "gpt-6-luna",
+      "model_revision": null,
+      "api_contract": {
+        "endpoint": "https://api.openai.com/v1/responses",
+        "family": "responses",
+        "namespace": "v1",
+        "version_header": null
+      },
+      "sampling": "provider_default",
+      "seed": null
+    },
+    "PYRA": {
+      "provider": "openai",
+      "model": "gpt-6-luna",
+      "model_revision": null,
+      "api_contract": {
+        "endpoint": "https://api.openai.com/v1/responses",
+        "family": "responses",
+        "namespace": "v1",
+        "version_header": null
+      },
+      "sampling": "provider_default",
+      "seed": null
+    },
+    "FLUX": {
+      "provider": "gemini",
+      "model": "gemini-3.5-flash-lite",
+      "model_revision": null,
+      "api_contract": {
+        "endpoint": "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
+        "family": "generateContent",
+        "namespace": "v1beta",
+        "version_header": null
+      },
+      "sampling": "provider_default",
+      "seed": null
+    }
+  },
+  "result": {
+    "schema_version": 2,
+    "win": false,
+    "loss": false,
+    "completed": false,
+    "turns": 1,
+    "stop_reason": "turn_limit",
+    "scores": null,
+    "energy": 4,
+    "budget": {
+      "calls_started": 9,
+      "max_calls": 18,
+      "reported_input_tokens": 16016,
+      "reported_output_tokens": 1095,
+      "unknown_usage_calls": 0,
+      "estimated_cost_usd": 0.0038577,
+      "cost_is_estimate_not_billing_guarantee": true
+    }
+  },
+  "phases": [
+    {
+      "turn": 0,
+      "phase": "broadcast",
+      "statuses": {
+        "SPECTRA": "ok",
+        "PYRA": "ok",
+        "FLUX": "ok"
+      }
+    },
+    {
+      "turn": 0,
+      "phase": "negotiate",
+      "statuses": {
+        "SPECTRA": "ok",
+        "PYRA": "ok",
+        "FLUX": "ok"
+      }
+    },
+    {
+      "turn": 0,
+      "phase": "commit",
+      "statuses": {
+        "SPECTRA": "ok",
+        "PYRA": "ok",
+        "FLUX": "ok"
+      }
+    }
+  ],
+  "attempts": [
+    {
+      "role": "PYRA",
+      "turn": 0,
+      "phase": "broadcast",
+      "attempt": 1,
+      "status": "ok",
+      "http_status": null,
+      "latency_seconds": 3.8166,
+      "usage": {
+        "input_tokens": 1305,
+        "output_tokens": 172,
+        "cached_input_tokens": 0,
+        "reasoning_output_tokens": 84,
+        "source_usage": {
+          "usage.input_tokens": {
+            "state": "count",
+            "value": 1305
+          },
+          "usage.output_tokens": {
+            "state": "count",
+            "value": 172
+          },
+          "usage.input_tokens_details.cached_tokens": {
+            "state": "count",
+            "value": 0
+          },
+          "usage.output_tokens_details.reasoning_tokens": {
+            "state": "count",
+            "value": 84
+          }
+        }
+      }
+    },
+    {
+      "role": "SPECTRA",
+      "turn": 0,
+      "phase": "broadcast",
+      "attempt": 1,
+      "status": "ok",
+      "http_status": null,
+      "latency_seconds": 5.1055,
+      "usage": {
+        "input_tokens": 1304,
+        "output_tokens": 266,
+        "cached_input_tokens": 0,
+        "reasoning_output_tokens": 198,
+        "source_usage": {
+          "usage.input_tokens": {
+            "state": "count",
+            "value": 1304
+          },
+          "usage.output_tokens": {
+            "state": "count",
+            "value": 266
+          },
+          "usage.input_tokens_details.cached_tokens": {
+            "state": "count",
+            "value": 0
+          },
+          "usage.output_tokens_details.reasoning_tokens": {
+            "state": "count",
+            "value": 198
+          }
+        }
+      }
+    },
+    {
+      "role": "FLUX",
+      "turn": 0,
+      "phase": "broadcast",
+      "attempt": 1,
+      "status": "ok",
+      "http_status": null,
+      "latency_seconds": 16.1724,
+      "usage": {
+        "input_tokens": 2020,
+        "output_tokens": 37,
+        "cached_input_tokens": 0,
+        "reasoning_output_tokens": 0,
+        "source_usage": {
+          "usageMetadata.promptTokenCount": {
+            "state": "count",
+            "value": 2020
+          },
+          "usageMetadata.candidatesTokenCount": {
+            "state": "count",
+            "value": 37
+          },
+          "usageMetadata.cachedContentTokenCount": {
+            "state": "omitted",
+            "value": null
+          },
+          "usageMetadata.thoughtsTokenCount": {
+            "state": "omitted",
+            "value": null
+          }
+        }
+      }
+    },
+    {
+      "role": "FLUX",
+      "turn": 0,
+      "phase": "negotiate",
+      "attempt": 1,
+      "status": "ok",
+      "http_status": null,
+      "latency_seconds": 1.2047,
+      "usage": {
+        "input_tokens": 2232,
+        "output_tokens": 61,
+        "cached_input_tokens": 0,
+        "reasoning_output_tokens": 0,
+        "source_usage": {
+          "usageMetadata.promptTokenCount": {
+            "state": "count",
+            "value": 2232
+          },
+          "usageMetadata.candidatesTokenCount": {
+            "state": "count",
+            "value": 61
+          },
+          "usageMetadata.cachedContentTokenCount": {
+            "state": "omitted",
+            "value": null
+          },
+          "usageMetadata.thoughtsTokenCount": {
+            "state": "omitted",
+            "value": null
+          }
+        }
+      }
+    },
+    {
+      "role": "PYRA",
+      "turn": 0,
+      "phase": "negotiate",
+      "attempt": 1,
+      "status": "ok",
+      "http_status": null,
+      "latency_seconds": 2.4044,
+      "usage": {
+        "input_tokens": 1514,
+        "output_tokens": 128,
+        "cached_input_tokens": 0,
+        "reasoning_output_tokens": 37,
+        "source_usage": {
+          "usage.input_tokens": {
+            "state": "count",
+            "value": 1514
+          },
+          "usage.output_tokens": {
+            "state": "count",
+            "value": 128
+          },
+          "usage.input_tokens_details.cached_tokens": {
+            "state": "count",
+            "value": 0
+          },
+          "usage.output_tokens_details.reasoning_tokens": {
+            "state": "count",
+            "value": 37
+          }
+        }
+      }
+    },
+    {
+      "role": "SPECTRA",
+      "turn": 0,
+      "phase": "negotiate",
+      "attempt": 1,
+      "status": "ok",
+      "http_status": null,
+      "latency_seconds": 3.0132,
+      "usage": {
+        "input_tokens": 1513,
+        "output_tokens": 168,
+        "cached_input_tokens": 0,
+        "reasoning_output_tokens": 101,
+        "source_usage": {
+          "usage.input_tokens": {
+            "state": "count",
+            "value": 1513
+          },
+          "usage.output_tokens": {
+            "state": "count",
+            "value": 168
+          },
+          "usage.input_tokens_details.cached_tokens": {
+            "state": "count",
+            "value": 0
+          },
+          "usage.output_tokens_details.reasoning_tokens": {
+            "state": "count",
+            "value": 101
+          }
+        }
+      }
+    },
+    {
+      "role": "FLUX",
+      "turn": 0,
+      "phase": "commit",
+      "attempt": 1,
+      "status": "ok",
+      "http_status": null,
+      "latency_seconds": 1.3131,
+      "usage": {
+        "input_tokens": 2471,
+        "output_tokens": 84,
+        "cached_input_tokens": 0,
+        "reasoning_output_tokens": 0,
+        "source_usage": {
+          "usageMetadata.promptTokenCount": {
+            "state": "count",
+            "value": 2471
+          },
+          "usageMetadata.candidatesTokenCount": {
+            "state": "count",
+            "value": 84
+          },
+          "usageMetadata.cachedContentTokenCount": {
+            "state": "omitted",
+            "value": null
+          },
+          "usageMetadata.thoughtsTokenCount": {
+            "state": "omitted",
+            "value": null
+          }
+        }
+      }
+    },
+    {
+      "role": "SPECTRA",
+      "turn": 0,
+      "phase": "commit",
+      "attempt": 1,
+      "status": "ok",
+      "http_status": null,
+      "latency_seconds": 2.7381,
+      "usage": {
+        "input_tokens": 1828,
+        "output_tokens": 78,
+        "cached_input_tokens": 0,
+        "reasoning_output_tokens": 16,
+        "source_usage": {
+          "usage.input_tokens": {
+            "state": "count",
+            "value": 1828
+          },
+          "usage.output_tokens": {
+            "state": "count",
+            "value": 78
+          },
+          "usage.input_tokens_details.cached_tokens": {
+            "state": "count",
+            "value": 0
+          },
+          "usage.output_tokens_details.reasoning_tokens": {
+            "state": "count",
+            "value": 16
+          }
+        }
+      }
+    },
+    {
+      "role": "PYRA",
+      "turn": 0,
+      "phase": "commit",
+      "attempt": 1,
+      "status": "ok",
+      "http_status": null,
+      "latency_seconds": 2.805,
+      "usage": {
+        "input_tokens": 1829,
+        "output_tokens": 101,
+        "cached_input_tokens": 0,
+        "reasoning_output_tokens": 33,
+        "source_usage": {
+          "usage.input_tokens": {
+            "state": "count",
+            "value": 1829
+          },
+          "usage.output_tokens": {
+            "state": "count",
+            "value": 101
+          },
+          "usage.input_tokens_details.cached_tokens": {
+            "state": "count",
+            "value": 0
+          },
+          "usage.output_tokens_details.reasoning_tokens": {
+            "state": "count",
+            "value": 33
+          }
+        }
+      }
+    }
+  ],
+  "artifact_checks": {
+    "launcher": true,
+    "configuration": true,
+    "outcome": true,
+    "calls": true,
+    "phases": true,
+    "record_structure": true,
+    "lifecycle": true,
+    "usage": true,
+    "artifacts": true
+  },
+  "limitations": [
+    "One separately authorized retry, not a campaign or a full-game victory.",
+    "No refusal, truncation or provider failure observed in these nine attempts; negative paths retain offline-test evidence only.",
+    "Requested aliases do not identify verified provider backend revisions.",
+    "Omitted Gemini cache/thought counters remain omitted; they do not prove absence of caching or hidden reasoning.",
+    "The configured-rate cost is a local estimate, not an inspected invoice or provider billing ceiling.",
+    "All three roles submitted valid contracts; no claim of general image understanding, strategy, cooperation or other provider/model combinations follows.",
+    "Anthropic was not called and remains live-unverified; retiring its mandatory validation task is a scope decision.",
+    "Unsigned local artifacts and checks establish structural consistency, not cryptographic authenticity.",
+    "No additional live invocation is authorized by publication of this evidence."
+  ]
+}

@@ -61,7 +61,12 @@ shows SPECTRA/PYRA as independent `gpt-6-luna` agents, FLUX as
 `gemini-3.5-flash-lite`, the required environment-variable names, dated rates, model/pricing source links, eligibility/accounting notes and
 fixed limits. PYRA retains its character, abilities, thermal view and objective.
 No credential value enters the browser. Ordinary defaults still map PYRA to
-Anthropic; its live smoke issue #15 remains open.
+Anthropic; that adapter remains live-unverified. The maintainer's
+[scope decision](VERIFICATION.md#provider-acceptance-and-scope-decision--november-15-2026)
+retires mandatory validation #15 without removing its adapter or marking it tested.
+The current form permits independent choices among the three implemented adapters;
+additional APIs and model modalities are future [#37](https://github.com/dhar174/Parallax-Relay-AI-Game/issues/37)
+work. The hosted Site is not republished by this documentation change.
 
 Download the TOML and use the displayed `scripts/live_smoke.py --check --config
 relay-workbench.toml` command locally. The helper accepts only an export matching

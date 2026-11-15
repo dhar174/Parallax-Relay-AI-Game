@@ -5,10 +5,12 @@ sees a different sensor image, exchanges public messages, and commits one action
 without seeing its teammates' current actions. A deterministic Python engine
 resolves the turn.
 
-**Status:** Milestone 2 is an offline-tested coordination prototype. A bounded live
-attempt accepted all six OpenAI outputs from two independent `gpt-6-luna` agents;
-Gemini returned HTTP 429 and blocked the first resolved turn. Anthropic remains
-untested live. See the [dated evidence](docs/VERIFICATION.md#slice-7-bounded-live-attempt--november-15-2026).
+**Status:** Milestone 2 is a coordination prototype with a verified one-turn live
+smoke: two independent `gpt-6-luna` agents and `gemini-3.5-flash-lite` completed
+all nine requests on their first attempts. It stopped normally at the one-turn
+limit; no full-game victory or benchmark result is established. Anthropic remains
+implemented and tested offline, but live-unverified. See the
+[successful retry and scope decision](docs/VERIFICATION.md#provider-acceptance-and-scope-decision--november-15-2026).
 The bundled victories use scripted players that already know the solution; they
 are not evidence of model reasoning or cooperation.
 
@@ -98,6 +100,13 @@ and prices are not supplied by default. A separate [named one-turn smoke profile
 selects two independent OpenAI agents and one Gemini agent, preserving all characters
 and abilities; it requires explicit spending authorization. Current validation limits and open issues
 are documented in the [review](docs/REVIEW.md).
+
+Each role independently selects from the existing OpenAI, Anthropic and Gemini
+adapters, including repeated providers and models. Today's contract requires
+role-specific PNG/HUD input and structured text replies; other assignments remain
+unverified unless separately tested. Additional hosted/local APIs, text-only,
+audio/video and non-chat models are a [future direction](ROADMAP.md#provider-and-model-extensibility),
+not current universal compatibility.
 
 ## Current limits and direction
 

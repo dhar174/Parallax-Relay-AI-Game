@@ -120,7 +120,9 @@ selects OpenAI, `PYRA_MODEL` and `OPENAI_API_KEY` instead of the default Anthrop
 provider and variables.
 Both OpenAI agents use `OPENAI_API_KEY`, with separate `OPENAI_MODEL` and
 `PYRA_MODEL` selections pinned by the helper. FLUX uses `GEMINI_MODEL` and `GEMINI_API_KEY`.
-Anthropic smoke validation #15 remains deferred; no Anthropic key is required.
+No Anthropic key is required. The maintainer chose to retire mandatory Anthropic
+validation #15 through the [scope decision](VERIFICATION.md#provider-acceptance-and-scope-decision--november-15-2026);
+its adapter remains implemented/offline-tested/live-unverified.
 
 The profile retains normal broadcast, negotiation and commitment, limits execution
 to one turn, permits at most 18 total attempts (two per request), bounds output at
@@ -247,9 +249,28 @@ Inspect `calls.jsonl` and `phases.jsonl` before attempting a full match:
 python -m parallax_relay.play --live --env-file .env
 ```
 
-No credentialed smoke test or full live match has been run as part of the repository
-review. Offline tests cannot establish that a given model interprets the PNGs or
-cooperates successfully.
+A separately authorized one-turn retry completed the selected two-OpenAI/one-Gemini
+roster successfully. See the [dated evidence](VERIFICATION.md#provider-acceptance-and-scope-decision--november-15-2026)
+for the exact models, source, usage and limits; the earlier failed attempt remains
+historical evidence. No full live match is verified. Neither a successful smoke
+nor offline tests establish general image understanding or cooperation.
+
+## Provider and model combinations
+
+For each of SPECTRA, PYRA and FLUX, choose `openai`, `anthropic` or `gemini` in its
+player settings and supply the named local model/key variables and explicit rates.
+Providers and models may repeat across roles; each agent keeps separate role-local
+context. Character abilities, observations and objectives do not depend on vendor.
+The fixed named-smoke helper still accepts only its frozen profile.
+
+This configuration freedom does not mean every model is compatible. Today's adapters
+send the role PNG and HUD and require the existing structured text reply contract;
+model selection must satisfy both, including output/reasoning bounds. A successful
+run verifies only its recorded combination and conditions. Anthropic models and
+other untested combinations remain live-unverified, not proven unsupported.
+Additional APIs, local deployments, text-only, audio/video and non-chat models need
+future explicit bridges and capability validation under [#37](https://github.com/dhar174/Parallax-Relay-AI-Game/issues/37).
+No implicit input removal, model/API fallback or new paid request is authorized.
 
 ## Outputs and replay
 

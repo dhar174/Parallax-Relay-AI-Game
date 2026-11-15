@@ -1,5 +1,72 @@
 # Verification record
 
+## Provider acceptance and scope decision — November 15, 2026
+
+The separately authorized retry ran on **clean merged source
+`d76be6c086b25569baf308e5530f9875a9cd9da7`** at 17:10 EST (22:10 UTC), using the
+same frozen profile as the initial failed attempt. Native execution lasted
+22.113 seconds. Both the wrapper and CLI exited **0**; offline revalidation passed
+all configuration, launcher, lifecycle, record, usage and artifact checks.
+
+| Role / requested model | API | Attempts | Reported input/output |
+|---|---|---:|---:|
+| SPECTRA / `gpt-6-luna` | OpenAI v1 Responses | 3 | 4,645 / 512 |
+| PYRA / `gpt-6-luna` | OpenAI v1 Responses | 3 | 4,648 / 401 |
+| FLUX / `gemini-3.5-flash-lite` | Gemini v1beta generateContent | 3 | 6,723 / 182 |
+
+All **nine requests succeeded on their first attempts**, without fallback output.
+Broadcast, negotiation and commitment completed for every role. The engine resolved
+**one turn**, then stopped normally at `turn_limit`, `completed=false`, energy **4**,
+no win/loss and null scores. This meets the healthy one-turn smoke condition; it is
+not a full-game victory, a benchmark, or evidence of general image understanding,
+strategy or cooperation. PYRA's character, abilities, thermal view and objective
+remain unchanged; the two OpenAI agents retain independent role-local contexts.
+
+The [sanitized retry summary](verification/2026-11-15-slice7-live-retry-summary.json)
+contains the native source/environment provenance, prompt/schema/room hashes,
+actual settings/prices, requested model/API identities, timing, phase/attempt
+statuses, normalized usage, counter-origin states and offline verifier results.
+It records **16,016 input / 1,095 output tokens** and **zero unknown-usage calls**.
+OpenAI output already includes **469 reasoning tokens**; do not add them again.
+OpenAI cache counters were explicit zero. Gemini cache/thought counters were
+omitted; omission does not prove an absence of caching or hidden reasoning.
+The **$0.0038577 local estimate** uses configured rates, not an inspected invoice
+or provider billing ceiling. Backend revisions remain unknown; aliases were
+requested, with provider-default sampling and no seed.
+
+No refusal, truncation or provider failure was observed in these nine attempts.
+Their negative-path classifications retain the independent offline evidence under
+#13; no extra paid fault-inducing calls were made. The actual PNG-bearing requests
+and structured phase replies establish bounded transport/execution for this
+recorded roster. Unsigned artifacts establish structural consistency, not
+cryptographic authenticity. Full spectator logs remain private and ignored;
+prompts, messages, private notes, HUDs, image contents, keys and raw errors are
+excluded from the public summary.
+
+### Acceptance disposition and future scope
+
+The maintainer explicitly chose to retire the mandatory Anthropic test and pursue
+independent combinations of supported APIs/models instead. This is an evidenced
+scope exception, not an Anthropic success or proof that its adapter cannot work.
+The original issue criteria remain visible alongside dated dispositions.
+
+| Issue | Disposition after the evidence PR merges |
+|---|---|
+| #14 | Close **completed** for the recorded OpenAI Responses model/role configuration. |
+| #16 | Close **completed** for the recorded Gemini generateContent model/role configuration. |
+| #15 | Close **not planned**: mandatory Anthropic validation retired by explicit scope decision; live compatibility remains unverified. |
+| #8 | Close **completed for revised scope**, linking #13, this live evidence and the #15 exception. |
+
+All four issues remain open pending the evidence PR merge. Anthropic's adapter,
+offline tests and ordinary defaults remain intact. No runtime change, additional
+provider request, Site deployment or acceptance-issue closure is performed by this
+documentation work. Future provider/model/modality expansion is tracked in
+[#37](https://github.com/dhar174/Parallax-Relay-AI-Game/issues/37); see the
+[roadmap](../ROADMAP.md#provider-and-model-extensibility) for implemented versus
+prospective capabilities. The failed first attempt and earlier review entries
+below are historical snapshots; their blocked statuses are superseded by this
+successful retry and revised scope, without erasing the original failure.
+
 ## PR #36 comment recheck — November 15, 2026
 
 All 18 inline comments and the full Antigravity review against `8d297d5` were
