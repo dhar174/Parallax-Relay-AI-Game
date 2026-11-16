@@ -31,6 +31,7 @@ from .config import Rates, ConfigError
 from .money import total as money_total, difference, json_fields, amount
 from .campaign_validation import validate_frozen, utc, equal_money
 from .state import initial_world
+from .rooms import get_room, rooms, catalog_identity
 
 
 class CampaignError(ValueError):
@@ -64,14 +65,28 @@ def read_json(path: Path):
 
 def frozen_inputs(spec: CampaignSpec) -> dict:
     return {'source': collect_source(ROOT), 'environment': collect_environment(),
-            'inputs': {name: input_identities(initial_world().snapshot(),
-                       trial_settings(spec, {'condition': name, 'team': 'models' if spec.mode == 'live' else 'wait'}))
-                       for name in spec.conditions},
+            'catalog': catalog_identity(),
+            'inputs': {room.id: {name: input_identities(initial_world(room.id).snapshot(),
+                       trial_settings(spec, {'room':room.id,'condition': name, 'team': 'models' if spec.mode == 'live' else 'wait'}))
+                       for name in spec.conditions} for room in rooms() if spec.protocol_version==2 or room.id=='split_span'},
             'provider_contracts': {p.provider: provider_contract(p.provider) for p in spec.roster},
             'sampling': 'provider_default', 'known_model_revisions': None,
-            'analysis': {'version': 1, 'bootstrap_resamples': 10000, 'seed': 0,
+            'analysis': {'version': 2, 'bootstrap_resamples': 10000, 'seed': 0,
                          'percentile': 'Hyndman-Fan-7', 'prng': 'random.Random',
                          'concurrency': 1, 'primary_contrast': ['full', 'disabled']}}
+
+
+def validate_pilot_transition(pilot: CampaignSpec, confirmation: CampaignSpec, before: dict, after: dict) -> None:
+    """Protocol 2 permits stage exposure changes, never treatment/input tuning."""
+    excluded={'stage','rooms','repetitions','campaign_max_calls','campaign_max_estimated_cost_usd','scheduler_seed'}
+    def common(spec):
+        value={k:v for k,v in spec.model_dump(mode='json').items() if k not in excluded}
+        value['roster']=sorted(value['roster'],key=lambda p:(p['provider'],p['model']))
+        value['policies']=sorted(value['policies']);value['conditions']=sorted(value['conditions'])
+        return value
+    if (pilot.stage!='pilot' or confirmation.stage!='confirmatory' or pilot.protocol_version!=2 or
+        confirmation.protocol_version!=2 or common(pilot)!=common(confirmation) or before!=after):
+        raise CampaignError('Changed frozen inputs, settings or design require a new development pilot')
 
 
 def register(value: dict, out: Path, *, pilot: Path | None = None) -> dict:
@@ -86,10 +101,14 @@ def register(value: dict, out: Path, *, pilot: Path | None = None) -> dict:
             raise CampaignError('Confirmation requires a completed pilot registration')
         from .campaign_analysis import analyze
         pilot_data = read_registration(pilot)
+        if pilot_data['schema_version']!=2:raise CampaignError('Confirmation requires a fresh registration and current pilot')
         pilot_report = analyze(pilot)
         if pilot_data['spec']['stage'] != 'pilot' or not pilot_report['cohort_eligible']:
             raise CampaignError('Confirmation requires a completed pilot registration')
-        if (pilot_data['spec']['mode'] != spec.mode or pilot_data['spec']['rooms'] != spec.rooms or
+        if spec.protocol_version==2:
+            if pilot_data['schema_version']!=2:raise CampaignError('Confirmation requires a current development pilot')
+            validate_pilot_transition(CampaignSpec.model_validate(pilot_data['spec']),spec,pilot_data['frozen'],frozen)
+        elif (pilot_data['spec']['mode'] != spec.mode or pilot_data['spec']['rooms'] != spec.rooms or
                 sorted(pilot_data['spec']['roster'],key=lambda p:(p['provider'],p['model'])) !=
                 sorted([p.model_dump() for p in spec.roster],key=lambda p:(p['provider'],p['model'])) or
                 set(pilot_data['spec']['policies']) != set(spec.policies)):
@@ -99,7 +118,7 @@ def register(value: dict, out: Path, *, pilot: Path | None = None) -> dict:
                         'match_settings_changed': spec.match.model_dump() != pilot_data['spec']['match']}
     elif pilot is not None:
         raise CampaignError('Only confirmation can reference a pilot')
-    data = {'schema_version': 1, 'experiment_id': str(uuid4()), 'created_at': now(),
+    data = {'schema_version': 2, 'experiment_id': str(uuid4()), 'created_at': now(),
             'spec': spec.model_dump(mode='json'), 'frozen': frozen, 'pilot': pilot_record,
             'schedule': schedule(spec)}
     exposures = [trial_exposure(spec, trial) for trial in data['schedule']]
@@ -115,9 +134,12 @@ def register(value: dict, out: Path, *, pilot: Path | None = None) -> dict:
 
 
 def read_registration(root: Path) -> dict:
-    data = read_json(root / 'registration.json')
+    return validate_registration(read_json(root / 'registration.json'))
+
+
+def validate_registration(data: dict) -> dict:
     try:
-        if type(data['schema_version']) is not int or data['schema_version'] != 1:
+        if type(data['schema_version']) is not int or data['schema_version'] not in (1,2):
             raise ValueError()
         digest = data['sha256']
         if digest != canonical_hash({k: v for k, v in data.items() if k != 'sha256'}):
@@ -126,7 +148,9 @@ def read_registration(root: Path) -> dict:
             raise ValueError()
         utc(data['created_at'])
         spec = CampaignSpec.model_validate(data['spec'])
-        validate_frozen(data['frozen'],spec)
+        if data['schema_version']==1 and data['spec'].get('schema_version')!=1:raise ValueError()
+        if data['schema_version']==2 and data['spec'].get('schema_version')!=2:raise ValueError()
+        validate_frozen(data['frozen'],spec,version=data['schema_version'])
         pilot=data['pilot']
         if spec.stage=='confirmatory':
             if (not isinstance(pilot,dict) or not isinstance(pilot.get('registration_sha256'),str) or
@@ -135,8 +159,9 @@ def read_registration(root: Path) -> dict:
                 not isinstance(pilot.get('changed_frozen_sections'),list) or
                 any(key not in data['frozen'] for key in pilot['changed_frozen_sections'])):
                 raise ValueError()
+            if spec.protocol_version==2 and (pilot['match_settings_changed'] or pilot['changed_frozen_sections']):raise ValueError()
         elif pilot is not None:raise ValueError()
-        actual, expected = data['schedule'], schedule(spec)
+        actual, expected = data['schedule'], schedule(spec,legacy=data['schema_version']==1)
         if not isinstance(actual, list) or len(actual) != len(expected):
             raise ValueError()
         ids, blocks = set(), {}
@@ -187,6 +212,9 @@ class Ledger:
 async def execute_trial(root: Path, registration: dict, spec: CampaignSpec, trial: dict,
                         environ: dict) -> dict:
     settings = trial_settings(spec, trial)
+    from .room_execution import RoomExecutionPermit
+    # Gate before output, credentials, client construction and provider calls.
+    permit=RoomExecutionPermit.from_registration(registration,trial) if get_room(settings.room_id).split=='held_out' else None
     agents, recorder, result = {}, None, None
     started = monotonic()
     stage, stop, cleanup = 'setup', 'setup_failure', 'ok'
@@ -202,7 +230,7 @@ async def execute_trial(root: Path, registration: dict, spec: CampaignSpec, tria
                                     players=identities, requested_settings=settings.model_copy(update={
                                         'max_estimated_cost_usd': spec.match.max_estimated_cost_usd}),
                                     policy=None if model_team else trial['team'])
-        recorder = Recorder(root / 'trials' / trial['trial_id'], {'room': 'The Split Span'}, context=context)
+        recorder = Recorder(root / 'trials' / trial['trial_id'], {'room': trial['room']}, context=context)
         rates = {}
         for role in ROLES:
             if model_team:
@@ -213,7 +241,7 @@ async def execute_trial(root: Path, registration: dict, spec: CampaignSpec, tria
             else:
                 agents[role] = make_policy(trial['team'], role, UUID(trial['trial_id']))
         stage = 'execution'
-        result = await run_match(agents, settings, rates=rates, recorder=recorder)
+        result = await run_match(agents, settings, rates=rates, recorder=recorder,room_permit=permit)
         stop = result.stop_reason
     except MatchExecutionError as error:
         result, stop, execution_stop = error.result, error.result.stop_reason, error.original_stop_reason
@@ -252,9 +280,15 @@ async def execute_trial(root: Path, registration: dict, spec: CampaignSpec, tria
 async def run_campaign(root: Path, *, offline: bool = False, live: bool = False,
                        environ: dict | None = None) -> None:
     registration = read_registration(root)
+    if registration['schema_version']!=2:
+        raise CampaignError('Historical campaigns require a fresh registration for current execution')
     spec = CampaignSpec.model_validate(registration['spec'])
     if offline == live or offline != (spec.mode == 'offline'):
         raise CampaignError('Select the registered execution mode explicitly: --offline or --live')
+    current = frozen_inputs(spec)
+    matches = current == registration['frozen']
+    if (spec.stage != 'diagnostic' or spec.protocol_version==2) and not matches:
+        raise CampaignError('Frozen source/environment/inputs changed; register a new cohort')
     selected_env=dict(os.environ if environ is None else environ)
     if live:
         for player in spec.roster:
@@ -265,10 +299,6 @@ async def run_campaign(root: Path, *, offline: bool = False, live: bool = False,
             if '\r' in key or '\n' in key:
                 raise CampaignError('Invalid selected live credential format')
             selected_env[player.api_key_env]=key
-    current = frozen_inputs(spec)
-    matches = current == registration['frozen']
-    if spec.stage != 'diagnostic' and not matches:
-        raise CampaignError('Frozen source/environment/inputs changed; register a new cohort')
     lock = root / '.runner.lock'
     # Atomic directory creation rejects every existing directory entry, including
     # broken symlinks on Windows (where file open('x') can follow their target).
@@ -303,7 +333,7 @@ async def run_campaign(root: Path, *, offline: bool = False, live: bool = False,
             for trial, (max_calls, max_dollars) in zip(trials, exposure):
                 if last_launch is not None:
                     await asyncio.sleep(max(0, spec.min_trial_interval_seconds - (monotonic() - last_launch)))
-                if spec.stage != 'diagnostic' and frozen_inputs(spec) != registration['frozen']:
+                if (spec.stage != 'diagnostic' or spec.protocol_version==2) and frozen_inputs(spec) != registration['frozen']:
                     stop = 'frozen_input_drift'
                     break
                 ledger.emit('trial_launched', trial_id=trial['trial_id'], block_id=block_id)
@@ -386,6 +416,8 @@ def main(argv: list[str] | None = None) -> int:
             data = register(read_json(args.spec), args.out, pilot=args.pilot)
             print(f"Registered {len(data['schedule'])} trials; no API requests made.")
         elif args.command == 'run':
+            registered=read_registration(args.campaign)
+            if registered['schema_version']!=2:raise CampaignError('Historical campaigns require a fresh registration for current execution')
             env = dict(os.environ)
             if args.env_file is not None:
                 if not args.live:

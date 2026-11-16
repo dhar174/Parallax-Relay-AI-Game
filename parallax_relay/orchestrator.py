@@ -187,7 +187,8 @@ async def run_match(agents: Mapping[str, Agent], settings: MatchSettings | None 
     from .rooms import get_room
     room=get_room(settings.room_id)
     if room.split=='held_out':
-        if room_permit is None:raise ValueError('A held-out room requires a registered confirmatory campaign')
+        from .room_execution import RoomExecutionPermit
+        if not isinstance(room_permit,RoomExecutionPermit):raise ValueError('A held-out room requires a registered confirmatory campaign')
         room_permit.validate(settings.room_id)
     world = initial_world(settings.room_id)
     budget = Budget(settings, rates or {})

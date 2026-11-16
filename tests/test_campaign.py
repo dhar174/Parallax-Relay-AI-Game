@@ -277,11 +277,11 @@ class ScheduleTests(unittest.TestCase):
 
     def test_protocol_counts_and_theoretical_block_exposure(self):
         from parallax_relay.campaign_models import CampaignSpec, schedule, trial_exposure
-        base = {'campaign_max_calls': 1000000, 'stage': 'pilot'}
+        base = {'schema_version':1,'campaign_max_calls': 1000000, 'stage': 'pilot'}
         rows = schedule(CampaignSpec(**base))
         self.assertEqual(len(rows), 35)  # 25 uniform, five WAIT, five oracle.
         self.assertEqual(len(schedule(CampaignSpec(**{**base,'stage':'confirmatory'}))), 160)
-        conf = CampaignSpec(campaign_max_calls=1000000)
+        conf = CampaignSpec(schema_version=1,campaign_max_calls=1000000)
         first_block = [t for t in schedule(conf) if t['team'] == 'scripted']
         self.assertEqual(sum(trial_exposure(conf,t)[0] for t in first_block), 864)
 
