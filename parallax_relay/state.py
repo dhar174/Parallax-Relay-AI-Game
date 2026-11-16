@@ -117,7 +117,8 @@ def public_hud(world: WorldState, role: str) -> dict:
         raise ValueError(f"Unknown active role: {role}")
     return {
         "turn": world.turn,
-        "max_turns": MAX_TURNS,
+        "max_turns": world.room.deadline,
+        "lane_width": world.room.width,
         "shared_energy": world.energy,
         "shared_coolant": world.coolant,
         "your_role": role,
@@ -126,13 +127,14 @@ def public_hud(world: WorldState, role: str) -> dict:
             r: agent.x for r, agent in world.robots.items() if r != role
         },
         "your_private_goal": PRIVATE_GOALS[role],
-        "shared_goal": "Unlock exit at x=12 and extract all three robots by the end of round 12.",
+        "shared_goal": ("Recover the shard, then " if world.room.requires_shard else "") +
+                       "unlock extraction and bring all three robots to it by the mission deadline.",
         "action_contract": {
             "MOVE": "direction must be -1 or 1; steps must be 1 or 2",
-            "VENT": "PYRA only, if adjacent to motor x=4; costs 1 coolant",
-            "REROUTE": "FLUX only, if adjacent to console x=4; costs 2 energy",
+            "VENT": "PYRA only, within one tile of a motor; costs 1 coolant",
+            "REROUTE": "FLUX only, within one tile of a motor console; costs 2 energy",
             "COLLECT": "SPECTRA can collect a shard at its current tile; FLUX can collect an energy cell at its current tile. Locate items through sensors or messages.",
-            "UNLOCK": "FLUX at x=12; costs 1 energy",
+            "UNLOCK": "FLUX at extraction; costs 1 energy",
             "WAIT": "Do nothing",
         },
         "recent_events": public_events(world.events),

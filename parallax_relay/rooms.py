@@ -1,5 +1,7 @@
 """Finite, immutable room definitions. Full definitions are spectator-only."""
 from typing import Literal
+import hashlib
+import json
 from pydantic import BaseModel, ConfigDict, Field, model_validator, field_validator
 
 
@@ -99,3 +101,18 @@ def get_room(room_id: str='split_span') -> RoomDefinition:
     for room in _ROOMS:
         if type(room_id) is str and room.id==room_id:return room
     raise ValueError('Unknown room selection')
+
+
+def digest(value) -> str:
+    return hashlib.sha256(json.dumps(value,sort_keys=True,separators=(',',':'),ensure_ascii=True,allow_nan=False).encode()).hexdigest()
+
+
+def room_hash(room: RoomDefinition) -> str:
+    return digest(room.model_dump(mode='json'))
+
+
+def catalog_identity() -> dict:
+    from .room_certificates import certificate_hash
+    value={'id':'catalog_v1','version':1,'rooms':[r.model_dump(mode='json') for r in rooms()],
+           'certificates':{r.id:certificate_hash(r.id) for r in rooms()}}
+    return {'value':value,'sha256':digest(value)}

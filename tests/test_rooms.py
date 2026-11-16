@@ -45,4 +45,6 @@ class RoomTests(unittest.TestCase):
         with self.assertRaises(ValueError):RoomDefinition.model_validate(data)
         data=get_room('split_span').model_dump();data['version']=True
         with self.assertRaises(ValueError):RoomDefinition.model_validate(data)
+        data=get_room('ret_01').model_dump();data['shard']=3
+        with self.assertRaises(ValueError):RoomDefinition.model_validate(data)
 
