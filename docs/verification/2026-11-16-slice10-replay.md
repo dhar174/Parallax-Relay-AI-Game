@@ -13,8 +13,7 @@ an exception on arbitrary phase metadata, and lost role-specific fallback labels
 Focused regressions failed before these fixes and passed afterward, including
 conflicting checkpoint and replay evidence.
 
-- Full Python suite passed 364 tests (62.673 s) during the review fixes; a final
-  rerun against the committed code was started separately.
+- Full Python suite passed 364 tests (64.765 s) after the review fixes.
 - Built the workbench and ran the Node suite against the final UI: 74 tests passed.
 - `compileall`, JavaScript syntax checks, both scripted mock checks, and the nine
   room certificates passed. Normal/fast mock runs produced 63/42 calls, seven
