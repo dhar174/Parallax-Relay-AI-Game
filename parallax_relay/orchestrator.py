@@ -149,14 +149,21 @@ async def _ask(agent: Agent, request: AgentRequest, ticket: Ticket, settings: Ma
 async def _phase(agents: Mapping[str, Agent], requests: dict[str, AgentRequest], budget: Budget,
                  settings: MatchSettings, calls: list[dict], recorder) -> dict[str, Outcome]:
     tickets = budget.reserve_phase(requests)
-    tasks = [asyncio.create_task(_ask(agents[r], requests[r], tickets[r], settings, calls, recorder)) for r in ROLES]
+    tasks = []
     try:
+        for role in ROLES:
+            tasks.append(asyncio.create_task(_ask(agents[role],requests[role],tickets[role],settings,calls,recorder)))
         outcomes = await asyncio.gather(*tasks)
     except BaseException:
         for task in tasks:
             task.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)
         raise
+    finally:
+        # A task cancelled before its first entry never runs _ask's finally.
+        # Release is idempotent, so this also covers partially-created phases.
+        for ticket in tickets.values():
+            ticket.release()
     return dict(zip(ROLES, outcomes))
 
 
@@ -273,7 +280,6 @@ async def run_match(agents: Mapping[str, Agent], settings: MatchSettings | None 
                         'events': public_events(after.events),
                     })
                     histories[role] = histories[role][-settings.history_turns:]
-            world = after
         if world.win:
             stop = 'victory'
         elif world.loss:

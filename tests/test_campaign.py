@@ -175,7 +175,7 @@ class CampaignTests(unittest.IsolatedAsyncioTestCase):
             root = Path(temp) / 'campaign'
             register(live_spec(campaign_max_estimated_cost_usd=4), root)
             with patch('parallax_relay.campaign.HTTPAgent') as provider:
-                await run_campaign(root, live=True)
+                await run_campaign(root, live=True, environ={'TEST_KEY':'FAKE'})
                 provider.assert_not_called()
             report = analyze(root)
             self.assertEqual(report['counts']['launched'], 0)
@@ -237,7 +237,7 @@ class CampaignTests(unittest.IsolatedAsyncioTestCase):
             root=Path(temp)/'campaign'
             register(live_spec(),root)
             with patch('parallax_relay.campaign.HTTPAgent',Expensive):
-                await run_campaign(root,live=True)
+                await run_campaign(root,live=True,environ={'TEST_KEY':'FAKE'})
             report=analyze(root)
             self.assertEqual(report['counts']['launched'],1)
             self.assertEqual(report['campaign_stop']['reason'],'accounting_overrun')

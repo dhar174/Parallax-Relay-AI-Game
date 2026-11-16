@@ -31,9 +31,9 @@ class CampaignSpec(Settings):
     repetitions: int | None = Field(default=None, ge=1, le=1000, strict=True)
     match: MatchSettings = MatchSettings()
     campaign_max_calls: int = Field(ge=1, le=10**12, strict=True)
-    campaign_max_estimated_cost_usd: float | None = Field(default=None, gt=0)
+    campaign_max_estimated_cost_usd: float | None = Field(default=None, gt=0, strict=True)
     scheduler_seed: int = Field(default=0, ge=0, le=2**63-1, strict=True)
-    min_trial_interval_seconds: float = Field(default=0, ge=0, le=3600)
+    min_trial_interval_seconds: float = Field(default=0, ge=0, le=3600, strict=True)
     rerun_of: UUID | None = None
     rerun_reason: Literal['infrastructure_recheck', 'manual_recheck'] | None = None
 
@@ -46,6 +46,10 @@ class CampaignSpec(Settings):
             raise ValueError('Empty room or condition selection')
         if self.match.condition is not None:
             raise ValueError('Campaign conditions are selected by the schedule, not match.condition')
+        if self.match.communication_rounds != 2:
+            raise ValueError('Campaign phase schedules override rounds; leave communication_rounds at its default')
+        if self.stage == 'diagnostic' and self.mode == 'offline' and 'uniform' not in self.policies and self.repeats > 1:
+            raise ValueError('Deterministic controls run once; repetitions require a stochastic team')
         if self.mode == 'live':
             if len(self.roster) != 3:
                 raise ValueError('Live roster must contain three entries')

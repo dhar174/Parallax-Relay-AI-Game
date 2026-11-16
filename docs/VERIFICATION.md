@@ -1,5 +1,14 @@
 # Verification record
 
+## Antigravity review corrections — November 16, 2026 UTC
+
+The [controls follow-up](verification/2026-11-15-pr39-antigravity.md) and
+[campaign follow-up](verification/2026-11-16-pr40-antigravity.md) map the review
+findings to fixes and regressions. The campaign revision passed 325 local Python
+tests, 57 Node tests, a fresh offline CLI roundtrip and focused Chromium checks.
+The PR responses record the final hosted matrix receipts. Older evidence below
+continues to identify the revision it actually verified.
+
 ## Slice 8 campaign implementation — November 15, 2026 (EST)
 
 The serial campaign CLI implements registration, whole-block admission, durable
@@ -35,11 +44,9 @@ Locked Ubuntu/Python 3.12 also passed all 54 Node tests with no skips.
 Controls-only [workflow 43793559788](https://github.com/dhar174/Parallax-Relay-AI-Game/actions/runs/43793559788)
 at `f9d035e` passed all six jobs with 268 Python tests and 53 Node tests; every
 log was inspected. Later evidence-only revisions need their own CI receipt.
-Chromium 156
-again exercised the five selectors, real no-images companion output, three PNGs,
+Chromium 156 again exercised the five selectors, real no-images companion output, three PNGs,
 turn-limit/unscored labels and desktop/mobile overflow with no runtime exceptions.
-The workbench passed 54 Node tests with no skips. Dependency consistency,
-compilation, build, expected normal/fast mock outcomes, 120 local documentation
+Dependency consistency, compilation, build, expected normal/fast mock outcomes, 120 local documentation
 links/anchors and whitespace checks passed. Broader browser/security/room work
 remains separately tracked; none of #20/#23/#24/#26/#34/#35 closes here.
 

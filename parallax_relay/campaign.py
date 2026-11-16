@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 import json
 import os
+import re
 from pathlib import Path
 import sys
 from time import monotonic
@@ -26,7 +27,9 @@ from .providers import HTTPAgent, provider_contract
 from .provenance import (ROOT, PlayerIdentity, ProvenanceContext, canonical_hash,
                          collect_environment, collect_source, input_identities)
 from .recording import Recorder
-from .config import Rates
+from .config import Rates, ConfigError
+from .money import total as money_total, difference, json_fields, amount
+from .campaign_validation import validate_frozen, utc, equal_money
 from .state import initial_world
 
 
@@ -84,8 +87,9 @@ def register(value: dict, out: Path, *, pilot: Path | None = None) -> dict:
         if pilot_data['spec']['stage'] != 'pilot' or not pilot_report['cohort_eligible']:
             raise CampaignError('Confirmation requires a completed pilot registration')
         if (pilot_data['spec']['mode'] != spec.mode or pilot_data['spec']['rooms'] != spec.rooms or
-                pilot_data['spec']['roster'] != [p.model_dump() for p in spec.roster] or
-                pilot_data['spec']['policies'] != spec.policies):
+                sorted(pilot_data['spec']['roster'],key=lambda p:(p['provider'],p['model'])) !=
+                sorted([p.model_dump() for p in spec.roster],key=lambda p:(p['provider'],p['model'])) or
+                set(pilot_data['spec']['policies']) != set(spec.policies)):
             raise CampaignError('Changed roster, policies or rooms require a new pilot')
         pilot_record = {'registration_sha256': pilot_data['sha256'],
                         'changed_frozen_sections': [k for k in frozen if frozen[k] != pilot_data['frozen'][k]],
@@ -96,9 +100,9 @@ def register(value: dict, out: Path, *, pilot: Path | None = None) -> dict:
             'spec': spec.model_dump(mode='json'), 'frozen': frozen, 'pilot': pilot_record,
             'schedule': schedule(spec)}
     exposures = [trial_exposure(spec, trial) for trial in data['schedule']]
-    data['planned_exposure'] = {'calls': sum(c for c, _ in exposures),
-                                'estimated_usd': float(sum((Decimal(str(d)) for _, d in exposures), Decimal(0))),
-                                'cost_is_estimate_not_billing_guarantee': True}
+    data['planned_exposure'] = json_fields({'calls': sum(c for c, _ in exposures),
+                                'estimated_usd': money_total(Decimal(str(d)) for _, d in exposures),
+                                'cost_is_estimate_not_billing_guarantee': True})
     data['sha256'] = canonical_hash(data)
     out.mkdir(parents=True, exist_ok=False)
     atomic_json(out / 'registration.json', data)
@@ -115,8 +119,20 @@ def read_registration(root: Path) -> dict:
         digest = data['sha256']
         if digest != canonical_hash({k: v for k, v in data.items() if k != 'sha256'}):
             raise ValueError()
-        UUID(data['experiment_id'])
+        if str(UUID(data['experiment_id']))!=data['experiment_id']:
+            raise ValueError()
+        utc(data['created_at'])
         spec = CampaignSpec.model_validate(data['spec'])
+        validate_frozen(data['frozen'],spec)
+        pilot=data['pilot']
+        if spec.stage=='confirmatory':
+            if (not isinstance(pilot,dict) or not isinstance(pilot.get('registration_sha256'),str) or
+                not re.fullmatch(r'[0-9a-f]{64}',pilot['registration_sha256']) or
+                type(pilot.get('match_settings_changed')) is not bool or
+                not isinstance(pilot.get('changed_frozen_sections'),list) or
+                any(key not in data['frozen'] for key in pilot['changed_frozen_sections'])):
+                raise ValueError()
+        elif pilot is not None:raise ValueError()
         actual, expected = data['schedule'], schedule(spec)
         if not isinstance(actual, list) or len(actual) != len(expected):
             raise ValueError()
@@ -139,8 +155,13 @@ def read_registration(root: Path) -> dict:
                 raise ValueError()
         if len(blocks) != len(set(blocks.values())):
             raise ValueError()
+        exposures=[trial_exposure(spec,t) for t in actual]
+        if (type(data['planned_exposure']['calls']) is not int or
+            data['planned_exposure']['calls']!=sum(c for c,_ in exposures) or
+            not equal_money(data['planned_exposure'],'estimated_usd',money_total(Decimal(str(d)) for _,d in exposures))):
+            raise ValueError()
         return data
-    except (KeyError, TypeError, ValueError, RecursionError):
+    except (KeyError, TypeError, ValueError, RecursionError, AttributeError, OverflowError):
         raise CampaignError('Invalid campaign registration or schedule') from None
 
 
@@ -151,7 +172,7 @@ class Ledger:
     def emit(self, event: str, **fields) -> dict:
         self.sequence += 1
         record = {'schema_version': 1, 'sequence': self.sequence, 'event': event,
-                  'at': now(), **fields}
+                  'at': now(), **json_fields(fields)}
         with (self.root / 'ledger.jsonl').open('a', encoding='utf-8', newline='\n') as handle:
             handle.write(json.dumps(record, ensure_ascii=True, allow_nan=False) + '\n')
             handle.flush()
@@ -209,7 +230,7 @@ async def execute_trial(root: Path, registration: dict, spec: CampaignSpec, tria
         except Exception:
             cleanup = 'failed'
     summary = result.summary() if result is not None else None
-    if cleanup == 'failed':
+    if cleanup == 'failed' and cancelled is None:
         stop = 'local_error'
     provenance = recorder.manifest['provenance'] if recorder else None
     evidence = {'trial_id': trial['trial_id'], 'stage': stage, 'stop_reason': stop,
@@ -231,23 +252,34 @@ async def run_campaign(root: Path, *, offline: bool = False, live: bool = False,
     spec = CampaignSpec.model_validate(registration['spec'])
     if offline == live or offline != (spec.mode == 'offline'):
         raise CampaignError('Select the registered execution mode explicitly: --offline or --live')
+    selected_env=dict(os.environ if environ is None else environ)
+    if live:
+        for player in spec.roster:
+            key=selected_env.get(player.api_key_env)
+            if not isinstance(key,str) or not key.strip():
+                raise CampaignError('Missing selected live credentials; configure keys before campaign launch')
+            key=key.strip()
+            if '\r' in key or '\n' in key:
+                raise CampaignError('Invalid selected live credential format')
+            selected_env[player.api_key_env]=key
     current = frozen_inputs(spec)
     matches = current == registration['frozen']
     if spec.stage != 'diagnostic' and not matches:
         raise CampaignError('Frozen source/environment/inputs changed; register a new cohort')
-    if (root / 'started.json').exists() or (root / 'ledger.jsonl').exists():
-        raise CampaignError('Campaign already attempted; analyze it without relaunching')
     lock = root / '.runner.lock'
     # Exclusive creation also rejects broken symlinks and simultaneous workers.
-    with lock.open('x', encoding='utf-8') as handle:
-        handle.write('exclusive campaign runner\n')
     ledger = Ledger(root)
     stop = 'completed'
     calls_used, dollars_used = 0, Decimal(0)
     last_launch = None
     active_block = None
     block_calls, block_dollars = 0, Decimal(0)
+    handle=lock.open('x', encoding='utf-8')
     try:
+        with handle:
+            handle.write('exclusive campaign runner\n')
+        if any(path.exists() or path.is_symlink() for path in (root/'started.json',root/'ledger.jsonl')):
+            raise CampaignError('Campaign already attempted; analyze it without relaunching')
         atomic_json(root / 'started.json', {'registration_sha256': registration['sha256'], 'at': now()})
         ledger.emit('campaign_started', registration_sha256=registration['sha256'],
                     registration_matches=matches)
@@ -257,14 +289,14 @@ async def run_campaign(root: Path, *, offline: bool = False, live: bool = False,
         for block_id, trials in blocks.items():
             exposure = [trial_exposure(spec, t) for t in trials]
             block_calls = sum(c for c, _ in exposure)
-            block_dollars = sum((Decimal(str(d)) for _, d in exposure), Decimal(0))
+            block_dollars = money_total(Decimal(str(d)) for _, d in exposure)
             cap = spec.campaign_max_estimated_cost_usd
             if calls_used + block_calls > spec.campaign_max_calls or (cap is not None and
-                    dollars_used + block_dollars > Decimal(str(cap))):
+                    money_total((dollars_used,block_dollars)) > Decimal(str(cap))):
                 stop = 'campaign_call_budget' if calls_used + block_calls > spec.campaign_max_calls else 'campaign_spend_budget'
                 break
             ledger.emit('block_reserved', block_id=block_id, reserved_calls=block_calls,
-                        reserved_estimated_usd=float(block_dollars))
+                        reserved_estimated_usd=block_dollars)
             active_block = block_id
             for trial, (max_calls, max_dollars) in zip(trials, exposure):
                 if last_launch is not None:
@@ -276,8 +308,7 @@ async def run_campaign(root: Path, *, offline: bool = False, live: bool = False,
                 last_launch = monotonic()
                 interrupted = None
                 try:
-                    receipt = await execute_trial(root, registration, spec, trial,
-                                                  dict(os.environ if environ is None else environ))
+                    receipt = await execute_trial(root, registration, spec, trial,selected_env)
                 except asyncio.CancelledError as error:
                     interrupted = error
                     receipt = getattr(error, 'campaign_trial', {
@@ -288,18 +319,18 @@ async def run_campaign(root: Path, *, offline: bool = False, live: bool = False,
                 summary = receipt['result']
                 budget = summary['budget'] if summary else None
                 actual_calls = budget['calls_started'] if budget else (0 if receipt['stage'] == 'setup' else None)
-                actual_dollars = budget['estimated_cost_usd'] if budget else None
+                actual_dollars = amount(budget,'estimated_cost_usd') if budget else None
                 accounted_calls = actual_calls if actual_calls is not None else max_calls
-                accounted_dollars = (Decimal(str(actual_dollars)) if actual_dollars is not None else
+                accounted_dollars = (actual_dollars if actual_dollars is not None else
                                      Decimal(0) if trial['team'] != 'models' or receipt['stage'] == 'setup' else Decimal(str(max_dollars)))
                 calls_used += accounted_calls
-                dollars_used += accounted_dollars
+                dollars_used = money_total((dollars_used,accounted_dollars))
                 block_calls -= max_calls
-                block_dollars -= Decimal(str(max_dollars))
+                block_dollars = difference(block_dollars,Decimal(str(max_dollars)))
                 ledger.emit('trial_finished', **receipt, accounted_calls=accounted_calls,
-                            accounted_estimated_usd=float(accounted_dollars),
+                            accounted_estimated_usd=accounted_dollars,
                             released_calls=max(0, max_calls - accounted_calls),
-                            released_estimated_usd=float(max(Decimal(0), Decimal(str(max_dollars)) - accounted_dollars)))
+                            released_estimated_usd=max(Decimal(0), difference(Decimal(str(max_dollars)),accounted_dollars)))
                 if interrupted is not None:
                     raise interrupted
                 if accounted_calls > max_calls or accounted_dollars > Decimal(str(max_dollars)) or (
@@ -311,18 +342,18 @@ async def run_campaign(root: Path, *, offline: bool = False, live: bool = False,
                     stop = receipt['stop_reason']
                     break
             ledger.emit('block_released', block_id=block_id, released_calls=block_calls,
-                        released_estimated_usd=float(block_dollars))
+                        released_estimated_usd=block_dollars)
             active_block = None
             if stop != 'completed':
                 break
         ledger.emit('campaign_stopped', reason=stop, accounted_calls=calls_used,
-                    accounted_estimated_usd=float(dollars_used))
+                    accounted_estimated_usd=dollars_used)
     except asyncio.CancelledError:
         if active_block is not None:
             ledger.emit('block_released', block_id=active_block, released_calls=block_calls,
-                        released_estimated_usd=float(block_dollars))
+                        released_estimated_usd=block_dollars)
         ledger.emit('campaign_stopped', reason='cancelled', accounted_calls=calls_used,
-                    accounted_estimated_usd=float(dollars_used))
+                    accounted_estimated_usd=dollars_used)
         raise
     finally:
         lock.unlink()
@@ -369,10 +400,17 @@ def main(argv: list[str] | None = None) -> int:
     except KeyboardInterrupt:
         print('Interrupted; analyze the existing campaign without relaunching.', file=sys.stderr)
         return 130
+    except (CampaignError,ConfigError) as error:
+        print(str(error),file=sys.stderr)
+        return 2
+    except FileExistsError:
+        print('Campaign/report path or runner lock already exists; choose a fresh output or analyze the existing campaign.',file=sys.stderr)
+        return 2
     except (ValueError, OSError, TypeError, KeyError):
         print('Campaign operation failed; inspect registration and available sanitized ledger/artifacts.', file=sys.stderr)
         return 2
 
 
 if __name__ == '__main__':
-    raise SystemExit(main())
+    from .campaign import main as entrypoint
+    raise SystemExit(entrypoint())

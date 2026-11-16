@@ -8,6 +8,7 @@ import csv
 from decimal import Decimal
 import json
 import math
+import os
 from pathlib import Path
 import random
 from statistics import NormalDist
@@ -17,6 +18,10 @@ from .campaign_models import CampaignSpec, trial_settings
 from .conditions import CONDITIONS
 from .provenance import ROOT, collect_source, read_provenance, _WorldSnapshot
 from .protocol import ROLES
+from .campaign_validation import validate_summary, BUDGET_COUNTS, BUDGET_MONEY, utc, cross_artifacts
+from .policies import policy_identity
+from .money import amount, total as money_total, difference, json_fields
+from uuid import UUID
 
 TRIAL_STOPS = frozenset({'victory', 'defeat', 'turn_limit', 'call_budget', 'spend_budget',
                          'provider_error', 'unreliable_agent', 'internal_error', 'local_error',
@@ -28,6 +33,8 @@ ATTEMPT_STATUSES = frozenset({'ok', 'cancelled', 'timeout', 'refusal', 'incomple
 
 
 def percentile(values: list[float], p: float) -> float | None:
+    if type(p) not in (int,float) or not math.isfinite(p) or not 0<=p<=1:
+        raise ValueError('Percentile probability must lie between zero and one')
     if not values:
         return None
     ordered = sorted(values)
@@ -42,6 +49,8 @@ def distribution(values: list[float]) -> dict:
 
 
 def wilson(successes: int, total: int) -> list[float] | None:
+    if type(successes) is not int or type(total) is not int or not 0<=successes<=total:
+        raise ValueError('Invalid binary counts')
     if total == 0:
         return None
     if not 0 <= successes <= total:
@@ -115,31 +124,11 @@ def _project_usage(value) -> dict | None:
 
 
 def _valid_summary(value) -> bool:
-    if not isinstance(value, dict):
+    try:
+        validate_summary(value)
+        return True
+    except (ValueError,TypeError,KeyError,OverflowError,RecursionError):
         return False
-    if any(type(value.get(key)) is not bool for key in ('win', 'loss', 'completed')):
-        return False
-    if value['win'] and value['loss'] or value['completed'] != (value['win'] or value['loss']):
-        return False
-    if type(value.get('turns')) is not int or not 0 <= value['turns'] <= 12:
-        return False
-    if not isinstance(value.get('stop_reason'), str) or value['stop_reason'] not in TRIAL_STOPS or not isinstance(value.get('budget'), dict):
-        return False
-    if value['completed']:
-        if not isinstance(value.get('scores'), dict) or set(value['scores']) != set(ROLES) or any(
-                type(n) is not int for n in value['scores'].values()):
-            return False
-    elif value.get('scores') is not None:
-        return False
-    budget = value['budget']
-    for key in ('calls_started', 'max_calls', 'reported_input_tokens', 'reported_output_tokens', 'unknown_usage_calls'):
-        if type(budget.get(key)) is not int or budget[key] < 0:
-            return False
-    for key in ('estimated_cost_usd', 'known_usage_estimated_usd', 'retained_estimate_usd'):
-        amount = budget.get(key)
-        if amount is not None and (type(amount) not in (int, float) or not math.isfinite(amount) or amount < 0):
-            return False
-    return True
 
 
 def _artifacts(root: Path, trial: dict, registration: dict) -> tuple[dict, list[str]]:
@@ -162,6 +151,14 @@ def _artifacts(root: Path, trial: dict, registration: dict) -> tuple[dict, list[
                 execution = p['execution']['value'] if p['execution'] else None
                 if execution is None or execution['settings'] != settings.model_dump():
                     raise ValueError()
+                if (p['lifecycle']['stage']!='ended' or str(UUID(p['run_id']))!=p['run_id'] or
+                    execution['mode']!=('live' if trial['team']=='models' else 'mock')):
+                    raise ValueError()
+                expected_policy=None
+                if trial['team']!='models':
+                    expected_policy=policy_identity(trial['team'],UUID(trial['trial_id']),settings.max_turns)
+                    if trial['team']=='uniform':expected_policy['python_version']=p['environment']['value']['python']['version']
+                if execution['policy']!=expected_policy:raise ValueError()
                 for role in ROLES:
                     expected = trial['players'][role] if trial['team'] == 'models' else {
                         'provider': 'mock', 'model': 'scripted-fixture' if trial['team'] == 'scripted' else trial['team']+'-v1'}
@@ -170,6 +167,7 @@ def _artifacts(root: Path, trial: dict, registration: dict) -> tuple[dict, list[
                     if trial['team'] == 'models' and (execution['pricing'][role] != expected['pricing'] or
                             p['players'][role]['api_contract'] != registration['frozen']['provider_contracts'][expected['provider']]):
                         raise ValueError()
+                    if trial['team']!='models' and execution['pricing'][role] is not None:raise ValueError()
                 data['provenance'] = p
                 if p['source'] != registration['frozen']['source'] or p['environment'] != registration['frozen']['environment']:
                     issues.append('provenance_drift')
@@ -190,9 +188,7 @@ def _artifacts(root: Path, trial: dict, registration: dict) -> tuple[dict, list[
                         call.get('settlement_basis') not in ('complete_usage', 'retained_estimate')):
                         raise ValueError()
                     for key in ('reservation_quote_usd', 'settled_amount_usd'):
-                        amount = call.get(key)
-                        if amount is not None and (type(amount) not in (int, float) or not math.isfinite(amount) or amount < 0):
-                            raise ValueError()
+                        amount(call,key)
             elif name == 'phases':
                 for phase in data[name]:
                     if (not isinstance(phase.get('statuses'), dict) or set(phase['statuses']) != set(ROLES) or
@@ -224,7 +220,9 @@ def _artifacts(root: Path, trial: dict, registration: dict) -> tuple[dict, list[
             issues.append('world_turn_mismatch')
         if 'replay' in data and len(data['replay']) != result['turns']:
             issues.append('resolved_turn_count_mismatch')
-    return data, issues
+    try:issues.extend(cross_artifacts(data,trial,settings))
+    except (ValueError,TypeError,KeyError,OverflowError):issues.append('accounting_inconsistent')
+    return data, sorted(set(issues))
 
 
 def _counts(rows: list[dict]) -> dict:
@@ -245,7 +243,8 @@ def _counts(rows: list[dict]) -> dict:
 
 def _summary(rows: list[dict]) -> dict:
     counts = _counts(rows)
-    known_costs = [r['estimated_cost_usd'] for r in rows if r['launched'] and r['estimated_cost_usd'] is not None]
+    known_costs = [amount(r,'estimated_cost_usd') for r in rows if r['launched'] and r['estimated_cost_usd'] is not None]
+    known_cost_total=money_total(known_costs)
     successes = [r for r in rows if r['operational_success'] is True]
     return {'counts': counts,
             'operational_success': success_summary(counts['operational_successes'], counts['launched'],
@@ -262,13 +261,13 @@ def _summary(rows: list[dict]) -> dict:
                       'reported_cached_input_tokens', 'reported_reasoning_output_tokens')},
             'usage_coverage': {'trials_with_summary': sum(r['calls_started'] is not None for r in rows),
                                'launched_trials_without_summary': sum(r['launched'] and r['calls_started'] is None for r in rows)},
-            'cost': {'priced_trials': len(known_costs), 'unpriced_or_unknown_launched_trials': counts['launched']-len(known_costs),
-                     'known_estimated_usd': sum(known_costs),
-                     'known_usage_estimated_usd': sum(r['known_usage_estimated_usd'] or 0 for r in rows) if known_costs else None,
-                     'retained_estimate_usd': sum(r['retained_estimate_usd'] or 0 for r in rows) if known_costs else None,
-                     'per_launched_trial_usd': sum(known_costs)/counts['launched'] if counts['launched'] and len(known_costs) == counts['launched'] else None,
-                     'per_successful_completion_usd': sum(known_costs)/len(successes) if successes and len(known_costs) == counts['launched'] else None,
-                     'cost_is_estimate_not_billing_guarantee': True}}
+            'cost': json_fields({'priced_trials': len(known_costs), 'unpriced_or_unknown_launched_trials': counts['launched']-len(known_costs),
+                     'known_estimated_usd': known_cost_total if known_costs else None,
+                     'known_usage_estimated_usd': money_total(amount(r,'known_usage_estimated_usd') or Decimal(0) for r in rows) if known_costs else None,
+                     'retained_estimate_usd': money_total(amount(r,'retained_estimate_usd') or Decimal(0) for r in rows) if known_costs else None,
+                     'per_launched_trial_usd': float(known_cost_total/counts['launched']) if counts['launched'] and len(known_costs) == counts['launched'] else None,
+                     'per_successful_completion_usd': float(known_cost_total/len(successes)) if successes and len(known_costs) == counts['launched'] else None,
+                     'cost_is_estimate_not_billing_guarantee': True})}
 
 
 def analyze(root: Path) -> dict:
@@ -282,13 +281,12 @@ def analyze(root: Path) -> dict:
         with ledger_path.open(encoding='utf-8') as handle:
             for sequence, line in enumerate(handle, 1):
                 try:
-                    row = json.loads(line)
+                    row = json.loads(line,parse_constant=lambda _: (_ for _ in ()).throw(ValueError()))
                     if (type(row['sequence']) is not int or row['sequence'] != sequence or
                             type(row['schema_version']) is not int or row['schema_version'] != 1):
                         raise ValueError()
                     event = row['event']
-                    if not isinstance(row.get('at'), str) or not row['at'].endswith('Z'):
-                        raise ValueError()
+                    utc(row.get('at'))
                     numeric = {'block_reserved': ('reserved_calls', 'reserved_estimated_usd'),
                                'block_released': ('released_calls', 'released_estimated_usd'),
                                'trial_finished': ('accounted_calls', 'accounted_estimated_usd', 'released_calls',
@@ -300,9 +298,18 @@ def analyze(root: Path) -> dict:
                         value = row.get(key)
                         if type(value) not in (int, float) or not math.isfinite(value) or value < 0:
                             raise ValueError()
+                        if key.endswith('_calls') and type(value) is not int:
+                            raise ValueError()
+                        if key.endswith('_usd'):amount(row,key)
                     if event == 'trial_finished' and (row.get('cleanup_status') not in ('ok', 'failed', 'cancelled') or
                             row.get('stage') not in ('setup', 'execution') or row.get('stop_reason') not in TRIAL_STOPS):
                         raise ValueError()
+                    if event=='trial_finished':
+                        for key in ('execution_stop_reason','recording_stop_reason'):
+                            value=row.get(key)
+                            if value is not None and (not isinstance(value,str) or value not in TRIAL_STOPS):raise ValueError()
+                        run_id=row.get('run_id')
+                        if run_id is not None and (not isinstance(run_id,str) or str(UUID(run_id))!=run_id):raise ValueError()
                     if event == 'campaign_started' and (type(row.get('registration_matches')) is not bool or
                             row.get('registration_sha256') != registration['sha256']):
                         raise ValueError()
@@ -318,14 +325,20 @@ def analyze(root: Path) -> dict:
                             raise ValueError()
                         finished[row['trial_id']] = row
                     elif event == 'campaign_started':
+                        if campaign_start is not None or events:raise ValueError()
                         campaign_start = row
                     elif event == 'campaign_stopped':
+                        if campaign_stop is not None:raise ValueError()
                         campaign_stop = row
+                    if campaign_stop is not None and event!='campaign_stopped':raise ValueError()
                     events.append(row)
-                except (ValueError, TypeError, KeyError, OverflowError):
+                except (ValueError, TypeError, KeyError, OverflowError, RecursionError):
                     anomalies.append('ledger_incomplete_or_invalid')
                     break
     ids = {t['trial_id'] for t in registration['schedule']}
+    expected_blocks={t['trial_id']:t['block_id'] for t in registration['schedule']}
+    if any(row.get('block_id')!=expected_blocks.get(key) for key,row in launched.items()):
+        anomalies.append('launch_block_mismatch')
     if set(launched) - ids or set(finished) - ids:
         raise CampaignError('Ledger refers to an unregistered trial')
     rows, attempt_rows = [], []
@@ -343,9 +356,8 @@ def analyze(root: Path) -> dict:
                'scores': None, 'completed': None, 'run_id': None,
                'artifact_directory': 'trials/'+trial_id,
                'estimated_cost_usd': None, 'known_usage_estimated_usd': None, 'retained_estimate_usd': None}
-        for key in ('calls_started', 'reported_input_tokens', 'reported_output_tokens', 'unknown_usage_calls',
-                    'input_usage_calls', 'output_usage_calls', 'reported_cached_input_tokens', 'reported_reasoning_output_tokens',
-                    'calls_reserved_total', 'calls_released', 'reserved_calls'):
+        row.update({key+'_decimal':None for key in BUDGET_MONEY})
+        for key in BUDGET_COUNTS:
             row[key] = None
         data, issues = _artifacts(root, trial, registration) if launch else ({}, [])
         row['artifact_issues'] = issues
@@ -373,10 +385,17 @@ def analyze(root: Path) -> dict:
         if result:
             row.update(engine_outcome='win' if result['win'] else 'defeat' if result['loss'] else 'nonterminal',
                        turns=result['turns'], completed=result['completed'], energy=result.get('energy'), scores=result['scores'])
-            row.update({key: result['budget'].get(key) for key in row if key in result['budget']})
+            row.update({key:result['budget'].get(key) for key in BUDGET_COUNTS+BUDGET_MONEY})
+            for key in BUDGET_MONEY:
+                row[key+'_decimal']=result['budget'].get(key+'_decimal')
         if receipt and _valid_summary(receipt.get('result')) and data.get('result') and receipt['result'] != data['result']:
             issues.append('ledger_artifact_disagreement')
             row.update(operational_success=None, engine_outcome='unknown')
+        if receipt and data.get('provenance'):
+            native=data['provenance'];life=native['lifecycle']
+            if receipt['run_id']!=native['run_id']:issues.append('run_id_mismatch')
+            if receipt['recording_stop_reason']!=life['stop_reason']:issues.append('recording_stop_mismatch')
+            if receipt['execution_stop_reason']!=life['execution_stop_reason']:issues.append('execution_stop_mismatch')
         row['artifact_available'] = bool(launch and not issues)
         provenance = data.get('provenance')
         if provenance:
@@ -395,7 +414,27 @@ def analyze(root: Path) -> dict:
                                        if 'replay' in data else None)
         rows.append(row)
     counts = _counts(rows)
-    complete = counts['launched'] == counts['planned'] and counts['unknown_operational'] == 0 and not anomalies and bool(
+    def event_total(event_names, key):
+        return money_total((amount(event,key) if key.endswith('_usd') else Decimal(event.get(key,0)))
+                           for event in events if event['event'] in event_names)
+    calls_reserved = int(event_total(('block_reserved',), 'reserved_calls'))
+    calls_released = int(event_total(('trial_finished', 'block_released'), 'released_calls'))
+    calls_accounted = int(event_total(('trial_finished',), 'accounted_calls'))
+    dollars_reserved = event_total(('block_reserved',), 'reserved_estimated_usd')
+    dollars_released = event_total(('trial_finished', 'block_released'), 'released_estimated_usd')
+    dollars_accounted = event_total(('trial_finished',), 'accounted_estimated_usd')
+    balance_calls=calls_reserved-calls_released-calls_accounted
+    balance_usd=difference(difference(dollars_reserved,dollars_released),dollars_accounted)
+    uncertainty=money_total(Decimal(str(math.ulp(float(event[key])))) for event in events
+        if event['event'] in ('block_reserved','block_released','trial_finished')
+        for key in ('reserved_estimated_usd','released_estimated_usd','accounted_estimated_usd')
+        if key in event and key+'_decimal' not in event)
+    if balance_calls:anomalies.append('unbalanced_call_reservations')
+    if abs(balance_usd)>uncertainty:anomalies.append('unbalanced_estimate_reservations')
+    if campaign_stop and (campaign_stop['accounted_calls']!=calls_accounted or
+            abs(difference(amount(campaign_stop,'accounted_estimated_usd'),dollars_accounted))>uncertainty):
+        anomalies.append('campaign_settlement_mismatch')
+    complete = len(launched)==len(finished) and counts['launched'] == counts['planned'] and counts['unknown_operational'] == 0 and not anomalies and bool(
         campaign_stop and campaign_stop['reason'] == 'completed')
     eligible = complete and all(r['artifact_available'] for r in rows) and bool(
         campaign_start and campaign_start['registration_matches']) and registration['frozen']['source']['status'] == 'clean' and registration['frozen']['environment']['value']['status'] == 'complete'
@@ -414,6 +453,7 @@ def analyze(root: Path) -> dict:
         equal_weight_arms.append({'room': room, 'team': team, 'condition': condition,
             'assignment_count': len(values), 'weights': 'equal_per_prespecified_assignment',
             'observed_rate': sum(v['rate'] for v in values)/len(values) if all(v['rate'] is not None for v in values) else None,
+            'launched_bounds':[sum(v['launched_bounds'][i] for v in values)/len(values) for i in (0,1)] if all(v['launched_bounds'] is not None for v in values) else None,
             'all_planned_bounds': [sum(v['all_planned_bounds'][i] for v in values)/len(values) for i in (0, 1)]})
     contrasts = []
     analysis_source = collect_source(ROOT)
@@ -436,14 +476,6 @@ def analyze(root: Path) -> dict:
                 contrasts.append({'room': room, 'team': team, 'contrast': 'full-minus-'+comparison,
                                   'exploratory': comparison != 'disabled', **paired_bootstrap(strata)})
     attempts = Counter(call['status'] for call in attempt_rows)
-    def event_total(event_names, key):
-        return sum((Decimal(str(event.get(key, 0))) for event in events if event['event'] in event_names), Decimal(0))
-    calls_reserved = int(event_total(('block_reserved',), 'reserved_calls'))
-    calls_released = int(event_total(('trial_finished', 'block_released'), 'released_calls'))
-    calls_accounted = int(event_total(('trial_finished',), 'accounted_calls'))
-    dollars_reserved = event_total(('block_reserved',), 'reserved_estimated_usd')
-    dollars_released = event_total(('trial_finished', 'block_released'), 'released_estimated_usd')
-    dollars_accounted = event_total(('trial_finished',), 'accounted_estimated_usd')
     report = {'schema_version': 1, 'analysis_version': 1, 'analyzed_at': now(),
               'analysis_source': analysis_source, 'registration_sha256': registration['sha256'],
               'experiment_id': registration['experiment_id'], 'stage': spec.stage,
@@ -469,9 +501,11 @@ def analyze(root: Path) -> dict:
                   'estimated_usd_reserved_total': float(dollars_reserved),
                   'estimated_usd_released_total': float(dollars_released),
                   'estimated_usd_accounted': float(dollars_accounted),
-                  'reservation_balance_estimated_usd': float(dollars_reserved-dollars_released-dollars_accounted),
+                  'reservation_balance_estimated_usd': float(balance_usd),
+                  'reservation_balance_estimated_usd_decimal':str(balance_usd),
+                  'legacy_rounding_uncertainty_usd':float(uncertainty),
                   'launched_without_finished_receipt': len(launched)-len(finished),
-                  'interpretation': 'An interrupted ledger can retain reservations; negative balances expose overruns. Monetary reservations are local estimates, not invoices.'},
+                  'interpretation': 'An interrupted ledger can retain reservations; balances beyond the reported legacy rounding uncertainty expose unmatched exposure. Monetary reservations are local estimates, not invoices.'},
               'limitations': ['No provider ranking or general cooperation/vision claim follows from this fixed room.',
                               'Pilot and diagnostic runs are not confirmatory estimates.',
                               'Missing and unlaunched outcomes are retained; no complete-pair subset substitutes for the cohort.',
@@ -491,12 +525,22 @@ def write_report(report: dict, out: Path) -> None:
     atomic_json(out / 'report.json', report)
     for name in ('trials', 'cells', 'attempts'):
         rows = report[name]
-        fields = list(rows[0]) if rows else []
-        with (out / (name+'.csv')).open('w', encoding='utf-8', newline='') as handle:
-            writer = csv.DictWriter(handle, fieldnames=fields, lineterminator='\n')
-            writer.writeheader()
-            writer.writerows({k: json.dumps(v, ensure_ascii=True, allow_nan=False) if isinstance(v, (dict, list)) else v
-                             for k, v in row.items()} for row in rows)
+        fields = list(rows[0]) if rows else {'trials':['trial_id'],'cells':['room','team','condition'],
+                                            'attempts':['trial_id','role','turn','phase','attempt','status']}[name]
+        target=out/(name+'.csv');temporary=target.with_suffix('.csv.tmp')
+        def cell(value):
+            if isinstance(value,(dict,list)):return json.dumps(value,ensure_ascii=True,allow_nan=False)
+            if isinstance(value,str) and (value.startswith(('\t','\r','\n')) or value.lstrip(' \t\r\n').startswith(('=','+','-','@'))):
+                return "'"+value
+            return value
+        try:
+            with temporary.open('w',encoding='utf-8',newline='') as handle:
+                writer=csv.DictWriter(handle,fieldnames=fields,lineterminator='\n');writer.writeheader()
+                writer.writerows({k:cell(v) for k,v in row.items()} for row in rows)
+                handle.flush();os.fsync(handle.fileno())
+            temporary.replace(target)
+        finally:
+            temporary.unlink(missing_ok=True)
         with (out / (name+'.csv')).open(encoding='utf-8', newline='') as handle:
             if len(list(csv.DictReader(handle))) != len(rows):
                 raise CampaignError('Report readback failed')

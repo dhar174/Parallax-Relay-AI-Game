@@ -10,6 +10,42 @@ from parallax_relay.state import Action, initial_world
 
 
 class AccountingTests(unittest.TestCase):
+    def test_all_diagnostic_codes_clear_stale_keys_and_keep_caller_actions(self):
+        from copy import deepcopy
+        cases=[('wait','SPECTRA',Action('WAIT'),{}),
+               ('applied','SPECTRA',Action('MOVE',-1,1),{}),
+               ('invalid_parameters','SPECTRA',Action('MOVE',0,3),{}),
+               ('outer_wall','SPECTRA',Action('MOVE',-1,2),{'x':0}),
+               ('unbridged_gap','SPECTRA',Action('MOVE',1,1),{'x':4}),
+               ('role_or_range','SPECTRA',Action('VENT'),{}),
+               ('insufficient_resource','PYRA',Action('VENT'),{'coolant':0}),
+               ('already_done','FLUX',Action('REROUTE'),{'bridge_extended':True}),
+               ('overload','FLUX',Action('REROUTE'),{'motor_heat':4}),
+               ('nothing_to_collect','SPECTRA',Action('COLLECT'),{}),
+               ('unknown_action','SPECTRA',Action('UNKNOWN'),{})]
+        for code,role,action,changes in cases:
+            with self.subTest(code=code):
+                world=initial_world()
+                for key,value in changes.items():
+                    if key=='x':world.robots[role].x=value
+                    else:setattr(world,key,value)
+                actions={r:Action('WAIT') for r in ROLES};actions[role]=action
+                before=deepcopy(actions);diagnostics={'STALE':'SECRET_SENTINEL'}
+                observed=resolve_turn(world,actions,diagnostics=diagnostics)
+                self.assertEqual(diagnostics[role],code);self.assertEqual(set(diagnostics),set(ROLES))
+                self.assertEqual(actions,before)
+                self.assertEqual(observed.snapshot(),resolve_turn(world,actions).snapshot())
+
+    def test_partial_pricing_has_explicit_coverage_and_unknown_overall_total(self):
+        rates={'SPECTRA':Rates(input_per_million=1,output_per_million=1)}
+        budget=Budget(MatchSettings(max_attempts=1),rates)
+        ticket=budget.reserve_phase({'SPECTRA':AgentRequest(Observation('SPECTRA',0,'{}',b''),'commit')})['SPECTRA']
+        ticket.start();receipt=ticket.settle(Usage(10,2));ticket.release()
+        summary=budget.summary()
+        self.assertEqual(summary['priced_roles'],['SPECTRA']);self.assertEqual(summary['unpriced_roles'],['PYRA','FLUX'])
+        self.assertEqual(summary['priced_role_estimated_usd'],receipt['settled_amount_usd'])
+        self.assertIsNone(summary['estimated_cost_usd']);self.assertIsNone(summary['known_usage_estimated_usd'])
+
     def test_malformed_outcome_and_usage_are_rejected_or_allowlisted(self):
         from parallax_relay.campaign_analysis import _valid_summary, _project_usage
         self.assertFalse(_valid_summary({'win':False,'loss':False,'completed':False,'turns':0,

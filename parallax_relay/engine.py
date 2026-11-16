@@ -42,6 +42,7 @@ def resolve_turn(world: WorldState, actions: dict[str, Action], *, diagnostics: 
     w = deepcopy(world)
     events: list[str] = []
     diagnostics = diagnostics if diagnostics is not None else {}
+    diagnostics.clear()
     diagnostics.update({role: 'wait' if act.kind == 'WAIT' else 'applied' for role, act in actions.items()})
 
     # Parameters are game legality, not a reason to retry a model response.

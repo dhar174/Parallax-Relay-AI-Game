@@ -39,7 +39,7 @@ The JSON specification is version 1; unknown keys are rejected. Its fields are:
 | `rooms` | Only `["split_span"]` is implemented |
 | `conditions` | Unique subset of the five arms; all five by default |
 | `repetitions` | Diagnostic default 1; pilot exactly 5; confirmation exactly 30 |
-| `match` | Existing match settings shared across arms; omit `condition`; the schedule supplies condition/round count |
+| `match` | Existing match settings shared across arms; omit `condition` and leave `communication_rounds` at default 2; the schedule supplies both |
 | `campaign_max_calls` | Required positive integer; conservative block admission counts every possible attempt |
 | `campaign_max_estimated_cost_usd` | Required positive live estimate guard; omitted for unpriced offline policies |
 | `scheduler_seed` | Nonnegative integer, default 0; controls order, not model randomness |
@@ -53,6 +53,8 @@ the same pricing/account-variable configuration. Deterministic oracle/WAIT teams
 run once per condition; uniform teams use the full repetition count without
 model-label multiplication. For three distinct model identities this gives 150
 pilot and 900 confirmatory model trials per room, plus 35/160 baseline trials.
+An offline diagnostic containing only deterministic teams rejects repetitions above
+one instead of silently discarding them. Money/interval fields reject JSON booleans.
 
 `register` does not resolve keys, construct HTTP agents or contact providers. It
 freezes the validated specification, UUID allocation, block ordering, source,
@@ -79,6 +81,8 @@ into confirmation; missing/failed trials cannot be replaced for favorable result
 separate explicit approval of the registered spending exposure. No live campaign
 was conducted to deliver Slice 8. `--env-file` is live-only, uses literal loading,
 and preserves process-variable precedence; credential values are never recorded.
+Selected keys are trimmed and checked before acquiring the runner lock or writing
+one-shot markers. Missing/invalid keys leave the registration reusable.
 Requested model aliases do not attest remote backend revisions or image ability.
 
 The runner reserves a complete next block before starting any of its trials.
@@ -101,9 +105,12 @@ fresh agents, state, histories, notes and a native Recorder under `trials/<UUID>
 The ledger captures setup failures even if no manifest can be written. Runner
 duration includes finalization and client teardown; match lifecycle duration
 remains separate. Cleanup failure after engine victory is an operational failure.
-Cancellation drains cooperative role tasks and attempts bounded client cleanup.
+Cancellation drains cooperative role tasks and attempts bounded client cleanup;
+cleanup failure remains recorded separately and does not relabel cancellation.
 
-Exclusive creation of `.runner.lock` prevents concurrent workers. `started.json`
+Exclusive creation of `.runner.lock` prevents concurrent workers. Marker checks
+run inside the owned lock, include broken symlinks, and lock write/close failures
+release that lock. `started.json`
 and the ledger prevent automatic reruns even after a crash. There is no v1 resume
 command. Analyze the existing directory; use new IDs/registration and explicit
 rerun linkage for an operational recheck. Never delete a marker to resume a cohort.
@@ -120,6 +127,9 @@ schedule can contain engine defeats or intentional turn-limit stops.
 
 `analyze` performs no provider calls or trial execution. It writes fresh
 `report.json`, `trials.csv`, `cells.csv` and `attempts.csv`, verifying readback.
+Each file is written through a temporary file and atomic replacement; the four
+files are not a transaction. String CSV cells with formula prefixes are quoted
+with a leading apostrophe; JSON retains original values. Empty CSVs retain headers.
 Reports link registration and per-trial artifacts; model dialogue, HUDs, private
 notes and image contents remain in native spectator files rather than CSV rows.
 Review all spectator metadata before sharing. Reports keep:
@@ -146,6 +156,10 @@ complete-pair substitute. Secondary contrasts are exploratory. Degenerate interv
 are labeled and do not establish equivalence. Deterministic controls are not
 independent repeated samples. No fixed-room result establishes held-out ability,
 provider rankings, general image understanding or broad cooperation.
+Validation cross-checks ended lifecycles, scheduled mode/policy, run UUIDs, stop
+reasons, engine state/energy/turns, replay sequences, phase ranges and call/usage/
+cost conservation. Malformed ledgers, duplicate lifecycle events and unmatched
+launch/finish receipts prevent complete-cohort inference.
 
 ## Accounting additions
 
@@ -155,6 +169,13 @@ Budget summaries separately expose known-usage-priced and retained-estimate tota
 partial token coverage, cached/reasoning counters and reserved/released call counts.
 Inclusive reasoning tokens are not added again to output. Counter-origin states
 remain reported distinctly from normalized zero defaults.
+Numeric dollar fields have additive `<field>_decimal` strings for exact local
+estimate persistence. New records reconcile those values with Decimal arithmetic;
+historical numeric-only ledgers disclose their bounded serialization uncertainty.
+Partial per-role pricing keeps the overall total null, exposes `priced_roles`,
+`unpriced_roles` and `priced_role_estimated_usd`, and retains priced call amounts.
+Reports with no priced trials keep every cost aggregate null, including the known
+partial total; explicit priced zero remains zero.
 
 Turn records add spectator-only `action_outcomes` from engine resolution. These
 diagnostics never enter requests/history or provide policies with a legality oracle.

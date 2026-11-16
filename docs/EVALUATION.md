@@ -281,8 +281,8 @@ usage. Distinguish started attempts from reserved allowance and released capacit
 Use counts with their units/denominators; valid-but-illegal game actions receive no
 strategic retry. Preserve failed-trial diagnostics with sanitized stage/status data.
 
-Measure trial wall time from launch through finalization/client teardown in the
-future runner. Separately report provenance `lifecycle.elapsed_seconds`, which
+The campaign runner measures trial wall time from launch through finalization/client
+teardown. Separately report provenance `lifecycle.elapsed_seconds`, which
 covers match execution and cooperative task draining but excludes final artifact
 writes/client cleanup. Missing end times remain unknown, not zero. Give per-attempt
 latency and trial-duration distributions with counts and median/interquartile range;
@@ -334,7 +334,7 @@ are 216/full, 144/reduced, 72/disabled, 216/withheld and 216/no-images: **864 pe
 five-arm block**. For the six-assignment design this is at most **25,920 pilot and
 155,520 confirmatory attempts per room/roster**, before additional baselines or
 separately reported reruns. Actual calls may be lower. These figures are design
-bounds for future controls, not newly implemented limits or spending authorization.
+bounds for the implemented controls, not spending authorization.
 
 Report configured ceilings, planned maximum exposure, started/reserved/released
 calls, known/estimated/unknown dollar exposure, actual completion counts, and why
@@ -355,9 +355,9 @@ exploratory contrasts, baselines, role assignments and room splits. Synthetic
 examples and scripted verification stay labeled separately from model evidence.
 
 Current [provenance](PROVENANCE.md) supplies individual-run identity and lifecycle.
-#18 supplies tested policies and request controls; #19 must supply the pre-launch
-ledger, scheduling, campaign budgeting and aggregation/analysis; #20 must supply
-held-out families and solvability/privacy checks. #19 and #20 remain future work in this controls slice. None
+#18 supplies tested policies and request controls; #19 supplies the pre-launch
+ledger, scheduling, campaign budgeting and aggregation/analysis. #20 remains future
+work for held-out families and solvability/privacy checks. None
 of this protocol establishes live compatibility or requires a paid run in this PR.
 
 ## Slice 8 controls delivery

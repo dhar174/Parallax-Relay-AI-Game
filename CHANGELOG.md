@@ -11,8 +11,8 @@
 - Record per-attempt quote/settlement and token coverage, separate known-price and
   retained-estimate amounts, and spectator-only structured action diagnostics.
 - Include an offline diagnostic example. No paid campaign or Site release was run.
-
-## Slice 8 controls
+- Harden review-driven artifact/ledger validation, runner locking and credential
+  preflight; preserve cancellation, exact estimate settlements and atomic safe CSVs.
 
 ### Slice 8 controls
 

@@ -302,8 +302,8 @@ remain readable without provenance; missing identity is unknown.
 
 For comparative work, follow the prospective [evaluation protocol](EVALUATION.md).
 UUID flags label individual runs. All five controls and the WAIT/uniform-v1
-baselines are implemented. Campaign registration, scheduling and aggregation
-remain the separate #19 workstream.
+baselines are implemented. The [campaign CLI](CAMPAIGNS.md) implements registration,
+serial scheduling, whole-block admission and all-trial aggregation.
 
 Open `index.html` locally. The round slider and arrow buttons select resolved turns.
 Images show the state **before** that round; events describe its result. Calls and

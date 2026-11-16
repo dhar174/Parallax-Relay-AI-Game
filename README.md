@@ -119,7 +119,7 @@ requests. Diagnostic fixtures do not establish model ability or benchmark result
 
 This release has one fixed room, three active roles, compatible objectives, and a
 known scripted solution. It has no platformer physics, procedural rooms, playable
-ECHO role, live dashboard, validated benchmark results.
+ECHO role, live dashboard, or validated benchmark results.
 
 The [roadmap](ROADMAP.md) prioritizes reliable execution and reproducible evaluation
 before expanding the cooperative puzzles. The [verification record](docs/VERIFICATION.md)
