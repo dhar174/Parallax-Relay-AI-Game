@@ -24,8 +24,18 @@ the 10,000-resample analysis; it does not attest a real clean-source experiment.
 Actual HTTP serialization tests cover all three adapters and five arms over later
 turns and retry repairs without network access.
 
-The final local suite and hosted matrix must be checked for the submitted revision;
-results below are updated after inspecting their actual receipts. Chromium 156
+The final local suite passed **290 Python tests in 45.847 seconds**.
+The [sanitized clean-source diagnostic](verification/2026-11-15-slice8-offline-summary.json)
+records a second diagnostic on clean execution revision `58be0fd`, with the same
+15/15 artifact-complete outcomes, 216 calls and zero remaining reservations.
+[Workflow 43796878932](https://github.com/dhar174/Parallax-Relay-AI-Game/actions/runs/43796878932)
+at `58be0fd` passed all six jobs; every job log was inspected for 290 passing
+Python tests, dependency consistency, compilation, expected mocks and diff checks.
+Locked Ubuntu/Python 3.12 also passed all 54 Node tests with no skips.
+Controls-only [workflow 43793559788](https://github.com/dhar174/Parallax-Relay-AI-Game/actions/runs/43793559788)
+at `f9d035e` passed all six jobs with 268 Python tests and 53 Node tests; every
+log was inspected. Later evidence-only revisions need their own CI receipt.
+Chromium 156
 again exercised the five selectors, real no-images companion output, three PNGs,
 turn-limit/unscored labels and desktop/mobile overflow with no runtime exceptions.
 The workbench passed 54 Node tests with no skips. Dependency consistency,
