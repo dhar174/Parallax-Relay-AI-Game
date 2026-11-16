@@ -518,17 +518,21 @@ def analyze(root: Path) -> dict:
         for row in collection:
             if 'room' in row:row.update(labels(row['room']))
     descriptive={}
+    def descriptive_summary(group):
+        summary=_summary(group)
+        summary['operational_success'].pop('wilson_95')
+        return summary
     for dimension in ('family','split'):
         groups=defaultdict(list)
         for row in rows:groups[row[dimension]].append(row)
-        descriptive[dimension+'_summaries']=[{dimension:key,'interpretation':'Descriptive only; rooms are curated, not independent draws from a task population.',**_summary(group)} for key,group in sorted(groups.items())]
+        descriptive[dimension+'_summaries']=[{dimension:key,'interpretation':'Descriptive only; rooms are curated, not independent draws from a task population.',**descriptive_summary(group)} for key,group in sorted(groups.items())]
     report = {'schema_version': 2, 'analysis_version': 2, 'analyzed_at': now(),
               'analysis_source': analysis_source, 'registration_sha256': registration['sha256'],
               'experiment_id': registration['experiment_id'], 'stage': spec.stage,
               'registration': registration, 'completion_status': 'complete' if complete else 'incomplete',
               'cohort_eligible': eligible,
               'confirmatory_eligible': bool(spec.stage == 'confirmatory' and inference_eligible),
-              'counts': counts, 'overall': _summary(rows), 'cells': cell_reports,
+              'counts': counts, 'overall': (descriptive_summary(rows) if len({row['room'] for row in rows})>1 else _summary(rows)), 'cells': cell_reports,
               'equal_weight_arm_summaries': equal_weight_arms,
               'overall_interpretation': 'Descriptive accounting across the full schedule; comparisons use room/team/assignment cells and registered equal weights.',
               'contrasts': contrasts, 'trials': rows, 'attempts': attempt_rows,**descriptive,

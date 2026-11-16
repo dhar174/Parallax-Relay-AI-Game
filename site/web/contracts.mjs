@@ -92,17 +92,49 @@ export function checkRun(data){
  if(data.manifest.schema_version===3){
   const p=data.manifest.provenance;object(p,'provenance');
   field(p.schema_version,'provenance.schema_version',v=>v===3,'schema version 3');
-  const identity=p.inputs?.room?.value;object(identity,'room identity');
-  const room=identity.definition;object(room,'room definition');
-  string(room.id,'room.id');count(room.width,'room.width',3);
+  const external=p.lifecycle?.stage==='external_result'&&p.inputs==null&&p.execution==null;
+  const recorded=data.manifest.room_definition;
+  const identity=external?{id:recorded?.id,version:recorded?.version??1,definition:recorded}:p.inputs?.room?.value;
+  object(identity,'room identity');
+  object(identity.definition,'room definition');
+  const room={version:1,deadline:12,energy:6,cell_value:2,requires_shard:false,scoring_version:1,generation:'curated',generation_seed:null,...identity.definition};
+  const roomKeys=['id','version','family','split','width','deadline','bridges','exit','shard','cells','starts','energy','coolant','cell_value','requires_shard','scoring_version','generation','generation_seed'];
+  configObject(room,Object.fromEntries(roomKeys.map(k=>[k,true])),roomKeys,'room definition');
+  field(room.id,'room.id',v=>typeof v==='string'&&/^[a-z][a-z0-9_]{0,63}$/.test(v),'a room id');
+  count(room.width,'room.width',3);
   field(room.width,'room.width',v=>v<=13,'width <= 13');
   field(data.manifest.room,'manifest.room',v=>v===room.id&&identity.id===room.id,'the recorded room id');
   field(room.version,'room.version',v=>v===1&&identity.version===v,'room version 1');
-  count(room.deadline,'room.deadline',1);array(room.bridges,'room.bridges');array(room.cells,'room.cells');
+  for(const [key,expected] of Object.entries({deadline:12,energy:6,cell_value:2,scoring_version:1,generation:'curated',generation_seed:null}))field(room[key],'room.'+key,v=>v===expected,'the supported room metadata');
+  boolean(room.requires_shard,'room.requires_shard');count(room.coolant,'room.coolant');
+  field(room.coolant,'room.coolant',v=>v<=12,'coolant <= 12');
+  array(room.bridges,'room.bridges');array(room.cells,'room.cells');array(room.starts,'room.starts');
+  field(room.bridges,'room.bridges',v=>v.length>=1&&v.length<=2,'one or two bridges');
+  field(room.cells,'room.cells',v=>v.length>0&&new Set(v).size===v.length,'unique nonempty room cells');
+  field(room.starts,'room.starts',v=>v.length===3,'three room starts');
   const position=(v,path)=>{count(v,path);field(v,path,n=>n<room.width,'a position inside the room');};
   for(const key of ['exit','shard'])position(room[key],'room.'+key);
   room.cells.forEach(v=>position(v,'room cell'));
-  room.bridges.forEach(b=>{object(b,'room bridge');position(b.motor,'room motor');array(b.gap,'room gap');b.gap.forEach(v=>position(v,'room gap position'));});
+  room.starts.forEach(v=>position(v,'room start position'));
+  const gaps=[];
+  room.bridges.forEach((b,i)=>{
+   configObject(b,{gap:true,motor:true,heat:true},['gap','motor','heat'],'room bridge');
+   position(b.motor,'room motor');count(b.heat,'room heat');field(b.heat,'room heat',v=>v<=12,'heat <= 12');
+   array(b.gap,'room gap');
+   field(b.gap,'room gap',v=>v.length>0&&v.every((x,j)=>x===v[0]+j),'a nonempty contiguous unique gap');
+   b.gap.forEach(v=>position(v,'room gap position'));gaps.push(...b.gap);
+   field(b.motor,'room motor',v=>v<b.gap[0],'a motor before its gap');
+   if(i){field(b.gap[0],'room gap',v=>v>room.bridges[i-1].gap[0],'canonical bridge order');field(b.motor,'room motor',v=>Math.abs(v-room.bridges[i-1].motor)>2,'unambiguous controller ranges');}
+  });
+  field(gaps,'room gaps',v=>new Set(v).size===v.length,'disjoint room gaps');
+  const floor=[room.exit,room.shard,...room.cells,...room.starts,...room.bridges.map(b=>b.motor)];
+  field(floor,'room floor positions',v=>v.every(x=>!gaps.includes(x)),'objects and starts on floor');
+  field(room.starts,'room starts',v=>v.every(x=>x<Math.min(...gaps)),'starts on the first bank');
+  let familyValid=false;
+  if(room.family==='crossing')familyValid=room.split==='development'&&room.bridges.length===1&&room.exit>Math.max(...gaps)&&room.shard>Math.max(...gaps)&&!room.requires_shard;
+  if(room.family==='retrieval_return')familyValid=room.split==='held_out'&&room.bridges.length===1&&room.exit<Math.min(...gaps)&&room.shard>Math.max(...gaps)&&room.requires_shard;
+  if(room.family==='two_bridge_relay')familyValid=room.split==='held_out'&&room.bridges.length===2&&room.exit>Math.max(...gaps)&&room.shard>Math.max(...gaps)&&!room.requires_shard;
+  field(familyValid,'room family',v=>v,'geometry matching the structural family and split');
   checkState=(state,path)=>{
    object(state,path);
    field(state.room_id,path+'.room_id',v=>v===room.id,'the recorded room');
@@ -110,6 +142,7 @@ export function checkRun(data){
    for(const key of ['turn','energy','coolant'])count(state[key],path+'.'+key);
    field(state.turn,path+'.turn',v=>v<=room.deadline,'a turn within the deadline');
    object(state.robots,path+'.robots');
+   field(Object.keys(state.robots),path+'.robots',v=>v.length===roles.length&&roles.every(r=>Object.hasOwn(state.robots,r)),'the room roster');
    for(const role of roles){const robot=state.robots[role];object(robot,path+'.robot');field(robot.role,path+'.role',v=>v===role,'the matching role');position(robot.x,path+'.position');count(robot.damage,path+'.damage');}
    const keys=room.bridges.map((_,i)=>'bridge_'+i);
    object(state.motor_heats,path+'.motor_heats');
@@ -118,9 +151,14 @@ export function checkRun(data){
    for(const [key,allowed] of [['powered_bridges',keys],['collected_cells',room.cells]]){array(state[key],path+'.'+key);field(state[key],path+'.'+key,v=>new Set(v).size===v.length&&v.every(x=>allowed.includes(x)),'unique room references');}
    for(const key of ['exit_unlocked','shard_collected','win','loss'])boolean(state[key],path+'.'+key);
    field(state.win,path+'.win',v=>!v||(!state.loss&&state.exit_unlocked&&roles.every(r=>state.robots[r].x===room.exit)&&(!room.requires_shard||state.shard_collected)),'a consistent room victory');
+   field(state.loss,path+'.loss',v=>!v||(!state.win&&state.turn===room.deadline),'a consistent room defeat');
+   if(room.bridges.length===1){
+    const aliases={motor_heat:state.motor_heats.bridge_0,bridge_extended:state.powered_bridges.includes('bridge_0'),cell_collected:room.cells.every(x=>state.collected_cells.includes(x))};
+    for(const [key,expected] of Object.entries(aliases))if(Object.hasOwn(state,key))field(state[key],path+'.'+key+' alias',v=>v===expected,'the canonical room state');
+   }
    array(state.events,path+'.events');state.events.forEach(v=>string(v,path+'.event'));
   };
-  checkState(identity.initial_state,'room initial_state');
+  if(!external)checkState(identity.initial_state,'room initial_state');
   checkState(data.final_state,'final_state');
  }
  array(data.calls,'calls');

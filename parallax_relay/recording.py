@@ -110,6 +110,10 @@ class Recorder:
         self.viewer_ready = False
         if not self.match_started:
             self._provenance.end(result)  # External result: no invented execution times.
+        if self._provenance.snapshot()['lifecycle']['stage']=='external_result':
+            # Describe the supplied world without claiming execution inputs/times.
+            self.manifest['room']=result.world.room.id
+            self.manifest['room_definition']=result.world.room.model_dump(mode='json')
         self._provenance.refresh(result)
         self.manifest['provenance'] = self._provenance.snapshot()
         failures = []

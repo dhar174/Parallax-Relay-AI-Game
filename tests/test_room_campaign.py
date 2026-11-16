@@ -46,6 +46,15 @@ class RoomCampaignTests(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(all('contrasts' not in row for row in report['family_summaries']))
             self.assertEqual(read_registration(root),reg)
 
+    def test_cross_room_summaries_have_no_inferential_intervals_but_cells_retain_them(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp)/'run';register(design(),root)
+            report=analyze(root)
+            for summary in [report['overall'],*report['family_summaries'],*report['split_summaries']]:
+                self.assertNotIn('wilson_95',summary['operational_success'])
+                self.assertIn('all_planned_bounds',summary['operational_success'])
+            self.assertTrue(all('wilson_95' in cell['operational_success'] for cell in report['cells']))
+
     async def test_historical_registration_is_analyzable_but_not_executable(self):
         with tempfile.TemporaryDirectory() as temp:
             root=Path(temp);root.joinpath('registration.json').write_text(Path('tests/fixtures/legacy_registration_v1.json').read_text())

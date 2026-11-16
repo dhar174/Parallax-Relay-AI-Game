@@ -201,3 +201,8 @@ are never inserted into v1/v2 records. Historical native fixtures and the smoke
 profile-v1 digest remain intact. Campaign registration/report/analysis version 2
 adds catalog/split identity; ledger envelopes stay version 1. Historical registration
 version 1 is analyzable, but current execution requires fresh registration.
+
+A recorder finalized from an externally supplied result keeps execution/times
+unknown. Native v3 writes `manifest.room_definition` from that supplied world so
+the workbench can validate its geometry without inventing execution input identity.
+Bound runs retain their definition inside fingerprinted provenance inputs.

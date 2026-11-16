@@ -115,6 +115,7 @@ class ProvenanceRecordingTests(unittest.IsolatedAsyncioTestCase):
         recorder.finish(result)
         self.assertIn('provenance', self.saved())
         data = self.saved()['provenance']
+        self.assertEqual(self.saved()['room_definition'],result.world.room.model_dump(mode='json'))
         self.assertIsNone(data['execution'])
         self.assertIsNone(data['lifecycle']['started_at'])
         self.assertIsNone(data['lifecycle']['ended_at'])

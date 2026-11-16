@@ -114,3 +114,9 @@ live-smoke preset resets to Split Span and retains its historical profile hash.
 Held-out execution is available only through registered protocol-2 confirmation,
 not the browser. New native imports preserve the embedded spectator definition;
 legacy imports retain their original shape. See [rooms](ROOMS.md).
+
+Malformed v3 definitions, inconsistent loss flags and contradictory single-bridge
+aliases are rejected before replacing the selected run. External-result records
+validate against their declared `manifest.room_definition` while retaining unknown
+execution/timing identity. The fixed script is an original Split Span control;
+it runs unchanged in other development rooms and may fail or miss private goals.
