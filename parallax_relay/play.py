@@ -192,7 +192,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.condition:
             values.update(condition=args.condition, communication_rounds=CONDITIONS[args.condition].communication_rounds)
         if args.fast:
-            if values['condition'] not in (None, 'reduced'):
+            if values['condition'] not in (None, 'reduced') or values['communication_rounds'] == 0:
                 raise ConfigError('--fast conflicts with the selected condition')
             values.update(condition='reduced', communication_rounds=1)
         if args.max_turns is not None: values['max_turns'] = args.max_turns

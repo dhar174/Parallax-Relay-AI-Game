@@ -94,8 +94,9 @@ class ControlsTests(unittest.IsolatedAsyncioTestCase):
         without_tickets = b.reserve_phase({r: without for r in ROLES})
         # Notices differ slightly; compare the quote with the reserve explicitly zeroed.
         reserve = settings.image_token_reserve
-        self.assertGreater(with_tickets['SPECTRA'].quote - without_tickets['SPECTRA'].quote,
-                           reserve / 1000000 * .99)
+        from decimal import Decimal
+        expected=reserve+len(request.prompt_text().encode('utf-8'))-len(without.prompt_text().encode('utf-8'))
+        self.assertEqual(with_tickets['SPECTRA'].quote-without_tickets['SPECTRA'].quote,Decimal(expected)/Decimal(1000000))
 
     async def test_withheld_retry_and_failure_metadata_never_reaches_later_requests(self):
         seen = []

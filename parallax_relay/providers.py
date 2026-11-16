@@ -184,7 +184,7 @@ class HTTPAgent:
         self._client = client or httpx.AsyncClient(timeout=timeout_seconds, follow_redirects=False)
 
     def _wire_request(self, request: AgentRequest) -> tuple[str, dict, dict]:
-        png = base64.b64encode(request.observation.image_png).decode('ascii')
+        png = base64.b64encode(request.observation.image_png).decode('ascii') if request.include_image else ''
         text, schema = request.prompt_text(), response_schema(request.phase)
         headers = {'content-type': 'application/json'}
         if self.provider == 'openai':

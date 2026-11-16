@@ -55,6 +55,16 @@ class AgentRequest:
     include_image: bool = True
     condition: ConditionName = 'full'
 
+    def __post_init__(self):
+        if not isinstance(self.condition, str) or self.condition not in CONDITIONS or type(self.include_image) is not bool:
+            raise ValueError('Invalid request condition or image flag')
+        if self.condition == 'no_images':
+            object.__setattr__(self, 'include_image', False)
+        elif self.condition == 'full' and not self.include_image:
+            object.__setattr__(self, 'condition', 'no_images')
+        elif not self.include_image:
+            raise ValueError('Unsupported combined request treatment')
+
     @property
     def role(self) -> str:
         return self.observation.role

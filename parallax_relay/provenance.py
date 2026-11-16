@@ -187,6 +187,7 @@ class RunProvenance:
     def begin(self, settings, rates, initial_snapshot):
         if self.bound:
             raise ProvenanceError('Recorder already bound to a match')
+        settings = MatchSettings.model_validate(settings.model_dump())
         config = {'mode': self._mode, 'settings': settings.model_dump(),
                   'pricing': {r: rates[r].model_dump() if rates.get(r) is not None else None
                               for r in protocol.ROLES},
@@ -446,9 +447,14 @@ class _ExecutionValueV2(_RecordModel):
             expected = policy_identity(name, self.policy.get('trial_id'), settings.max_turns)
             if name == 'uniform':
                 recorded_python = self.policy.get('python_version')
-                if not isinstance(recorded_python, str) or not re.fullmatch(r'\d+\.\d+\.\d+', recorded_python):
+                if not isinstance(recorded_python, str) or not re.fullmatch(r'\d+\.\d+\.\d+[A-Za-z0-9.+_-]{0,80}', recorded_python):
                     raise ValueError('Invalid policy Python version')
                 expected['python_version'] = recorded_python
+                seeds = self.policy.get('commitment_seeds')
+                if (not isinstance(seeds, dict) or set(seeds) != set(protocol.ROLES) or
+                    any(not isinstance(values, list) or len(values) != settings.max_turns or
+                        any(type(seed) is not int or not 0 <= seed < 2**64 for seed in values) for values in seeds.values())):
+                    raise ValueError('Invalid commitment seeds')
             if type(self.policy.get('version')) is not int or self.policy != expected:
                 raise ValueError('Inconsistent policy identity')
         return self
@@ -574,6 +580,13 @@ class ProvenanceRecord(_RecordModel):
                 raise ValueError('Invalid prompt identity')
             _SchemaValue.model_validate(self.inputs['schemas'].value)
             _RoomValue.model_validate(self.inputs['room'].value)
+            if self.schema_version == 2 and self.execution is not None:
+                notice = execution.conditions.model_dump(exclude={'arm'})
+                schemas = self.inputs['schemas'].value
+                if (schemas['request_format_version'] != 2 or
+                        schemas['request_structure'].get('condition_notice') != notice or
+                        not self.inputs['prompt'].value.endswith('\n' + json.dumps(notice, sort_keys=True))):
+                    raise ValueError('Contradictory condition notice or request version')
         return self
 
 

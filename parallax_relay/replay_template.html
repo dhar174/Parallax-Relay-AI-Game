@@ -25,14 +25,15 @@ header{display:flex;justify-content:space-between;align-items:center;gap:20px;fl
 const DATA=__REPLAY_DATA__;
 const $=id=>document.getElementById(id),records=DATA.records,result=DATA.result;
 const provenance=DATA.manifest.provenance,mode=DATA.manifest.mode??provenance?.execution?.value?.mode;
-$('mode').textContent=mode==='mock'?'MOCK · SCRIPTED FIXTURE':mode==='live'?'LIVE API RUN':mode==='programmatic'?'PROGRAMMATIC RUN':'RUN MODE UNKNOWN';
+const policy=provenance?.execution?.value?.policy?.name;
+$('mode').textContent=mode==='mock'?(policy==='scripted'?'MOCK · SCRIPTED FIXTURE':policy?'MOCK · '+policy.toUpperCase()+' POLICY':'MOCK · OFFLINE POLICY'):mode==='live'?'LIVE API RUN':mode==='programmatic'?'PROGRAMMATIC RUN':'RUN MODE UNKNOWN';
 $('outcome').textContent=result.stop_reason.replaceAll('_',' ');
 $('turnCount').textContent=result.turns;$('calls').textContent=result.budget.calls_started;$('energy').textContent=result.energy;
 $('roster').textContent=['SPECTRA','PYRA','FLUX'].map(role=>{const p=DATA.manifest.players?.[role]??provenance?.players?.[role]??{};return role+': '+(p.provider??'unknown')+' / '+(p.model??'unknown')}).join('  ·  ');
 const slider=$('round');slider.max=Math.max(0,records.length-1);
 function line(parent,label,value){const el=document.createElement('div');el.className='entry';const key=document.createElement('b');key.textContent=label+' ';el.append(key,document.createTextNode(String(value)));parent.append(el)}
 function heading(parent,label){const el=document.createElement('div');el.className='subhead';el.textContent=label;parent.append(el)}
-$('condition').textContent='Condition: '+(DATA.manifest.provenance?.execution?.value?.conditions?.arm??'Historical / unspecified')+' · recorded messages may be spectator-only';
+$('condition').textContent='Condition: '+(provenance?.execution?.value?.conditions?.arm??provenance?.execution?.value?.conditions?.communication??'Historical / unspecified')+' · recorded messages may be spectator-only';
 function draw(){
  const i=Number(slider.value),r=records[i];
  for(const id of ['chat','actions','events','private','diagnostics'])$(id).replaceChildren();

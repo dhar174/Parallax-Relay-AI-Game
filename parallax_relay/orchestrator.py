@@ -175,6 +175,7 @@ async def run_match(agents: Mapping[str, Agent], settings: MatchSettings | None 
         # Reject reuse before recovery can overwrite the preceding match's files.
         raise ValueError('Recorder already bound to a match')
     settings = settings or MatchSettings()
+    settings = MatchSettings.model_validate(settings.model_dump())
     condition = resolve_condition(settings)
     world = initial_world()
     budget = Budget(settings, rates or {})

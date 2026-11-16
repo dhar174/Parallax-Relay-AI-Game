@@ -46,7 +46,7 @@ def main() -> int:
                     encoding='utf-8', errors='replace', timeout=120)
                 if proc.returncode != 0:
                     raise ValueError(f'exit {proc.returncode}')
-                if any(line.startswith(('Round ', 'MOCK scripted fixture;')) for line in proc.stdout.splitlines()):
+                if any(line.startswith(('Round ', 'MOCK ')) for line in proc.stdout.splitlines()):
                     raise ValueError('--quiet emitted banner or progress output')
                 result = json.loads((out / 'result.json').read_text(encoding='utf-8'))
                 expected = {'win': True, 'loss': False, 'completed': True,
