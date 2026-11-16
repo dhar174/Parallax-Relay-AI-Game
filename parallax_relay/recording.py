@@ -33,7 +33,7 @@ class Recorder:
         out.mkdir(parents=True, exist_ok=False)
         self.viewer_ready = False
         self.manifest = _safe_metadata(manifest)
-        self.manifest['schema_version'] = 2
+        self.manifest['schema_version'] = 3
         self.manifest['provenance'] = self._provenance.snapshot()
         players = {role: {key: player[key] for key in ('provider', 'model')}
                    for role, player in self.manifest['provenance']['players'].items()}
@@ -62,6 +62,7 @@ class Recorder:
         self._match_attempted = True
         self._provenance.begin(settings, rates, initial_snapshot)
         self.manifest['settings'] = settings.model_dump()
+        self.manifest['room']=settings.room_id
         self.manifest['provenance'] = self._provenance.snapshot()
         self._json('manifest.json', self.manifest)
 
@@ -109,6 +110,10 @@ class Recorder:
         self.viewer_ready = False
         if not self.match_started:
             self._provenance.end(result)  # External result: no invented execution times.
+        if self._provenance.snapshot()['lifecycle']['stage']=='external_result':
+            # Describe the supplied world without claiming execution inputs/times.
+            self.manifest['room']=result.world.room.id
+            self.manifest['room_definition']=result.world.room.model_dump(mode='json')
         self._provenance.refresh(result)
         self.manifest['provenance'] = self._provenance.snapshot()
         failures = []

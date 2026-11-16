@@ -1,4 +1,4 @@
-"""Frozen protocol-v1 campaign specifications and preallocated schedules."""
+"""Versioned campaign designs and preallocated, split-aware schedules."""
 from itertools import permutations
 import random
 from typing import Literal
@@ -10,6 +10,7 @@ from .conditions import CONDITIONS, ConditionName
 from .config import MatchSettings, Rates, Settings
 from .protocol import ROLES
 from .provenance import canonical_hash
+from .rooms import get_room,rooms as catalog_rooms,catalog_identity,room_hash
 
 
 class CampaignModel(Settings):
@@ -20,13 +21,13 @@ class CampaignModel(Settings):
 
 
 class CampaignSpec(Settings):
-    schema_version: Literal[1] = 1
-    protocol_version: Literal[1] = 1
+    schema_version: Literal[2] = 2
+    protocol_version: Literal[1,2] = 2
     stage: Literal['diagnostic', 'pilot', 'confirmatory'] = 'diagnostic'
     mode: Literal['offline', 'live'] = 'offline'
     policies: list[Literal['scripted', 'wait', 'uniform']] = Field(default_factory=lambda: ['scripted', 'wait', 'uniform'])
     roster: list[CampaignModel] = Field(default_factory=list)
-    rooms: list[Literal['split_span']] = Field(default_factory=lambda: ['split_span'])
+    rooms: list[str]
     conditions: list[ConditionName] = Field(default_factory=lambda: list(CONDITIONS))
     repetitions: int | None = Field(default=None, ge=1, le=1000, strict=True)
     match: MatchSettings = MatchSettings()
@@ -37,6 +38,23 @@ class CampaignSpec(Settings):
     rerun_of: UUID | None = None
     rerun_reason: Literal['infrastructure_recheck', 'manual_recheck'] | None = None
 
+    @model_validator(mode='before')
+    @classmethod
+    def adapt_version(cls,value):
+        if not isinstance(value,dict):return value
+        value=dict(value)
+        version=value.get('schema_version',2)
+        if type(version) is not int or version not in (1,2):raise ValueError('Unsupported campaign specification')
+        if version==1:
+            if type(value.get('protocol_version',1)) is not int or value.get('protocol_version',1)!=1:
+                raise ValueError('Legacy specifications require protocol 1')
+            value.update(schema_version=2,protocol_version=1)
+        if type(value.get('protocol_version',2)) is not int:raise ValueError('Invalid protocol version')
+        if 'rooms' not in value:
+            value['rooms']=(['split_span'] if value.get('protocol_version',2)==1 else
+                [r.id for r in catalog_rooms(split='held_out' if value.get('stage')=='confirmatory' else 'development')])
+        return value
+
     @model_validator(mode='after')
     def coherent_design(self):
         for values in (self.policies, self.rooms, self.conditions):
@@ -44,6 +62,14 @@ class CampaignSpec(Settings):
                 raise ValueError('Duplicate campaign cells')
         if not self.rooms or not self.conditions:
             raise ValueError('Empty room or condition selection')
+        selected=[get_room(room) for room in self.rooms]
+        if self.match.room_id!='split_span':raise ValueError('Select campaign rooms through rooms, not match.room_id')
+        if self.protocol_version==1:
+            if self.rooms!=['split_span']:raise ValueError('Protocol 1 requires Split Span')
+        elif self.stage=='diagnostic':
+            if any(room.split!='development' for room in selected):raise ValueError('Diagnostics require development rooms')
+        elif set(self.rooms)!={r.id for r in catalog_rooms(split='development' if self.stage=='pilot' else 'held_out')}:
+            raise ValueError('Protocol stage requires its entire prescribed room split')
         if self.match.condition is not None:
             raise ValueError('Campaign conditions are selected by the schedule, not match.condition')
         if self.match.communication_rounds != 2:
@@ -70,7 +96,7 @@ class CampaignSpec(Settings):
         if bool(self.rerun_of) != bool(self.rerun_reason):
             raise ValueError('Reruns require both original trial UUID and reason')
         if self.rerun_of and (self.stage != 'diagnostic' or len(self.conditions) != 1 or
-                              self.mode != 'offline' or len(self.policies) != 1 or self.repetitions not in (None, 1)):
+                              self.mode != 'offline' or len(self.rooms)!=1 or len(self.policies) != 1 or self.repetitions not in (None, 1)):
             raise ValueError('Operational reruns must be single diagnostic offline trials')
         identities = {}
         for entry in self.roster:
@@ -96,7 +122,7 @@ def assignments(spec: CampaignSpec) -> list[dict]:
     return [found[key] for key in sorted(found)]
 
 
-def schedule(spec: CampaignSpec) -> list[dict]:
+def schedule(spec: CampaignSpec, *, legacy: bool=False) -> list[dict]:
     rng = random.Random(spec.scheduler_seed)
     groups = []
     if spec.mode == 'live':
@@ -116,6 +142,12 @@ def schedule(spec: CampaignSpec) -> list[dict]:
                                    'condition': condition, 'repetition': repetition, **group,
                                    'rerun_of': str(spec.rerun_of) if spec.rerun_of else None,
                                    'rerun_reason': spec.rerun_reason})
+    if not legacy:
+        catalog_sha=catalog_identity()['sha256']
+        for trial in result:
+            room=get_room(trial['room'])
+            trial.update(family=room.family,split=room.split,room_version=room.version,
+                         room_sha256=room_hash(room),catalog_sha256=catalog_sha)
     if not result or len(result) > 100000:
         raise ValueError('Campaign schedule must contain 1–100000 trials')
     return result
@@ -123,7 +155,7 @@ def schedule(spec: CampaignSpec) -> list[dict]:
 
 def trial_settings(spec: CampaignSpec, trial: dict) -> MatchSettings:
     values = spec.match.model_dump()
-    values.update(condition=trial['condition'], communication_rounds=CONDITIONS[trial['condition']].communication_rounds)
+    values.update(room_id=trial.get('room','split_span'),condition=trial['condition'], communication_rounds=CONDITIONS[trial['condition']].communication_rounds)
     if trial['team'] != 'models':
         values['max_estimated_cost_usd'] = None  # Only known built-in zero-usage policies.
     return MatchSettings.model_validate(values)

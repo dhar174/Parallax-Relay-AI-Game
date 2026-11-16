@@ -14,7 +14,25 @@ const contract = JSON.parse(await readFile(join(dist, 'contract.json'), 'utf8'))
 const fixture = JSON.parse(await readFile(join(dist, 'fixture.json'), 'utf8'));
 const smokeProfile = JSON.parse(await readFile(join(root, 'configs/live_smoke.json'), 'utf8'));
 smokeProfile.config.match.condition = null;
+smokeProfile.config.match.room_id = 'split_span';
 let appInstance = 0;
+
+test('development room selector exports strings, preserves selection for smoke and excludes held-out execution',async t=>{
+ const app=await workbench(t);await app.tab('scenario');
+ assert.match(app.node('panel').innerHTML,/<select data-match="room_id">/);
+ assert.doesNotMatch(app.node('panel').innerHTML,/<option value="ret_01"/);
+ app.input({dataset:{match:'room_id'},value:'dev_01'});
+ await app.click('smoke');assert.match(await app.exportConfig(),/room_id = "dev_01"/);
+ const bad=structuredClone(contract.defaults);bad.match.room_id='ret_01';
+ assert.throws(()=>validate(bad,contract),/room|held-out/);
+});
+
+test('offline copy identifies Split Span fixture separately from the selected room',async t=>{
+ const app=await workbench(t);await app.tab('scenario');
+ app.input({dataset:{match:'room_id'},value:'dev_02'});await app.tab('offline');
+ assert.match(app.node('panel').innerHTML,/original Split Span fixture/);
+ assert.match(app.node('panel').innerHTML,/selected development room and may fail/);
+});
 
 test('workbench retains a historical v1 communication label',async t=>{
  const app=await workbench(t);const data=structuredClone(fixture);
@@ -52,6 +70,17 @@ test('unselecting a named arm preserves empty rounds without writing NaN',async 
  app.input({dataset:{match:'condition'},value:''});
  assert.equal(app.node('match-communication_rounds').value,'');
  assert.doesNotMatch(app.node('match-communication_rounds').value,/NaN/);
+});
+
+test('replay header names the recorded room safely and keeps the historical fallback',async()=>{
+ const template=await readFile(join(root,'parallax_relay/replay_template.html'),'utf8');
+ for(const [manifest,label] of [[{schema_version:3,room:'dev_02'},'dev_02'],[{schema_version:2},'The Split Span'],[{schema_version:3},'Room unspecified'],[{schema_version:3,room:'<img src=x onerror=alert(1)>'},'<img src=x onerror=alert(1)>']]){
+  const nodes=new Map();const node=id=>{if(!nodes.has(id))nodes.set(id,{value:'0',textContent:'',replaceChildren(){},closest(){return this;},addEventListener(){}});return nodes.get(id);};
+  const data={manifest,records:[],calls:[],result:{stop_reason:'turn_limit',turns:0,budget:{calls_started:0},energy:6}};
+  const script=template.match(/<script>([\s\S]*?)<\/script>/)[1].replace('__REPLAY_DATA__',JSON.stringify(data));
+  runInNewContext(script,{document:{getElementById:node,createElement:()=>({}),createTextNode:()=>({})}});
+  assert.equal(node('room').textContent,label+' · recorded match');
+ }
 });
 
 test('actual replay script labels policies and historical v1 conditions truthfully',async()=>{
@@ -738,7 +767,7 @@ test('actual one-turn and zero-turn CLI records remain importable', async t => {
   }
 });
 
-test('actual programmatic Recorder output without a room is importable', async t => {
+test('actual programmatic v3 Recorder binds room and rejects invalid embedded geometry', async t => {
   const directory = await mkdtemp(join(tmpdir(), 'parallax-programmatic-test-'));
   t.after(() => rm(directory, { recursive: true, force: true }));
   const output = join(directory, 'run');
@@ -760,6 +789,54 @@ print('{}')
   assert.equal(app.node('status').textContent, 'Imported native run records.');
   const exported = await app.exportJSON();
   assert.equal(exported.manifest.mode, 'programmatic');
-  assert.equal(exported.manifest.room, undefined);
-  assert.match(app.node('panel').innerHTML, /Room unspecified · programmatic/);
+  assert.equal(exported.manifest.room, 'split_span');
+  const bad=structuredClone(exported);bad.final_state.robots.SPECTRA.x=99;
+  assert.throws(()=>checkRun(bad),/room|position|state/);
+  const mismatched=structuredClone(exported);mismatched.manifest.provenance.inputs.room.value.definition.id='other';
+  assert.throws(()=>checkRun(mismatched),/room/);
+  const mutations=[
+   d=>{d.manifest.provenance.inputs.room.value.definition.bridges[0].gap=[];},
+   d=>{d.final_state.loss=true;},
+   d=>{d.final_state.motor_heat=99;},
+   d=>{d.manifest.provenance.inputs.room.value.definition.bridges[0].gap=[5,7];},
+   d=>{d.manifest.provenance.inputs.room.value.definition.cells=[5];},
+   d=>{d.manifest.provenance.inputs.room.value.definition.starts=[2,3,99];},
+   d=>{d.final_state.collected_cells=[10];},
+  ];
+  for(const mutate of mutations){
+   const broken=structuredClone(exported);mutate(broken);
+   assert.throws(()=>checkRun(broken),/room|state|loss|alias|gap|position|cell|bridge/);
+   await app.importJSON(broken);assert.deepEqual(await app.exportJSON(),exported);
+  }
+
+  assert.match(app.node('panel').innerHTML, /split_span · programmatic/);
+});
+
+
+test('external-result v3 records preserve unknown execution and validate all nine recorded room definitions',async t=>{
+ const directory=await mkdtemp(join(tmpdir(),'parallax-external-rooms-'));
+ t.after(()=>rm(directory,{recursive:true,force:true}));
+ const runs=python(`
+import json,sys
+from pathlib import Path
+from parallax_relay.rooms import rooms
+from parallax_relay.state import initial_world
+from parallax_relay.budget import Budget
+from parallax_relay.config import MatchSettings
+from parallax_relay.orchestrator import MatchResult
+from parallax_relay.recording import Recorder
+root=Path(json.load(sys.stdin));runs=[]
+for room in rooms():
+ out=root/room.id
+ result=MatchResult(initial_world(room.id),'turn_limit',[],[],Budget(MatchSettings(),{}).summary())
+ Recorder(out,{}).finish(result)
+ runs.append({**{k:json.loads((out/(k+'.json')).read_text()) for k in ('manifest','result','final_state')},'calls':[],'phases':[],'replay':[]})
+print(json.dumps(runs))
+`,JSON.stringify(directory));
+ const app=await workbench(t);
+ for(const run of runs){
+  assert.equal(run.manifest.provenance.execution,null);
+  assert.equal(run.manifest.provenance.lifecycle.started_at,null);
+  checkRun(run);await app.importJSON(run);assert.deepEqual(await app.exportJSON(),run);
+ }
 });

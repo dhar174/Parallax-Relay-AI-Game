@@ -4,7 +4,7 @@
 
 - These instructions apply to the entire repository.
 - Parallax Relay is a Python CLI for three cooperative multimodal players.
-- The current slice is one deterministic room with SPECTRA, PYRA, and FLUX.
+- The current slice has nine curated rooms with SPECTRA, PYRA, and FLUX.
 - ECHO rendering exists, but ECHO is not an active player.
 - Read README.md for onboarding and docs/ARCHITECTURE.md for module boundaries.
 - Read docs/PROTOCOL.md before changing observations, replies, or orchestration.
@@ -63,7 +63,7 @@ Use the actual results in your report; do not copy historical test counts.
 
 ## Code map
 
-- parallax_relay/state.py and engine.py own room state and resolution.
+- parallax_relay/rooms.py owns the finite versioned catalog; state.py and engine.py own state and shared resolution.
 - observations.py, render.py, and state.py HUD helpers project player inputs.
 - protocol.py and prompts.py define contracts and public rules.
 - orchestrator.py and budget.py own barriers, retries, memory, and reservations.
@@ -118,7 +118,7 @@ Use the actual results in your report; do not copy historical test counts.
   stop reasons, or recorded formats. Recheck provider sources for API changes.
 - Keep fixtures distinct from evidence of real model ability.
 - Follow docs/EVALUATION.md for evaluation claims; controls and the campaign runner
-  are implemented, while held-out rooms remain specifications. Neither is paid-run authorization.
+  and held-out room enforcement are implemented; research claims still require eligible campaigns. Neither is paid-run authorization.
 - Preserve historical verification logs; add dated evidence and limitations.
 - Check git diff --check and inspect the final changed-file list.
 - Report what changed, the checks actually run, and unresolved limitations.

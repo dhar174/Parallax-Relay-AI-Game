@@ -64,7 +64,7 @@ Protocol-v1 evaluation also supports disabled (commit only), withheld (all phase
 but no public message text/metadata in any player request or later history), and
 no_images (full phases, own HUD without provider image attachments). All arms use
 the same versioned factual condition notice. Actual role PNGs remain spectator
-artifacts even without provider attachments. Request format is now version 2;
+artifacts even without provider attachments. Request format is now version 3;
 reply schemas and engine legality are unchanged. See [evaluation](EVALUATION.md).
 
 Controls resolve before movement, including VENT before REROUTE. Movement precedes
@@ -173,13 +173,13 @@ Cancellation still raises `CancelledError`, with partial `result` and
 `secondary_errors` attached; cleanup errors cannot replace it.
 
 `MatchResult.phases` defaults to an empty list for existing constructors. Summary
-fields and schema version remain unchanged. `Recorder.finish` returns normally on
+fields remain compatible; new summaries use schema version 3. `Recorder.finish` returns normally on
 success and raises sanitized `RecordingFinalizationError` with ordered `failures`
 pairs on failure. The driver makes at most two finalization passes and preserves
 the original failure, even if recovery succeeds.
 Primary and secondary finalization operations use the same `finish:<artifact>`
 labels; a generic custom `finish` failure is labeled `finish:finish`.
-The built-in recorder also binds version-2 provenance to actual driver inputs;
+The built-in recorder also binds version-3 provenance to actual driver inputs;
 custom recorders need no new methods. Its manifest is now the eighth independent
 final artifact. Execution end time/original stop reason freeze before finalization,
 while writable metadata/viewers refresh the final stop reason on recovery. See
@@ -194,5 +194,13 @@ basis and settled local USD (null if unpriced). Budget summaries retain the lega
 estimate and separately expose both components, token coverage and reserved/released
 calls. Turn records add `action_outcomes` classifications from engine resolution;
 these are spectator metadata and never enter participant observations/history.
-Outer schema version 2 and existing custom recorder methods remain unchanged.
+New outer manifest/result records use schema version 3; existing custom recorder methods remain unchanged.
 See [campaigns](CAMPAIGNS.md) for whole-block reservation and two-axis reporting.
+
+## Catalog-aware observations
+
+Player rules describe generic lane geometry and independent motor/bridge controls.
+The HUD states the room dimensions, deadline and shared mission, including required
+shard recovery for retrieval/return missions. Room IDs, split/family metadata, hidden
+coordinates and host certificates never enter participant requests. Only the owning
+sensor image exposes heat, shard or cell/circuit facts. See [room contracts](ROOMS.md).

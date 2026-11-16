@@ -147,8 +147,11 @@ def _artifacts(root: Path, trial: dict, registration: dict) -> tuple[dict, list[
                 p = read_provenance(data[name])
                 if p is None or p['trial_id'] != trial['trial_id'] or p['experiment_id'] != registration['experiment_id']:
                     raise ValueError()
+                if data[name].get('schema_version')!=(3 if p['schema_version']==3 else 2):raise ValueError()
                 execution = p['execution']['value'] if p['execution'] else None
-                if execution is None or execution['settings'] != settings.model_dump():
+                expected_settings = settings.model_dump()
+                if p['schema_version'] < 3: expected_settings.pop('room_id')
+                if execution is None or execution['settings'] != expected_settings:
                     raise ValueError()
                 if (p['lifecycle']['stage']!='ended' or str(UUID(p['run_id']))!=p['run_id'] or
                     execution['mode']!=('live' if trial['team']=='models' else 'mock')):
@@ -170,13 +173,21 @@ def _artifacts(root: Path, trial: dict, registration: dict) -> tuple[dict, list[
                 data['provenance'] = p
                 if p['source'] != registration['frozen']['source'] or p['environment'] != registration['frozen']['environment']:
                     issues.append('provenance_drift')
-                if p['inputs'] != registration['frozen']['inputs'][trial['condition']]:
+                frozen_inputs=registration['frozen']['inputs']
+                if registration['schema_version']==2:frozen_inputs=frozen_inputs[trial['room']]
+                if p['inputs'] != frozen_inputs[trial['condition']]:
                     issues.append('input_drift')
             elif name == 'result':
                 if not _valid_summary(data[name]):
                     raise ValueError()
+                if 'manifest' in data and data[name]['schema_version']!=data['manifest']['schema_version']:raise ValueError()
             elif name == 'final_state':
-                _WorldSnapshot.model_validate(data[name])
+                if data.get('provenance', {}).get('schema_version') == 3:
+                    from .rooms import RoomDefinition, validate_snapshot
+                    room = RoomDefinition.model_validate_json(json.dumps(data['provenance']['inputs']['room']['value']['definition']))
+                    validate_snapshot(data[name], room)
+                else:
+                    _WorldSnapshot.model_validate(data[name])
             elif name == 'calls':
                 for call in data[name]:
                     if (call.get('role') not in ROLES or call.get('phase') not in CONDITIONS[trial['condition']].phases or
@@ -196,6 +207,10 @@ def _artifacts(root: Path, trial: dict, registration: dict) -> tuple[dict, list[
                         raise ValueError()
             elif name == 'replay':
                 for turn in data[name]:
+                    if data.get('provenance',{}).get('schema_version')==3:
+                        from .rooms import RoomDefinition,validate_snapshot
+                        room=RoomDefinition.model_validate_json(json.dumps(data['provenance']['inputs']['room']['value']['definition']))
+                        validate_snapshot(turn['state_after'],room)
                     if (not isinstance(turn.get('action_outcomes'), dict) or set(turn['action_outcomes']) != set(ROLES) or
                         any(code not in ('wait', 'applied', 'already_done', 'overload', 'invalid_parameters',
                                          'outer_wall', 'unbridged_gap', 'role_or_range', 'insufficient_resource',
@@ -416,7 +431,7 @@ def analyze(root: Path) -> dict:
             row['execution_elapsed_seconds'] = provenance['lifecycle']['elapsed_seconds']
         if data.get('calls') is not None:
             for call in data['calls']:
-                attempt_rows.append({'trial_id': trial_id, 'team': trial['team'], 'condition': trial['condition'],
+                attempt_rows.append({'trial_id': trial_id, 'room':trial['room'], 'team': trial['team'], 'condition': trial['condition'],
                                      **{k: call.get(k) for k in ('role', 'turn', 'phase', 'attempt', 'status', 'latency_seconds',
                                                                'reservation_quote_usd', 'settlement_basis', 'settled_amount_usd')},
                                      'status': call['status'] if call['status'] in ATTEMPT_STATUSES else 'unknown_status',
@@ -492,16 +507,36 @@ def analyze(root: Path) -> dict:
                 contrasts.append({'room': room, 'team': team, 'contrast': 'full-minus-'+comparison,
                                   'exploratory': comparison != 'disabled', **paired_bootstrap(strata)})
     attempts = Counter(call['status'] for call in attempt_rows)
-    report = {'schema_version': 1, 'analysis_version': 1, 'analyzed_at': now(),
+    # Cross-room summaries remain descriptive; inference stays within each room.
+    catalog=registration['frozen'].get('catalog')
+    definitions={r['id']:r for r in catalog['value']['rooms']} if catalog else {}
+    def labels(room_id):
+        room=definitions.get(room_id,{'family':'crossing','split':'development','version':1})
+        return {'family':room['family'],'split':room['split'],'room_version':room['version'],
+                'catalog_sha256':catalog['sha256'] if catalog else None}
+    for collection in (rows,cell_reports,equal_weight_arms,contrasts,attempt_rows):
+        for row in collection:
+            if 'room' in row:row.update(labels(row['room']))
+    descriptive={}
+    def descriptive_summary(group):
+        summary=_summary(group)
+        summary['operational_success'].pop('wilson_95')
+        return summary
+    for dimension in ('family','split'):
+        groups=defaultdict(list)
+        for row in rows:groups[row[dimension]].append(row)
+        descriptive[dimension+'_summaries']=[{dimension:key,'interpretation':'Descriptive only; rooms are curated, not independent draws from a task population.',**descriptive_summary(group)} for key,group in sorted(groups.items())]
+    report = {'schema_version': 2, 'analysis_version': 2, 'analyzed_at': now(),
               'analysis_source': analysis_source, 'registration_sha256': registration['sha256'],
               'experiment_id': registration['experiment_id'], 'stage': spec.stage,
               'registration': registration, 'completion_status': 'complete' if complete else 'incomplete',
               'cohort_eligible': eligible,
               'confirmatory_eligible': bool(spec.stage == 'confirmatory' and inference_eligible),
-              'counts': counts, 'overall': _summary(rows), 'cells': cell_reports,
+              'counts': counts, 'overall': (descriptive_summary(rows) if len({row['room'] for row in rows})>1 else _summary(rows)), 'cells': cell_reports,
               'equal_weight_arm_summaries': equal_weight_arms,
               'overall_interpretation': 'Descriptive accounting across the full schedule; comparisons use room/team/assignment cells and registered equal weights.',
-              'contrasts': contrasts, 'trials': rows, 'attempts': attempt_rows,
+              'contrasts': contrasts, 'trials': rows, 'attempts': attempt_rows,**descriptive,
+              'catalog':catalog,
               'attempt_metrics': {'observed_records': len(attempt_rows), 'statuses': dict(attempts),
                                   'retries': sum(c['attempt'] > 1 for c in attempt_rows),
                                   'latency_seconds': distribution([c['latency_seconds'] for c in attempt_rows]),
@@ -523,7 +558,7 @@ def analyze(root: Path) -> dict:
                   'legacy_settlement_rounding_uncertainty_usd':float(settlement_uncertainty),
                   'launched_without_finished_receipt': len(launched)-len(finished),
                   'interpretation': 'An interrupted ledger can retain reservations; balances beyond the reported legacy rounding uncertainty expose unmatched exposure. Monetary reservations are local estimates, not invoices.'},
-              'limitations': ['No provider ranking or general cooperation/vision claim follows from this fixed room.',
+              'limitations': ['No provider ranking or task-population generalization follows from this finite curated catalog.',
                               'Pilot and diagnostic runs are not confirmatory estimates.',
                               'Missing and unlaunched outcomes are retained; no complete-pair subset substitutes for the cohort.',
                               'Known setup failures are zero operational successes, not engine defeats.',

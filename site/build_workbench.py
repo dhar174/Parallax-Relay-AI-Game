@@ -16,6 +16,7 @@ sys.path.insert(0, str(ROOT))
 
 from parallax_relay.config import GameConfig, load_config
 from parallax_relay.state import PRIVATE_GOALS
+from parallax_relay.rooms import rooms
 from scripts.live_smoke import load_profile
 
 
@@ -36,6 +37,7 @@ def build(output: Path = OUTPUT) -> Path:
         "schema": GameConfig.model_json_schema(),
         "defaults": load_config(ROOT / "configs" / "three_models.toml").model_dump(),
         "goals": PRIVATE_GOALS,
+        "rooms": [{k: getattr(room, k) for k in ('id', 'version', 'family', 'split')} for room in rooms()],
         "live_smoke": load_profile(ROOT / "configs" / "live_smoke.json"),
     }
     write_json(output / "contract.json", contract)

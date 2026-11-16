@@ -62,7 +62,9 @@ it. GitHub's file view displays source rather than running the viewer.
 
 ## How the game works
 
-The current room, **The Split Span**, is a single horizontal lane. SPECTRA sees
+The default room, **The Split Span**, is a single horizontal lane. The
+[room catalog](docs/ROOMS.md) also includes crossing variants, retrieval/return
+missions and two-bridge relays. SPECTRA sees
 optical details and a shard; PYRA sees motor heat; FLUX sees circuits and an energy
 cell. Their abilities must be coordinated to extend a bridge and unlock the exit.
 All three must escape within 12 turns, while each pursues a private objective.
@@ -117,8 +119,10 @@ requests. Diagnostic fixtures do not establish model ability or benchmark result
 
 ## Current limits and direction
 
-This release has one fixed room, three active roles, compatible objectives, and a
-known scripted solution. It has no platformer physics, procedural rooms, playable
+This release has nine curated rooms, three active roles and compatible objectives.
+Three development rooms support tuning; six held-out rooms require registered
+confirmation. Host certificates establish solvability; the original fixed script
+remains a Split Span memorization control. It has no platformer physics, procedural rooms, playable
 ECHO role, live dashboard, or validated benchmark results.
 
 The [roadmap](ROADMAP.md) prioritizes reliable execution and reproducible evaluation
@@ -129,6 +133,7 @@ separates original milestone evidence from subsequent checks.
 
 | Document | Use it for |
 |---|---|
+| [Room catalog](docs/ROOMS.md) | Curated families, perception, solvability and split enforcement |
 | [Workbench guide](docs/WORKBENCH.md) | Browser configuration, native imports, and local companion |
 | [Running guide](docs/RUNNING.md) | Configuration, limits, troubleshooting, and replay files |
 | [Architecture](docs/ARCHITECTURE.md) | Modules, data flow, and extension boundaries |

@@ -1,8 +1,8 @@
 # Run provenance
 
-The main recorder adds `manifest.provenance.schema_version = 2` inside the existing
-version-2 manifest. Results, call/phase/turn records, engine behavior, and the replay
-data shape retain their existing versions. Provenance is spectator information:
+New runs use manifest/result/provenance/request version **3**. Call/phase/turn
+records retain their compatible field structure; room snapshots carry room ID/version
+and canonical per-controller/bridge/cell state. Provenance is spectator information:
 it includes room/objective identities and never belongs in a player request.
 
 ## Identity and effective configuration
@@ -30,9 +30,10 @@ All other limits and prices remain intact.
 The legacy top-level `manifest.requested_settings` is still mock-only; the
 provenance field also records live requested settings, with its dollar cap intact.
 
-The room fingerprint covers named geometry/item/deadline constants, sorted gap
-coordinates, private objective definitions, and the actual initial world snapshot.
-It is an identity for the current fixed room, not a general room registry. Prompt
+The room fingerprint covers the embedded validated room definition, catalog and
+certificate hashes, private objectives and actual initial snapshot. Definitions
+include family/split, geometry/resources, scoring version and curated/null generation
+metadata. The full catalog is frozen in campaign registrations. Prompt
 and schema identity include actual static rules, a synthetic request structure,
 `REQUEST_FORMAT_VERSION`, wire schemas, local Pydantic schemas, and reply limits.
 Bump the request format version when its meaning changes; record new identities
@@ -176,12 +177,12 @@ and availability limits; it does not recreate nondeterministic remote responses.
 
 ## Slice 8 condition and policy identity
 
-New runs write provenance version 2; version 1 retains its frozen historical
-settings/condition reader. Old checksums are validated without adding new defaults
-or rewriting the record. The outer manifest/result format remains version 2.
+Slice 8 wrote provenance version 2. Versions 1 and 2 retain frozen historical
+settings/condition readers; version 3 adds `room_id` and embedded room definitions. Old checksums are validated without adding new defaults
+or rewriting the record. Historical outer manifest/result version 2 remains readable.
 Execution conditions identify the arm and versioned factual request notice, phase
 schedule, public-message availability and image availability. The effective prompt
-fingerprint includes that notice; request format version 2 includes it in JSON.
+fingerprint includes that notice; request formats 2 and 3 include it in JSON.
 
 Explicit offline context can declare `policy="scripted"`, `"wait"` or `"uniform"`.
 Uniform requires a trial UUID and records the uniform-v1 derivation, Python/PRNG
@@ -189,3 +190,25 @@ identity and scheduled commitment seeds for every role/possible turn. Actual
 commitment attempts are identified by call turn/role; retries use the same seed.
 These are local policy seeds, never provider seeds. Undeclared custom policies
 remain unknown. Each condition/policy changes effective identity.
+
+## Room archive compatibility
+
+Version-3 readers validate snapshots against the recorded definition, without
+constructing a live world or looking up the current catalog. Position bounds, motor
+keys, bridge/cell references, terminal flags and single-bridge aliases are checked.
+Old provenance/checksums are returned unchanged: current `MatchSettings` defaults
+are never inserted into v1/v2 records. Historical native fixtures and the smoke
+profile-v1 digest remain intact. Campaign registration/report/analysis version 2
+adds catalog/split identity; ledger envelopes stay version 1. Historical registration
+version 1 is analyzable, but current execution requires fresh registration.
+
+A recorder finalized from an externally supplied result keeps execution/times
+unknown. Native v3 writes `manifest.room_definition` from that supplied world so
+the workbench can validate its geometry without inventing execution input identity.
+Bound runs retain their definition inside fingerprinted provenance inputs.
+
+
+The initial CLI manifest names the selected room even if setup fails before driver
+binding. Replay headers use the recorded room with text-only DOM insertion; old
+version-2 records without a room retain the Split Span fallback. This changes
+current output only; committed historical viewers remain unchanged.

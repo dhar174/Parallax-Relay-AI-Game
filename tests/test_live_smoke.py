@@ -54,7 +54,7 @@ class LiveSmokeTests(unittest.TestCase):
         self.assertEqual(config.match.max_output_tokens, 4096)
         self.assertEqual(config.match.max_estimated_cost_usd, 1)
         self.assertEqual(config.players['PYRA'].provider, 'openai')
-        self.assertEqual(config.model_dump(), profile['config'])
+        self.assertEqual(config.model_dump(), GameConfig.model_validate(profile['config']).model_dump())
 
     def test_real_check_never_constructs_provider_clients_or_creates_run(self):
         smoke = self.smoke()

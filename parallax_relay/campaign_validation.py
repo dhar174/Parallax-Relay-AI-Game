@@ -13,7 +13,7 @@ from .config import Rates
 from .protocol import Usage
 from .protocol import ROLES
 from .providers import provider_contract
-from .provenance import _SourceInfo, _Fingerprint, _EnvironmentValue, _SchemaValue, _RoomValue, _APIContract
+from .provenance import _SourceInfo, _Fingerprint, _EnvironmentValue, _SchemaValue, _RoomValue, _RoomValueV3, _APIContract
 
 TRIAL_STOPS = frozenset({'victory','defeat','turn_limit','call_budget','spend_budget','provider_error',
                          'unreliable_agent','internal_error','local_error','cancelled','setup_failure'})
@@ -67,7 +67,7 @@ class TrialSummary(BaseModel):
 
     @model_validator(mode='after')
     def consistent_outcome(self):
-        if self.schema_version!=2 or self.stop_reason not in TRIAL_STOPS:
+        if self.schema_version not in (2,3) or self.stop_reason not in TRIAL_STOPS:
             raise ValueError('Invalid outcome version/status')
         if self.win and self.loss or self.completed!=(self.win or self.loss):
             raise ValueError('Contradictory terminal outcome')
@@ -109,20 +109,46 @@ def utc(value):
     datetime.fromisoformat(value.replace('Z','+00:00'))
 
 
-def validate_frozen(value,spec):
+def validate_frozen(value,spec,*,version=2):
     required={'source','environment','inputs','provider_contracts','sampling','known_model_revisions','analysis'}
     if not isinstance(value,dict) or not required<=set(value):raise ValueError('Incomplete frozen identity')
     source=_SourceInfo.model_validate(value['source'])
     env=_Fingerprint.model_validate(value['environment']);_EnvironmentValue.model_validate(env.value)
     if spec.stage!='diagnostic' and (source.status!='clean' or env.value['status']!='complete'):
         raise ValueError('Ineligible frozen identity')
-    if not isinstance(value['inputs'],dict) or set(value['inputs'])!=set(spec.conditions):raise ValueError('Invalid frozen arms')
-    for arm,inputs in value['inputs'].items():
+    if version==2:
+        from .rooms import RoomDefinition
+        catalog=_Fingerprint.model_validate(value['catalog']);definitions=catalog.value['rooms']
+        if catalog.value.get('id')!='catalog_v1' or type(catalog.value.get('version')) is not int or catalog.value['version']!=1:
+            raise ValueError('Invalid frozen catalog')
+        definitions=[RoomDefinition.model_validate_json(json.dumps(room)) for room in definitions]
+        by_id={room.id:room for room in definitions}
+        if len(by_id)!=9 or len(definitions)!=9:raise ValueError('Invalid catalog membership')
+        certificates=catalog.value['certificates']
+        if set(certificates)!=set(by_id) or any(not isinstance(s,str) or not re.fullmatch(r'[0-9a-f]{64}',s) for s in certificates.values()):
+            raise ValueError('Invalid certificate identities')
+        expected=set(by_id) if spec.protocol_version==2 else {'split_span'}
+        if not isinstance(value['inputs'],dict) or set(value['inputs'])!=expected:raise ValueError('Invalid frozen rooms')
+        entries=[]
+        for room_id,arms in value['inputs'].items():
+            if not isinstance(arms,dict) or set(arms)!=set(spec.conditions):raise ValueError('Invalid frozen arms')
+            for arm,inputs in arms.items():
+                room=inputs['room']['value']
+                if (room['id']!=room_id or room['definition']!=by_id[room_id].model_dump(mode='json') or
+                    room['catalog_sha256']!=catalog.sha256 or room['certificate_sha256']!=certificates[room_id]):
+                    raise ValueError('Contradictory frozen room')
+                entries.append((arm,inputs))
+        if set(spec.rooms)-set(by_id):raise ValueError('Unknown scheduled room')
+    else:
+        if not isinstance(value['inputs'],dict) or set(value['inputs'])!=set(spec.conditions):raise ValueError('Invalid frozen arms')
+        entries=value['inputs'].items()
+    for arm,inputs in entries:
         if not isinstance(inputs,dict) or not {'prompt','schemas','room'}<=set(inputs):raise ValueError('Missing input identity')
         fingerprints={k:_Fingerprint.model_validate(inputs[k]) for k in ('prompt','schemas','room')}
-        _SchemaValue.model_validate(fingerprints['schemas'].value);_RoomValue.model_validate(fingerprints['room'].value)
+        _SchemaValue.model_validate(fingerprints['schemas'].value)
+        (_RoomValueV3 if fingerprints['schemas'].value['request_format_version']==3 else _RoomValue).model_validate(fingerprints['room'].value)
         notice=CONDITIONS[arm].notice();schema=fingerprints['schemas'].value
-        if (schema['request_format_version']!=2 or json.dumps(schema['request_structure'].get('condition_notice'),sort_keys=True)!=json.dumps(notice,sort_keys=True) or
+        if (type(schema['request_format_version']) is not int or schema['request_format_version']!=(3 if version==2 else 2) or json.dumps(schema['request_structure'].get('condition_notice'),sort_keys=True)!=json.dumps(notice,sort_keys=True) or
             not isinstance(fingerprints['prompt'].value,str) or not fingerprints['prompt'].value.endswith('\n'+json.dumps(notice,sort_keys=True))):
             raise ValueError('Contradictory frozen condition')
     contracts=value['provider_contracts']
@@ -135,7 +161,7 @@ def validate_frozen(value,spec):
             if not isinstance(header,str) or not re.fullmatch(r'\d{4}-\d{2}-\d{2}',header):raise ValueError('Invalid API version')
         elif header is not None:raise ValueError('Invalid API version')
     analysis=value['analysis']
-    expected={'version':1,'bootstrap_resamples':10000,'seed':0,'percentile':'Hyndman-Fan-7',
+    expected={'version':version,'bootstrap_resamples':10000,'seed':0,'percentile':'Hyndman-Fan-7',
               'prng':'random.Random','concurrency':1,'primary_contrast':['full','disabled']}
     if (value['sampling']!='provider_default' or value['known_model_revisions'] is not None or
         not isinstance(analysis,dict) or any(analysis.get(k)!=v for k,v in expected.items()) or

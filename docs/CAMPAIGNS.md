@@ -1,8 +1,9 @@
 # Registered evaluation campaigns
 
-Slice 8 implements the scheduler and analysis specified by [evaluation protocol
-v1](EVALUATION.md). Registration, execution and analysis are separate CLI actions.
-No dashboard, new room, provider fallback or paid experiment is implied.
+The scheduler supports historical protocol 1 and the split-aware protocol-2
+extension in [evaluation](EVALUATION.md). Registration, execution and analysis
+are separate CLI actions. The [nine curated rooms](ROOMS.md) add development/held-out
+cohorts; no dashboard, provider fallback or paid experiment is implied.
 
 ## Offline diagnostic quickstart
 
@@ -16,7 +17,7 @@ python -m parallax_relay.campaign analyze \
   --campaign runs/my-campaign --out runs/my-campaign-report
 ```
 
-Both destinations must be fresh. The example registers 15 trials: scripted, WAIT
+Both destinations must be fresh. This preserved version-1 example registers 15 trials: scripted, WAIT
 and uniform-v1 across all five arms, with two turns and one attempt per request.
 It schedules 216 maximum attempts. It is a small diagnostic, not a pilot,
 confirmatory cohort, model benchmark or proof of communication benefit.
@@ -25,21 +26,27 @@ Without pricing, monetary fields remain null even though the built-in policies
 return known zero token usage. Offline mode never reads credential files or
 constructs HTTP agents. The workbench's companion remains single-match/mock-only.
 
+The new `configs/campaign_rooms_offline.json` uses protocol 2: the same commands
+with that specification register 45 development trials and 648 maximum attempts.
+It is also a bounded diagnostic, not a pilot or confirmation.
+
 ## Specification and registration
 
-The JSON specification is version 1; unknown keys are rejected. Its fields are:
+New JSON specifications use version 2; unknown keys are rejected. Version-1
+inputs adapt into new registration version 2 with protocol-1 Split Span semantics
+and unchanged trial counts. Omitting a version selects version/protocol 2. Its fields are:
 
 | Field | Contract/default |
 |---|---|
-| `schema_version`, `protocol_version` | `1` |
+| `schema_version`, `protocol_version` | New defaults `2`; schema 1 requires protocol 1 |
 | `stage` | `diagnostic` (default), `pilot`, or `confirmatory` |
 | `mode` | `offline` (default) or `live` |
 | `policies` | Unique selection of `scripted`, `wait`, `uniform`; all three by default |
 | `roster` | Live-only, exactly three entries; each has `provider`, bare `model`, `api_key_env`, complete `pricing` |
-| `rooms` | Only `["split_span"]` is implemented |
+| `rooms` | Protocol 2: diagnostics use development subset (default all three), pilots all three development rooms, confirmation all six held-out rooms; protocol 1 only `["split_span"]` |
 | `conditions` | Unique subset of the five arms; all five by default |
 | `repetitions` | Diagnostic default 1; pilot exactly 5; confirmation exactly 30 |
-| `match` | Existing match settings shared across arms; omit `condition` and leave `communication_rounds` at default 2; the schedule supplies both |
+| `match` | Existing match settings shared across arms; omit `condition` and leave `communication_rounds` at default 2; the schedule supplies both and `room_id` |
 | `campaign_max_calls` | Required positive integer; conservative block admission counts every possible attempt |
 | `campaign_max_estimated_cost_usd` | Required positive live estimate guard; omitted for unpriced offline policies |
 | `scheduler_seed` | Nonnegative integer, default 0; controls order, not model randomness |
@@ -49,9 +56,10 @@ The JSON specification is version 1; unknown keys are rejected. Its fields are:
 Pilot/confirmation require all five arms and all three prescribed baseline teams.
 For model teams, enumerate unique provider/model permutations across the three
 roles. Repeated `(provider, model)` pairs deduplicate; repeated identities must use
-the same pricing/account-variable configuration. Deterministic oracle/WAIT teams
+the same pricing/account-variable configuration. Deterministic scripted/WAIT teams
 run once per condition; uniform teams use the full repetition count without
-model-label multiplication. For three distinct model identities this gives 150
+model-label multiplication. Protocol-2 offline pilot/confirmation therefore contain
+105/960 trials respectively. For three distinct model identities this gives 150
 pilot and 900 confirmatory model trials per room, plus 35/160 baseline trials.
 An offline diagnostic containing only deterministic teams rejects repetitions above
 one instead of silently discarding them. Money/interval fields reject JSON booleans.
@@ -61,17 +69,21 @@ freezes the validated specification, UUID allocation, block ordering, source,
 Python/package/OS environment, input fingerprints, API contracts, prices, limits
 and analysis version/seed. It writes a checksummed registration and verifies its
 readback. Hashes establish consistency, not authenticity. Registration includes
-static prompt/schema/room identity and is spectator metadata, never player input.
+static prompt/schema/per-room identity and the full catalog/certificate hashes and is spectator metadata, never player input.
 
 Protocol cohorts require clean Git source and complete environment identity.
 Diagnostics may use dirty/unavailable source, with explicit inference limitations.
-Registered inputs must still match before a protocol campaign and each subsequent
-trial launch. New cohorts, not edited registrations, represent changed inputs.
+Registered inputs must still match before every protocol-2 campaign (including
+diagnostics) and each subsequent trial launch. Protocol-1 diagnostics retain
+their explicit drift/ineligibility reporting. New cohorts, not edited registrations, represent changed inputs.
 
 After a complete, eligible pilot, register confirmation using a new specification
 with `stage="confirmatory"` and `--pilot runs/the-pilot`. Its registration links
-the pilot hash and records changed frozen sections/settings. Changed rooms,
-roster or baseline selection require a new pilot. Pilot results are never pooled
+the pilot hash. Protocol 2 freezes source, environment, catalog/membership, prompts,
+roster/prices, policies and match settings across the transition. Only stage,
+room split, repetition count, campaign ceilings and scheduler seed may change.
+Changed treatment/input settings require a new development pilot. Protocol 1
+retains its same-room transition and reports changed frozen sections/settings. Pilot results are never pooled
 into confirmation; missing/failed trials cannot be replaced for favorable results.
 
 ## Execution, budgets and interruption
@@ -128,6 +140,9 @@ schedule can contain engine defeats or intentional turn-limit stops.
 
 `analyze` performs no provider calls or trial execution. It writes fresh
 `report.json`, `trials.csv`, `cells.csv` and `attempts.csv`, verifying readback.
+New reports and analysis use version 2; ledger envelopes remain version 1.
+Historical registration version 1 remains analyzable; current execution requires
+fresh registration, without reinterpreting old trial IDs or adding trials.
 Each file is written through a temporary file and atomic replacement; the four
 files are not a transaction. String CSV cells with formula prefixes are quoted
 with a leading apostrophe; JSON retains original values. Empty CSVs retain headers.
@@ -159,7 +174,10 @@ Incomplete/ineligible cohorts receive descriptive rates/bounds without a
 complete-pair substitute. Secondary contrasts are exploratory. Degenerate intervals
 are labeled and do not establish equivalence. Deterministic controls are not
 independent repeated samples. No fixed-room result establishes held-out ability,
-provider rankings, general image understanding or broad cooperation.
+provider rankings, general image understanding or broad cooperation. Reports
+label every room/family/split and include descriptive family/split summaries.
+Contrasts and intervals remain per-room; no pooled task-population interval is
+computed from the finite curated room catalog.
 Validation cross-checks ended lifecycles, scheduled mode/policy, run UUIDs, stop
 reasons, engine state/energy/turns, replay sequences, phase ranges and call/usage/
 cost conservation. Malformed ledgers, duplicate lifecycle events and unmatched
@@ -191,3 +209,21 @@ Turn records add spectator-only `action_outcomes` from engine resolution. These
 diagnostics never enter requests/history or provide policies with a legality oracle.
 Existing engine outcomes, reply schemas and historical recording readers remain
 unchanged; new fields are additive within recording schema version 2.
+
+## Held-out execution permits
+
+Only the registered protocol-2 confirmation runner grants a room execution
+permit. It binds the validated registration, trial, catalog and current frozen
+inputs before output/provider construction, and `run_match` checks it again.
+Single-match runs, diagnostics, pilots and operational reruns cannot select
+held-out rooms. Pure engine/certificate APIs are trusted host utilities; the
+permit is a workflow guard, not a sandbox for arbitrary Python.
+
+
+Each trial launch collects one fresh frozen-input snapshot. The trusted runner
+passes that checked snapshot into permit creation; the permit detaches it and
+rechecks immutable registration/trial/catalog bindings at `run_match` entry.
+Direct `execute_trial`/permit-factory callers collect the fresh snapshot there.
+These are per-launch host receipts, not a cache to reuse across launches. Permit
+creation failures return sanitized `setup_failure` receipts before trial output or
+provider setup, so the campaign settles the attempted trial and releases its block.

@@ -43,7 +43,7 @@ class ProvenanceTests(unittest.TestCase):
         self.assertEqual(data['requested_settings']['max_estimated_cost_usd'], 0.001)
         self.assertEqual(data['players']['FLUX']['provider'], 'unknown')
         self.assertIsNone(data['players']['FLUX']['model_revision'])
-        self.assertEqual(data['schema_version'], 2)
+        self.assertEqual(data['schema_version'], 3)
         self.assertEqual(self.p.read_provenance({'schema_version': 2, 'provenance': data}), data)
         with self.assertRaises(ValueError):
             self.p.ProvenanceContext(api_key='SECRET_SENTINEL')
@@ -59,7 +59,7 @@ class ProvenanceTests(unittest.TestCase):
             self.assertNotEqual(original['prompt'], self.p.input_identities(state)['prompt'])
         with patch.object(self.p.protocol, 'MAX_REPLY_CHARS', 17):
             self.assertNotEqual(original['schemas'], self.p.input_identities(state)['schemas'])
-        with patch.object(self.p.state, 'ARTIFACT', 8):
+        with patch.object(self.p, 'get_room', return_value=self.p.get_room().model_copy(update={'coolant':3})):
             self.assertNotEqual(original['room'], self.p.input_identities(state)['room'])
         state['energy'] = 1
         self.assertNotEqual(original['room'], self.p.input_identities(state)['room'])
@@ -161,7 +161,7 @@ class ProvenanceTests(unittest.TestCase):
             ('environment', ('packages',), [{'name': 'example'}]),
             ('room', (), 'not a room'),
             ('room', ('initial_state',), []),
-            ('room', ('constants',), {}),
+            ('room', ('definition',), {}),
             ('schemas', (), {}),
             ('schemas', ('wire',), []),
             ('prompt', (), {}),

@@ -1,0 +1,11 @@
+{
+  "schema_version": 2,
+  "protocol_version": 2,
+  "stage": "diagnostic",
+  "mode": "offline",
+  "policies": ["scripted", "wait", "uniform"],
+  "rooms": ["split_span", "dev_01", "dev_02"],
+  "match": {"max_turns": 2, "max_attempts": 1},
+  "campaign_max_calls": 1000,
+  "scheduler_seed": 0
+}

@@ -21,6 +21,7 @@ from .protocol import ROLES
 from .providers import HTTPAgent
 from .recording import Recorder
 from .provenance import PlayerIdentity, ProvenanceContext
+from .rooms import get_room,rooms
 
 ROOT = Path(__file__).resolve().parent.parent
 CLEANUP_TIMEOUT_SECONDS = 5
@@ -80,11 +81,13 @@ def parser() -> argparse.ArgumentParser:
     modes.add_argument('--mock', action='store_true', help='Offline scripted agents; no API calls or keys.')
     modes.add_argument('--live', action='store_true', help='Real, potentially billable provider calls.')
     modes.add_argument('--check', action='store_true', help='Validate local config/credentials; no API requests.')
+    modes.add_argument('--list-rooms',action='store_true',help='List room metadata; no player inputs or provider calls.')
     p.add_argument('--config', type=Path, default=ROOT/'configs'/'three_models.toml')
     p.add_argument('--env-file', type=Path, help='Literal .env file (defaults to .env when it exists).')
     p.add_argument('--out', type=Path, help='New output directory. Existing directories are rejected.')
     p.add_argument('--max-turns', type=int, choices=range(1,13))
     p.add_argument('--max-calls', type=int)
+    p.add_argument('--room',choices=tuple(r.id for r in rooms()),help='Select a development room.')
     p.add_argument('--fast', action='store_true', help='One communication pass instead of two.')
     p.add_argument('--condition', choices=tuple(CONDITIONS), help='Protocol-v1 evaluation treatment.')
     p.add_argument('--policy', choices=('scripted', 'wait', 'uniform'), help='Offline policy; uniform requires --trial-id.')
@@ -106,8 +109,8 @@ async def _run(args, cfg, settings, runtime) -> int:
     policy_model = 'scripted-fixture' if policy == 'scripted' else policy + '-v1'
     players = ({r: {'provider':'mock','model':policy_model} for r in ROLES} if args.mock else
                {r: {'provider':p.provider,'model':p.model} for r,p in runtime.items()})
-    manifest = {'schema_version':2, 'mode':mode, 'players':players,
-                'settings':settings.model_dump(), 'room':'The Split Span'}
+    manifest = {'schema_version':3, 'mode':mode, 'players':players,
+                'settings':settings.model_dump(), 'room':settings.room_id}
     if args.mock:
         manifest['requested_settings'] = requested_settings
     context = ProvenanceContext(mode=mode, experiment_id=args.experiment_id, trial_id=args.trial_id,
@@ -183,8 +186,12 @@ async def _run(args, cfg, settings, runtime) -> int:
 def main(argv: list[str] | None = None) -> int:
     args = parser().parse_args(argv)
     try:
+        if args.list_rooms:
+            print(json.dumps([{k:getattr(r,k) for k in ('id','version','family','split')} for r in rooms()]))
+            return 0
         cfg = load_config(args.config)
         values = cfg.match.model_dump()
+        if args.room:values['room_id']=args.room
         if args.policy and not args.mock:
             raise ConfigError('--policy requires --mock')
         if args.policy == 'uniform' and args.trial_id is None:
@@ -198,6 +205,9 @@ def main(argv: list[str] | None = None) -> int:
         if args.max_turns is not None: values['max_turns'] = args.max_turns
         if args.max_calls is not None: values['max_calls'] = args.max_calls
         settings = MatchSettings.model_validate(values)
+        try:room=get_room(settings.room_id)
+        except ValueError:raise ConfigError('Unknown room selection') from None
+        if room.split=='held_out':raise ConfigError('A held-out room requires a registered confirmatory campaign')
         runtime = {}
         if not args.mock:
             if args.env_file:

@@ -121,9 +121,7 @@ class CompatibilityTests(unittest.TestCase):
     def test_legacy_reader_does_not_require_new_settings_or_rewrite_hashes(self):
         from parallax_relay.provenance import RunProvenance, read_provenance, canonical_hash
         from parallax_relay.state import initial_world
-        run = RunProvenance()
-        run.begin(MatchSettings(), {}, initial_world().snapshot())
-        data = run.snapshot()
+        data = json.loads(Path('tests/fixtures/legacy_provenance_v2.json').read_text())['provenance']
         data['schema_version'] = 1
         execution = data['execution']['value']
         execution['settings'].pop('condition')

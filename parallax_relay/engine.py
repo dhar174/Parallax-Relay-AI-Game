@@ -20,12 +20,13 @@ def _move(world: WorldState, role: str, action: Action, events: list[str], diagn
         diagnostics[role] = 'invalid_parameters'
         return
     destination = robot.x + action.direction * action.steps
-    if not 0 <= destination < WIDTH:
+    if not 0 <= destination < world.room.width:
         events.append(f"{role}: movement blocked by outer wall")
         diagnostics[role] = 'outer_wall'
         return
     crossed = range(robot.x + action.direction, destination + action.direction, action.direction)
-    if not world.bridge_extended and any(x in GAP for x in crossed):
+    if any(f'bridge_{i}' not in world.powered_bridges and any(x in bridge.gap for x in crossed)
+           for i,bridge in enumerate(world.room.bridges)):
         events.append(f"{role}: movement blocked by unbridged gap")
         diagnostics[role] = 'unbridged_gap'
         return
@@ -56,11 +57,16 @@ def resolve_turn(world: WorldState, actions: dict[str, Action], *, diagnostics: 
             diagnostics[role] = 'invalid_parameters'
             actions[role] = Action('WAIT')
 
+    def controller(role):
+        return next(((f'bridge_{i}',b) for i,b in enumerate(w.room.bridges)
+                     if abs(w.robots[role].x-b.motor)<=1),None)
+
     # 1. Controls: VENT precedes REROUTE, independent of agent order.
     for role, act in sorted(actions.items()):
         if act.kind != "VENT":
             continue
-        if role != "PYRA" or abs(w.robots[role].x - MOTOR) > 1:
+        target=controller(role)
+        if role != "PYRA" or target is None:
             events.append(f"{role}: VENT invalid (role/range)")
             diagnostics[role] = 'role_or_range'
         elif w.coolant < 1:
@@ -68,16 +74,18 @@ def resolve_turn(world: WorldState, actions: dict[str, Action], *, diagnostics: 
             diagnostics[role] = 'insufficient_resource'
         else:
             w.coolant -= 1
-            w.motor_heat = max(0, w.motor_heat - 3)
-            events.append(f"{role}: vented motor; heat now {w.motor_heat}")
+            key,_=target
+            w.motor_heats[key] = max(0, w.motor_heats[key] - 3)
+            events.append(f"{role}: vented motor; heat now {w.motor_heats[key]}")
 
     for role, act in sorted(actions.items()):
         if act.kind != "REROUTE":
             continue
-        if role != "FLUX" or abs(w.robots[role].x - MOTOR) > 1:
+        target=controller(role)
+        if role != "FLUX" or target is None:
             events.append(f"{role}: REROUTE invalid (role/range)")
             diagnostics[role] = 'role_or_range'
-        elif w.bridge_extended:
+        elif target[0] in w.powered_bridges:
             events.append(f"{role}: bridge already powered")
             diagnostics[role] = 'already_done'
         elif w.energy < 2:
@@ -85,16 +93,17 @@ def resolve_turn(world: WorldState, actions: dict[str, Action], *, diagnostics: 
             diagnostics[role] = 'insufficient_resource'
         else:
             w.energy -= 2
-            w.motor_heat += 2
-            if w.motor_heat > 4:
+            key,bridge=target
+            w.motor_heats[key] += 2
+            if w.motor_heats[key] > 4:
                 diagnostics[role] = 'overload'
                 # A wrong decision has a meaningful, reproducible consequence.
                 for victim in w.robots.values():
-                    if abs(victim.x - MOTOR) <= 1:
+                    if abs(victim.x - bridge.motor) <= 1:
                         victim.damage += 1
                 events.append(f"{role}: motor overloaded; bridge did not extend; nearby robots damaged")
             else:
-                w.bridge_extended = True
+                w.powered_bridges.add(key)
                 events.append(f"{role}: bridge extended safely; energy now {w.energy}")
 
     # 2. Movement: collisions are not modeled in this first slice.
@@ -106,18 +115,18 @@ def resolve_turn(world: WorldState, actions: dict[str, Action], *, diagnostics: 
     for role, act in sorted(actions.items()):
         if act.kind == "COLLECT":
             x = w.robots[role].x
-            if role == "SPECTRA" and x == ARTIFACT and not w.shard_collected:
+            if role == "SPECTRA" and x == w.room.shard and not w.shard_collected:
                 w.shard_collected = True
                 events.append("SPECTRA: memory shard recovered")
-            elif role == "FLUX" and x == ENERGY_CELL and not w.cell_collected:
-                w.cell_collected = True
-                w.energy += 2
+            elif role == "FLUX" and x in w.room.cells and x not in w.collected_cells:
+                w.collected_cells.add(x)
+                w.energy += w.room.cell_value
                 events.append(f"FLUX: recovered energy cell; energy now {w.energy}")
             else:
                 events.append(f"{role}: no collectable object available")
                 diagnostics[role] = 'nothing_to_collect'
         elif act.kind == "UNLOCK":
-            if role != "FLUX" or w.robots[role].x != EXIT:
+            if role != "FLUX" or w.robots[role].x != w.room.exit:
                 events.append(f"{role}: UNLOCK invalid (role/location)")
                 diagnostics[role] = 'role_or_range'
             elif w.exit_unlocked:
@@ -135,8 +144,9 @@ def resolve_turn(world: WorldState, actions: dict[str, Action], *, diagnostics: 
             diagnostics[role] = 'unknown_action'
 
     w.turn += 1
-    w.win = bool(w.exit_unlocked and all(r.x == EXIT for r in w.robots.values()))
-    w.loss = bool(w.turn >= MAX_TURNS and not w.win)
+    w.win = bool(w.exit_unlocked and all(r.x == w.room.exit for r in w.robots.values())
+                 and (not w.room.requires_shard or w.shard_collected))
+    w.loss = bool(w.turn >= w.room.deadline and not w.win)
     if w.win:
         events.append("TEAM SUCCESS: all three robots extracted")
     elif w.loss:

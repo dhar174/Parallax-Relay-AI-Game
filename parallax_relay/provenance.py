@@ -22,6 +22,7 @@ from .config import MatchSettings, Rates, Settings
 from .conditions import resolve_condition
 from .policies import policy_identity
 from .providers import provider_contract
+from .rooms import RoomDefinition,get_room,room_hash,catalog_identity,validate_snapshot
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -135,7 +136,10 @@ def collect_environment() -> dict:
 
 
 def input_identities(initial_snapshot: dict, settings: MatchSettings | None = None) -> dict:
-    condition = resolve_condition(settings or MatchSettings())
+    settings=settings or MatchSettings()
+    condition = resolve_condition(settings)
+    room=get_room(settings.room_id)
+    from .room_certificates import certificate_hash
     request = protocol.AgentRequest(protocol.Observation('SPECTRA', 0, '{}', b''), 'commit',
                                     include_image=condition.include_image, condition=condition.name)
     return {
@@ -149,11 +153,9 @@ def input_identities(initial_snapshot: dict, settings: MatchSettings | None = No
             'max_reply_chars': protocol.MAX_REPLY_CHARS,
         }),
         'room': _fingerprint({
-            'id': 'split_span', 'version': 1,
-            'constants': {name: getattr(state, name) for name in
-                          ('WIDTH', 'MAX_TURNS', 'EXIT', 'ARTIFACT', 'ENERGY_CELL', 'MOTOR')},
-            'gap': sorted(state.GAP), 'objectives': dict(state.PRIVATE_GOALS),
-            'initial_state': initial_snapshot,
+            'id':room.id,'version':room.version,'definition':room.model_dump(mode='json'),
+            'catalog_sha256':catalog_identity()['sha256'],'certificate_sha256':certificate_hash(room.id),
+            'objectives':dict(state.PRIVATE_GOALS),'initial_state':initial_snapshot,
         }),
     }
 
@@ -180,7 +182,7 @@ class RunProvenance:
                 'seed': None,
             }
         self._data = {
-            'schema_version': 2, 'run_id': str(uuid4()),
+            'schema_version': 3, 'run_id': str(uuid4()),
             'experiment_id': str(context.experiment_id) if context.experiment_id else None,
             'trial_id': str(context.trial_id) if context.trial_id else None,
             'source': collect_source(root), 'environment': collect_environment(), 'players': players,
@@ -398,6 +400,24 @@ class _Conditions(_RecordModel):
     observations: Literal['role_png_and_hud']
 
 
+class _LegacyMatchSettingsV2(_LegacyMatchSettings):
+    """Frozen control-era settings; never acquire current room defaults."""
+    communication_rounds: Literal[0,1,2]=2
+    condition: Literal['full','reduced','disabled','withheld','no_images']|None=None
+
+    @model_validator(mode='before')
+    @classmethod
+    def condition_rounds(cls,value):
+        if isinstance(value,dict):
+            if type(value.get('communication_rounds',2)) is not int:raise ValueError('Invalid rounds')
+            name=value.get('condition')
+            if name is not None:
+                from .conditions import CONDITIONS
+                if name not in CONDITIONS or value.get('communication_rounds',CONDITIONS[name].communication_rounds)!=CONDITIONS[name].communication_rounds:
+                    raise ValueError('Inconsistent legacy condition')
+        return value
+
+
 class _ExecutionValue(_RecordModel):
     mode: Literal['mock', 'live', 'programmatic']
     settings: dict
@@ -437,7 +457,7 @@ class _ExecutionValueV2(_RecordModel):
 
     @model_validator(mode='after')
     def valid_configuration(self):
-        settings = _complete_config(MatchSettings, self.settings)
+        settings = _complete_config(_LegacyMatchSettingsV2, self.settings)
         _require_roles(self.players)
         for rate in _require_roles(self.pricing).values():
             if rate is not None:
@@ -549,8 +569,33 @@ class _WorldSnapshot(_RecordModel):
         return self
 
 
+class _ExecutionValueV3(_ExecutionValueV2):
+    @model_validator(mode='after')
+    def current_settings(self):
+        _complete_config(MatchSettings,self.settings)
+        return self
+
+
+class _RoomValueV3(_RecordModel):
+    id: str
+    version: int=Field(ge=1)
+    definition: dict
+    catalog_sha256: str=Field(pattern=r'^[0-9a-f]{64}$')
+    certificate_sha256: str=Field(pattern=r'^[0-9a-f]{64}$')
+    objectives: dict[str,str]
+    initial_state: dict
+
+    @model_validator(mode='after')
+    def recorded_room(self):
+        definition=RoomDefinition.model_validate_json(json.dumps(self.definition,allow_nan=False))
+        if self.id!=definition.id or self.version!=definition.version:raise ValueError('Contradictory room identity')
+        _require_roles(self.objectives)
+        validate_snapshot(self.initial_state,definition)
+        return self
+
+
 class ProvenanceRecord(_RecordModel):
-    schema_version: Literal[1, 2]
+    schema_version: Literal[1, 2, 3]
     run_id: UUID
     experiment_id: UUID | None
     trial_id: UUID | None
@@ -567,17 +612,17 @@ class ProvenanceRecord(_RecordModel):
         _require_roles(self.players)
         _EnvironmentValue.model_validate(self.environment.value)
         if self.requested_settings is not None:
-            _complete_config(_LegacyMatchSettings if self.schema_version == 1 else MatchSettings, self.requested_settings)
+            _complete_config({1:_LegacyMatchSettings,2:_LegacyMatchSettingsV2,3:MatchSettings}[self.schema_version], self.requested_settings)
         if self.lifecycle.stage in ('running', 'ended'):
             if self.execution is None or self.inputs is None or not {'prompt', 'schemas', 'room'} <= set(self.inputs):
                 raise ValueError('Missing execution identity')
         elif self.execution is not None or self.inputs is not None:
             raise ValueError('Unexpected execution identity')
         if self.execution is not None:
-            execution = (_ExecutionValue if self.schema_version == 1 else _ExecutionValueV2).model_validate(self.execution.value)
+            execution = {1:_ExecutionValue,2:_ExecutionValueV2,3:_ExecutionValueV3}[self.schema_version].model_validate(self.execution.value)
             if self.players != execution.players:
                 raise ValueError('Contradictory player identities')
-            if self.schema_version == 2 and execution.policy is not None and execution.policy['name'] == 'uniform':
+            if self.schema_version >= 2 and execution.policy is not None and execution.policy['name'] == 'uniform':
                 if execution.policy['trial_id'] != str(self.trial_id):
                     raise ValueError('Contradictory trial identity')
         if self.inputs is not None:
@@ -586,11 +631,13 @@ class ProvenanceRecord(_RecordModel):
             if not isinstance(self.inputs['prompt'].value, str):
                 raise ValueError('Invalid prompt identity')
             _SchemaValue.model_validate(self.inputs['schemas'].value)
-            _RoomValue.model_validate(self.inputs['room'].value)
-            if self.schema_version == 2 and self.execution is not None:
+            (_RoomValueV3 if self.schema_version==3 else _RoomValue).model_validate(self.inputs['room'].value)
+            if self.schema_version==3 and self.execution is not None and execution.settings['room_id']!=self.inputs['room'].value['id']:
+                raise ValueError('Execution room mismatch')
+            if self.schema_version >= 2 and self.execution is not None:
                 notice = execution.conditions.model_dump(exclude={'arm'})
                 schemas = self.inputs['schemas'].value
-                if (schemas['request_format_version'] != 2 or
+                if (type(schemas['request_format_version']) is not int or schemas['request_format_version'] != self.schema_version or
                         canonical_hash(schemas['request_structure'].get('condition_notice')) != canonical_hash(notice) or
                         not self.inputs['prompt'].value.endswith('\n' + json.dumps(notice, sort_keys=True))):
                     raise ValueError('Contradictory condition notice or request version')
@@ -603,7 +650,7 @@ def read_provenance(manifest: dict) -> dict | None:
         return None
     try:
         value = manifest['provenance']
-        if type(value['schema_version']) is not int or value['schema_version'] not in (1, 2):
+        if type(value['schema_version']) is not int or value['schema_version'] not in (1, 2, 3):
             raise ValueError()
         encoded = json.dumps(value, allow_nan=False)
         ProvenanceRecord.model_validate_json(encoded)

@@ -161,7 +161,7 @@ class ReaderReviewTests(unittest.TestCase):
                 self.assert_invalid(data)
 
     def test_snapshot_bounds_use_recorded_width(self):
-        data = copy.deepcopy(self.running)
+        data = json.loads(Path('tests/fixtures/legacy_provenance_v2.json').read_text())['provenance']
         room = data['inputs']['room']
         room['value']['constants']['WIDTH'] = 20
         room['value']['initial_state']['robots']['SPECTRA']['x'] = 19

@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "kind": "offline_two_turn_development_diagnostic",
+  "source": {
+    "status": "clean",
+    "revision": "c315812e8dc1519a874b46b928ccf9878e84fd42",
+    "reason": null
+  },
+  "registration_sha256": "de85345f53825c4a2561e24235a9b4a124073793f673ef640b3d73ce06127259",
+  "catalog_sha256": "8f471109eee489596ec721713b2f1f7b38040e5a24ad19511bafaaa8b5688f57",
+  "registration_version": 2,
+  "protocol_version": 2,
+  "report_version": 2,
+  "analysis_version": 2,
+  "rooms": [
+    "split_span",
+    "dev_01",
+    "dev_02"
+  ],
+  "completion_status": "complete",
+  "counts": {
+    "planned": 45,
+    "launched": 45,
+    "unlaunched": 0,
+    "artifact_available": 45,
+    "operational_successes": 0,
+    "known_operational_failures": 45,
+    "unknown_operational": 0,
+    "engine_win": 0,
+    "engine_defeat": 0,
+    "terminal": 0,
+    "nonterminal": 45,
+    "unknown_engine": 0,
+    "aborted": 0,
+    "cancelled": 0
+  },
+  "planned_exposure": {
+    "calls": 648,
+    "estimated_usd": 0.0,
+    "cost_is_estimate_not_billing_guarantee": true,
+    "estimated_usd_decimal": "0"
+  },
+  "campaign_accounting": {
+    "configured_call_ceiling": 1000,
+    "configured_estimated_usd_ceiling": null,
+    "planned_maximum_exposure": {
+      "calls": 648,
+      "estimated_usd": 0.0,
+      "cost_is_estimate_not_billing_guarantee": true,
+      "estimated_usd_decimal": "0"
+    },
+    "calls_reserved_total": 648,
+    "calls_released_total": 0,
+    "calls_accounted": 648,
+    "reservation_balance_calls": 0,
+    "estimated_usd_reserved_total": 0.0,
+    "estimated_usd_released_total": 0.0,
+    "estimated_usd_accounted": 0.0,
+    "reservation_balance_estimated_usd": 0.0,
+    "reservation_balance_estimated_usd_decimal": "0",
+    "legacy_rounding_uncertainty_usd": 0.0,
+    "legacy_settlement_rounding_uncertainty_usd": 0.0,
+    "launched_without_finished_receipt": 0,
+    "interpretation": "An interrupted ledger can retain reservations; balances beyond the reported legacy rounding uncertainty expose unmatched exposure. Monetary reservations are local estimates, not invoices."
+  },
+  "anomalies": [],
+  "limitations": [
+    "Built-in policies only; no provider calls.",
+    "Two-turn truncation intentionally leaves all 45 trials nonterminal.",
+    "No model performance, pilot/confirmation, or difficulty claims."
+  ],
+  "reanalysis_source": {
+    "status": "clean",
+    "revision": "decdcca4aba667ff0d20b681d5032360787936ce",
+    "reason": null
+  },
+  "aggregate_confidence_intervals_omitted": true,
+  "per_room_cell_intervals_retained": true
+}
