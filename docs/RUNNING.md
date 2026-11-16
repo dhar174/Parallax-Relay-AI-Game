@@ -353,3 +353,30 @@ use 12 turns. No experiment-horizon override is currently sent to the players.
   never include raw exceptions.
 
 For current defects and their proposed acceptance tests, see [Review](REVIEW.md).
+
+## Evaluation conditions and offline controls
+
+`--condition full|reduced|disabled|withheld|no_images` selects a protocol-v1 arm.
+Legacy communication rounds 2/1 still select full/reduced; 0 means disabled.
+An explicit condition normalizes an omitted round count and rejects a conflicting
+explicit count. CLI `--condition` overrides the configuration; `--fast` is the
+reduced arm and rejects a conflicting named condition. Ordinary defaults stay full.
+
+```bash
+python -m parallax_relay.play --mock --policy wait --condition disabled
+python -m parallax_relay.play --mock --policy uniform --condition no_images \
+  --trial-id b81b3e0a-61cc-45fd-83c6-f871291c98af
+```
+
+`--policy` is mock-only; default scripted is the known solvability oracle. WAIT
+and uniform-v1 use empty messages/private notes and the normal engine consequences.
+Uniform requires a trial UUID. It samples canonical role action kinds without
+hidden-state legality filtering; an illegal game action consumes the normal turn.
+
+Disabled skips communication calls. Withheld runs and records communication but
+removes all public messages, including own public scratchpad and metadata, from
+current and later player inputs. Own commitment notes remain local. No-images
+omits provider image parts and image cost reserves while recording the unchanged
+role PNGs for spectators. All arms include the same factual condition-notice template.
+These interventions establish host behavior, not evidence of intelligence or a
+communication benefit. See [evaluation protocol](EVALUATION.md).

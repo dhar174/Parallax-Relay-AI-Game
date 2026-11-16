@@ -11,13 +11,14 @@ from typing import Literal, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from .state import Action
+from .conditions import CONDITIONS, ConditionName
 
 ROLES = ('SPECTRA', 'PYRA', 'FLUX')
 Phase = Literal['broadcast', 'negotiate', 'commit']
 MAX_MESSAGE_CHARS = 400
 MAX_NOTES_CHARS = 1000
 MAX_REPLY_CHARS = 16384
-REQUEST_FORMAT_VERSION = 1
+REQUEST_FORMAT_VERSION = 2
 
 
 @dataclass(frozen=True)
@@ -51,6 +52,8 @@ class AgentRequest:
     private_notes: str = ''
     repair: str = ''
     max_output_tokens: int = 2048
+    include_image: bool = True
+    condition: ConditionName = 'full'
 
     @property
     def role(self) -> str:
@@ -70,6 +73,7 @@ class AgentRequest:
             'your_recent_history': json.loads(self.history_json),
             'your_private_notes': self.private_notes,
             'format_repair': self.repair,
+            'condition_notice': CONDITIONS[self.condition].notice(),
         }, ensure_ascii=True, separators=(',', ':'))
 
 

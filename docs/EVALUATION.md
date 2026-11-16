@@ -3,9 +3,8 @@
 Protocol version **1**, November 14, 2026. This is a prospective specification for
 #17, not benchmark results or authorization to spend money. It defines requirements
 for controls (#18), the campaign runner/analysis (#19), and held-out rooms (#20).
-Only full communication, reduced communication (`--fast`), and the scripted fixture
-are implemented today. No campaign, new policy, ablation control, statistical
-package, or room is introduced by this document. Parent research gate #9 stays open;
+Slice 8 controls implement all five arms, WAIT and uniform-v1 alongside the scripted
+oracle; see the running guide for their CLI and provenance contracts. This protocol itself supplies no campaign results or new rooms. Parent research gate #9 stays open;
 live claims also require bounded provider/model compatibility evidence under #8.
 
 ## Question and comparison scope
@@ -364,3 +363,12 @@ Current [provenance](PROVENANCE.md) supplies individual-run identity and lifecyc
 ledger, scheduling, campaign budgeting and aggregation/analysis; #20 must supply
 held-out families and solvability/privacy checks. Those issues remain open. None
 of this protocol establishes live compatibility or requires a paid run in this PR.
+
+## Slice 8 controls delivery
+
+Issue #18 now has explicit condition selection, actual provider image omission,
+withheld-history filtering, role-local deterministic policies, request-format v2
+and provenance v2 with a frozen v1 reader. The workbench exports the same conditions
+and invalidates live preparation after changes. The prospective requirements above
+remain the campaign acceptance specification; delivery does not establish model
+performance, held-out generalization or standing authorization for live requests.

@@ -60,6 +60,13 @@ commitment phase finishes. Then the host calls `resolve_turn` exactly once.
 Default: broadcast -> negotiate -> commit -> resolve.
 Fast: broadcast -> commit -> resolve.
 
+Protocol-v1 evaluation also supports disabled (commit only), withheld (all phases,
+but no public message text/metadata in any player request or later history), and
+no_images (full phases, own HUD without provider image attachments). All arms use
+the same versioned factual condition notice. Actual role PNGs remain spectator
+artifacts even without provider attachments. Request format is now version 2;
+reply schemas and engine legality are unchanged. See [evaluation](EVALUATION.md).
+
 Controls resolve before movement, including VENT before REROUTE. Movement precedes
 collection/unlock, as in the starter. This is not a real-time physics system.
 
@@ -172,7 +179,7 @@ pairs on failure. The driver makes at most two finalization passes and preserves
 the original failure, even if recovery succeeds.
 Primary and secondary finalization operations use the same `finish:<artifact>`
 labels; a generic custom `finish` failure is labeled `finish:finish`.
-The built-in recorder also binds version-1 provenance to actual driver inputs;
+The built-in recorder also binds version-2 provenance to actual driver inputs;
 custom recorders need no new methods. Its manifest is now the eighth independent
 final artifact. Execution end time/original stop reason freeze before finalization,
 while writable metadata/viewers refresh the final stop reason on recovery. See

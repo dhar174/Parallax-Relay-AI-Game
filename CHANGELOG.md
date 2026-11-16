@@ -1,5 +1,12 @@
 # Changelog
 
+## Slice 8 controls
+
+- Add five recorded evaluation arms, actual image omission, withheld-history
+  isolation, and WAIT/uniform-v1 offline policies without changing engine rules.
+- Version prompt/request and provenance identities; retain historical provenance
+  and recording readers. Update CLI/workbench condition exports and replay labels.
+
 ## Unreleased
 
 - Publish a separately authorized successful live retry: nine first-attempt

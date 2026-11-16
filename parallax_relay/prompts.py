@@ -28,10 +28,11 @@ unlocked by the end of round 12. WAIT is always legal. Bad game moves consume a 
 
 PERCEPTION: Optical SPECTRA sees inscriptions and shards; thermal PYRA sees motor heat;
 electromagnetic FLUX sees circuits and energy cells. All share geometry/positions.
-Interpret your PNG, do not assume invisible details. Current hidden state is not supplied
+When a PNG is available, interpret it; do not assume invisible details. Current hidden state is not supplied
 in text. You receive your own goal, bounded history, and optional factual private notes.
 
-PHASES: broadcast: independently report observations and propose a plan. negotiate:
+PHASES: The request's condition_notice states the active phases and available inputs.
+broadcast: independently report observations and propose a plan. negotiate:
 respond to the completed broadcast, resolve conflicts and clarify intended actions.
 commit: after all available messages, submit exactly one action. You never see anyone
 else's current sealed action before committing. Return ONLY JSON matching the supplied

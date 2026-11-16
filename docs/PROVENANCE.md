@@ -1,6 +1,6 @@
 # Run provenance
 
-The main recorder adds `manifest.provenance.schema_version = 1` inside the existing
+The main recorder adds `manifest.provenance.schema_version = 2` inside the existing
 version-2 manifest. Results, call/phase/turn records, engine behavior, and the replay
 data shape retain their existing versions. Provenance is spectator information:
 it includes room/objective identities and never belongs in a player request.
@@ -149,7 +149,7 @@ match-resume guarantee. Pre-match setup failure may leave only initialized metad
 
 ## Reading and compatibility
 
-`read_provenance(manifest)` returns a detached dictionary for supported version-1
+`read_provenance(manifest)` returns a detached dictionary for supported version-1 and version-2
 records after structural, timestamp, and fingerprint validation. Validation covers
 known nested settings/prices, environment, request contracts, and room
 snapshots; matching a digest alone does not make an arbitrary payload valid.
@@ -173,3 +173,19 @@ manifest metadata remains that trusted caller's responsibility; neither a metada
 reader nor the old key-name redactor is a general secret detector. Keep credentials
 out of prompts, declarations, and spectator metadata. Provenance identifies inputs
 and availability limits; it does not recreate nondeterministic remote responses.
+
+## Slice 8 condition and policy identity
+
+New runs write provenance version 2; version 1 retains its frozen historical
+settings/condition reader. Old checksums are validated without adding new defaults
+or rewriting the record. The outer manifest/result format remains version 2.
+Execution conditions identify the arm and versioned factual request notice, phase
+schedule, public-message availability and image availability. The effective prompt
+fingerprint includes that notice; request format version 2 includes it in JSON.
+
+Explicit offline context can declare `policy="scripted"`, `"wait"` or `"uniform"`.
+Uniform requires a trial UUID and records the uniform-v1 derivation, Python/PRNG
+identity and scheduled commitment seeds for every role/possible turn. Actual
+commitment attempts are identified by call turn/role; retries use the same seed.
+These are local policy seeds, never provider seeds. Undeclared custom policies
+remain unknown. Each condition/policy changes effective identity.

@@ -13,6 +13,7 @@ from typing import Callable, Mapping
 
 from .budget import Budget, BudgetExceeded, Ticket
 from .config import MatchSettings, Rates
+from .conditions import resolve_condition
 from .engine import resolve_turn, score
 from .observations import observe
 from .protocol import (Agent, AgentRequest, BroadcastReply, CommitReply, ChatMessage,
@@ -174,6 +175,7 @@ async def run_match(agents: Mapping[str, Agent], settings: MatchSettings | None 
         # Reject reuse before recovery can overwrite the preceding match's files.
         raise ValueError('Recorder already bound to a match')
     settings = settings or MatchSettings()
+    condition = resolve_condition(settings)
     world = initial_world()
     budget = Budget(settings, rates or {})
     histories: dict[str, list[dict]] = {r: [] for r in ROLES}
@@ -195,14 +197,15 @@ async def run_match(agents: Mapping[str, Agent], settings: MatchSettings | None 
             observations = {r: observe(world, r) for r in ROLES}
             if recorder: recorder.begin_turn(world, observations)
             messages: tuple[ChatMessage, ...] = ()
-            phase_names = ['broadcast'] + (['negotiate'] if settings.communication_rounds == 2 else []) + ['commit']
+            phase_names = condition.phases
             abort = False
             outcomes: dict[str, Outcome] = {}
             for phase in phase_names:
                 requests = {r: AgentRequest(
-                    observations[r], phase, messages,
+                    observations[r], phase, messages if condition.deliver_messages else (),
                     json.dumps(histories[r], separators=(',', ':')), notes[r],
                     max_output_tokens=settings.max_output_tokens,
+                    include_image=condition.include_image, condition=condition.name,
                 ) for r in ROLES}
                 try:
                     outcomes = await _phase(agents, requests, budget, settings, calls, recorder)
@@ -213,6 +216,7 @@ async def run_match(agents: Mapping[str, Agent], settings: MatchSettings | None 
                     failures[role] = failures[role] + 1 if outcome.parsed is None else 0
                 phase_record = {'turn': world.turn, 'phase': phase,
                                 'statuses': {r: o.error or 'ok' for r, o in outcomes.items()}}
+                phase_record['messages_delivered'] = condition.deliver_messages
                 if phase != 'commit':
                     published = tuple(ChatMessage(r, world.turn, phase,
                         o.parsed.message if isinstance(o.parsed, BroadcastReply) else '',
@@ -261,7 +265,7 @@ async def run_match(agents: Mapping[str, Agent], settings: MatchSettings | None 
                 if settings.history_turns:
                     histories[role].append({
                         'turn': previous_turn, 'your_observation': observations[role].hud,
-                        'public_messages': [asdict(m) for m in messages],
+                        'public_messages': [asdict(m) for m in messages] if condition.deliver_messages else [],
                         'your_action': asdict(actions[role]),
                         'events': public_events(after.events),
                     })

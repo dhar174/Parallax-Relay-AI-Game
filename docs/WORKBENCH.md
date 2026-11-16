@@ -91,3 +91,12 @@ an older checkout produce a clear compatibility mismatch without a traceback.
 5. Confirm the deployment succeeded, then load the Site as its owner. Check the displayed source revision, native fixture and companion download. Record the game revision **G** embedded in `contract.json` and the separate Site-source revision **S** used for the saved version/deployment, plus the archive hash and deployment receipt. Verify hosted contract G and the built fingerprint; the saved Site version must identify S. These are different repositories, so the SHAs need not match. To roll back, republish the previous known-good saved Sites version and verify the revision and fixture again.
 
 There is no automatic deployment on merge. The game repository contains the source and build procedure. It does not contain Sites credentials or provider secrets.
+
+## Evaluation conditions
+
+The condition selector exports the same five protocol arms as the CLI. Selecting
+an arm updates its communication-round count and invalidates live preparation.
+No-images retains spectator PNGs but sends no image parts to providers. Withheld
+communications are spectator-only; imported runs display their recorded arm.
+Historical imports without a condition label remain explicitly unspecified.
+Campaign registration/execution/analysis are CLI operations, not browser actions.

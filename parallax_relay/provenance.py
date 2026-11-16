@@ -18,7 +18,9 @@ from uuid import UUID, uuid4
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from . import prompts, protocol, state
-from .config import MatchSettings, Rates
+from .config import MatchSettings, Rates, Settings
+from .conditions import resolve_condition
+from .policies import policy_identity
 from .providers import provider_contract
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -41,6 +43,15 @@ class ProvenanceContext(BaseModel):
     trial_id: UUID | None = None
     players: dict[str, PlayerIdentity] = Field(default_factory=dict)
     requested_settings: MatchSettings | None = None
+    policy: Literal['scripted', 'wait', 'uniform'] | None = None
+
+    @model_validator(mode='after')
+    def policy_trial(self):
+        if self.policy == 'uniform' and self.trial_id is None:
+            raise ValueError('Uniform policy requires a trial UUID')
+        if self.policy is not None and self.mode != 'mock':
+            raise ValueError('Offline policy requires mock identity')
+        return self
 
     @field_validator('players')
     @classmethod
@@ -116,10 +127,12 @@ def collect_environment() -> dict:
     })
 
 
-def input_identities(initial_snapshot: dict) -> dict:
-    request = protocol.AgentRequest(protocol.Observation('SPECTRA', 0, '{}', b''), 'commit')
+def input_identities(initial_snapshot: dict, settings: MatchSettings | None = None) -> dict:
+    condition = resolve_condition(settings or MatchSettings())
+    request = protocol.AgentRequest(protocol.Observation('SPECTRA', 0, '{}', b''), 'commit',
+                                    include_image=condition.include_image, condition=condition.name)
     return {
-        'prompt': _fingerprint(prompts.SYSTEM_RULES),
+        'prompt': _fingerprint(prompts.SYSTEM_RULES + '\n' + json.dumps(condition.notice(), sort_keys=True)),
         'schemas': _fingerprint({
             'request_format_version': protocol.REQUEST_FORMAT_VERSION,
             'request_structure': json.loads(request.prompt_text()),
@@ -147,6 +160,7 @@ class RunProvenance:
         self.bound = False
         self._tick = None
         self._mode = context.mode
+        self._policy, self._trial_id = context.policy, context.trial_id
         players = {}
         for role in protocol.ROLES:
             identity = context.players.get(role, PlayerIdentity())
@@ -159,7 +173,7 @@ class RunProvenance:
                 'seed': None,
             }
         self._data = {
-            'schema_version': 1, 'run_id': str(uuid4()),
+            'schema_version': 2, 'run_id': str(uuid4()),
             'experiment_id': str(context.experiment_id) if context.experiment_id else None,
             'trial_id': str(context.trial_id) if context.trial_id else None,
             'source': collect_source(root), 'environment': collect_environment(), 'players': players,
@@ -177,12 +191,13 @@ class RunProvenance:
                   'pricing': {r: rates[r].model_dump() if rates.get(r) is not None else None
                               for r in protocol.ROLES},
                   'players': self._data['players'],
-                  'conditions': {'communication': 'full' if settings.communication_rounds == 2 else 'reduced',
-                                 'observations': 'role_png_and_hud'}}
+                  'conditions': {'arm': resolve_condition(settings).name,
+                                 **resolve_condition(settings).notice()},
+                  'policy': policy_identity(self._policy, self._trial_id, settings.max_turns) if self._policy else None}
         # Publish a complete binding only after every fallible input collector
         # succeeds. Failed setup must not look like an external/partial match.
         execution = _fingerprint(config)
-        inputs = input_identities(initial_snapshot)
+        inputs = input_identities(initial_snapshot, settings)
         tick, started_at = monotonic(), _utc_now()
         self._data['execution'], self._data['inputs'] = execution, inputs
         self._tick = tick
@@ -355,6 +370,21 @@ def _require_roles(value):
     return value
 
 
+class _LegacyMatchSettings(Settings):
+    """Frozen provenance-v1 contract; do not extend with current defaults."""
+    communication_rounds: Literal[1, 2] = 2
+    max_turns: int = Field(default=12, ge=1, le=12)
+    max_calls: int = Field(default=216, ge=1, le=10000)
+    max_attempts: int = Field(default=2, ge=1, le=3)
+    timeout_seconds: float = Field(default=60, gt=0, le=600)
+    max_output_tokens: int = Field(default=2048, ge=256, le=16384)
+    history_turns: int = Field(default=4, ge=0, le=12)
+    retry_delay_seconds: float = Field(default=0.5, ge=0, le=30)
+    max_consecutive_failures: int = Field(default=3, ge=1, le=20)
+    max_estimated_cost_usd: float | None = Field(default=None, gt=0)
+    image_token_reserve: int = Field(default=8192, ge=1, le=1000000)
+
+
 class _Conditions(_RecordModel):
     communication: Literal['full', 'reduced']
     observations: Literal['role_png_and_hud']
@@ -369,7 +399,7 @@ class _ExecutionValue(_RecordModel):
 
     @model_validator(mode='after')
     def valid_configuration(self):
-        settings = _complete_config(MatchSettings, self.settings)
+        settings = _complete_config(_LegacyMatchSettings, self.settings)
         _require_roles(self.players)
         for rate in _require_roles(self.pricing).values():
             if rate is not None:
@@ -378,6 +408,49 @@ class _ExecutionValue(_RecordModel):
                 raise ValueError('Missing guarded pricing')
         if self.conditions.communication != ('full' if settings.communication_rounds == 2 else 'reduced'):
             raise ValueError('Inconsistent communication condition')
+        return self
+
+
+class _ConditionsV2(_RecordModel):
+    arm: Literal['full', 'reduced', 'disabled', 'withheld', 'no_images']
+    version: Literal[1]
+    phases: list[Literal['broadcast', 'negotiate', 'commit']]
+    public_messages_available: bool
+    role_image_available: bool
+
+
+class _ExecutionValueV2(_RecordModel):
+    mode: Literal['mock', 'live', 'programmatic']
+    settings: dict
+    pricing: dict[str, dict | None]
+    players: dict[str, _PlayerRecord]
+    conditions: _ConditionsV2
+    policy: dict | None
+
+    @model_validator(mode='after')
+    def valid_configuration(self):
+        settings = _complete_config(MatchSettings, self.settings)
+        _require_roles(self.players)
+        for rate in _require_roles(self.pricing).values():
+            if rate is not None:
+                _complete_config(Rates, rate)
+            elif settings.max_estimated_cost_usd is not None:
+                raise ValueError('Missing guarded pricing')
+        condition = resolve_condition(settings)
+        if self.conditions.model_dump() != {'arm': condition.name, **condition.notice()}:
+            raise ValueError('Inconsistent condition')
+        if self.policy is not None:
+            name = self.policy.get('name')
+            if name not in ('scripted', 'wait', 'uniform') or self.mode != 'mock':
+                raise ValueError('Invalid policy identity')
+            expected = policy_identity(name, self.policy.get('trial_id'), settings.max_turns)
+            if name == 'uniform':
+                recorded_python = self.policy.get('python_version')
+                if not isinstance(recorded_python, str) or not re.fullmatch(r'\d+\.\d+\.\d+', recorded_python):
+                    raise ValueError('Invalid policy Python version')
+                expected['python_version'] = recorded_python
+            if type(self.policy.get('version')) is not int or self.policy != expected:
+                raise ValueError('Inconsistent policy identity')
         return self
 
 
@@ -464,7 +537,7 @@ class _WorldSnapshot(_RecordModel):
 
 
 class ProvenanceRecord(_RecordModel):
-    schema_version: Literal[1]
+    schema_version: Literal[1, 2]
     run_id: UUID
     experiment_id: UUID | None
     trial_id: UUID | None
@@ -481,16 +554,19 @@ class ProvenanceRecord(_RecordModel):
         _require_roles(self.players)
         _EnvironmentValue.model_validate(self.environment.value)
         if self.requested_settings is not None:
-            _complete_config(MatchSettings, self.requested_settings)
+            _complete_config(_LegacyMatchSettings if self.schema_version == 1 else MatchSettings, self.requested_settings)
         if self.lifecycle.stage in ('running', 'ended'):
             if self.execution is None or self.inputs is None or not {'prompt', 'schemas', 'room'} <= set(self.inputs):
                 raise ValueError('Missing execution identity')
         elif self.execution is not None or self.inputs is not None:
             raise ValueError('Unexpected execution identity')
         if self.execution is not None:
-            execution = _ExecutionValue.model_validate(self.execution.value)
+            execution = (_ExecutionValue if self.schema_version == 1 else _ExecutionValueV2).model_validate(self.execution.value)
             if self.players != execution.players:
                 raise ValueError('Contradictory player identities')
+            if self.schema_version == 2 and execution.policy is not None and execution.policy['name'] == 'uniform':
+                if execution.policy['trial_id'] != str(self.trial_id):
+                    raise ValueError('Contradictory trial identity')
         if self.inputs is not None:
             if not {'prompt', 'schemas', 'room'} <= set(self.inputs):
                 raise ValueError('Missing input identity')
@@ -507,7 +583,7 @@ def read_provenance(manifest: dict) -> dict | None:
         return None
     try:
         value = manifest['provenance']
-        if type(value['schema_version']) is not int or value['schema_version'] != 1:
+        if type(value['schema_version']) is not int or value['schema_version'] not in (1, 2):
             raise ValueError()
         encoded = json.dumps(value, allow_nan=False)
         ProvenanceRecord.model_validate_json(encoded)

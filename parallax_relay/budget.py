@@ -46,7 +46,7 @@ class Budget:
             # Byte count rather than the usual chars/4 heuristic deliberately
             # overestimates text. Image reserve remains model-dependent.
             text = SYSTEM_RULES + request.prompt_text() + json.dumps(response_schema(request.phase))
-            tokens = len(text.encode('utf-8')) + self.settings.image_token_reserve + 2048
+            tokens = len(text.encode('utf-8')) + (self.settings.image_token_reserve if request.include_image else 0) + 2048
             rates = self.rates.get(role)
             quotes[role] = _price(Usage(tokens, request.max_output_tokens), rates) if rates else Decimal(0)
         total = sum(quotes.values()) * self.settings.max_attempts

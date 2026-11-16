@@ -9,6 +9,7 @@ import tomllib
 from typing import Literal, Mapping
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 from .protocol import ROLES
+from .conditions import ConditionName, CONDITIONS
 
 
 class ConfigError(ValueError):
@@ -25,7 +26,8 @@ class Rates(Settings):
 
 
 class MatchSettings(Settings):
-    communication_rounds: Literal[1, 2] = 2
+    communication_rounds: Literal[0, 1, 2] = 2
+    condition: ConditionName | None = None
     max_turns: int = Field(default=12, ge=1, le=12)
     max_calls: int = Field(default=216, ge=1, le=10000)
     max_attempts: int = Field(default=2, ge=1, le=3)
@@ -36,6 +38,17 @@ class MatchSettings(Settings):
     max_consecutive_failures: int = Field(default=3, ge=1, le=20)
     max_estimated_cost_usd: float | None = Field(default=None, gt=0)
     image_token_reserve: int = Field(default=8192, ge=1, le=1000000)
+
+    @model_validator(mode='before')
+    @classmethod
+    def normalize_condition(cls, value):
+        if isinstance(value, dict) and isinstance(value.get('condition'), str) and value['condition'] in CONDITIONS:
+            value = dict(value)
+            rounds = CONDITIONS[value['condition']].communication_rounds
+            if 'communication_rounds' in value and value['communication_rounds'] != rounds:
+                raise ValueError('Conflicting condition and communication_rounds')
+            value['communication_rounds'] = rounds
+        return value
 
 
 class PlayerSettings(Settings):

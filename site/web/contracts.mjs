@@ -1,4 +1,6 @@
 export const roles=['SPECTRA','PYRA','FLUX'];
+export const conditions=['full','reduced','disabled','withheld','no_images'];
+export const conditionRounds=name=>name==='disabled'?0:name==='reduced'?1:2;
 function configObject(value,properties,required,where){
  if(value===null||typeof value!=='object'||Array.isArray(value)||![Object.prototype,null].includes(Object.getPrototypeOf(value)))throw Error('Invalid '+where+': expected an object.');
  if(Object.keys(value).some(key=>!Object.hasOwn(properties,key)))throw Error('Invalid '+where+': unknown setting.');
@@ -11,11 +13,14 @@ export function validate(config,contract,live=false){
  configObject(match,defs.MatchSettings.properties,defs.MatchSettings.required??[],'match');
  const defaults=Object.fromEntries(Object.entries(defs.MatchSettings.properties).map(([key,s])=>[key,s.default]));
  const normalized={match:{...defaults,...match},players:{}};
+ if(match.condition!=null&&!Object.hasOwn(match,'communication_rounds'))normalized.match.communication_rounds=conditionRounds(match.condition);
  for(const [key,s] of Object.entries(defs.MatchSettings.properties)){
   const value=normalized.match[key];
+  if(key==='condition'){if(value!==null&&!conditions.includes(value))throw Error('Invalid condition');continue;}
   if(key==='max_estimated_cost_usd'){if(value!==null&&!(Number.isFinite(value)&&value>0))throw Error('Enter a positive spending limit.');continue;}
   if(!Number.isFinite(value)||(s.type==='integer'&&!Number.isInteger(value))||(s.minimum!==undefined&&value<s.minimum)||(s.maximum!==undefined&&value>s.maximum)||(s.exclusiveMinimum!==undefined&&value<=s.exclusiveMinimum)||(s.enum&&!s.enum.includes(value)))throw Error('Invalid '+key);
  }
+ if(normalized.match.condition!==null&&normalized.match.communication_rounds!==conditionRounds(normalized.match.condition))throw Error('Conflicting condition and communication_rounds');
  configObject(config.players,Object.fromEntries(roles.map(r=>[r,true])),roles,'players');
  for(const role of roles){
   const p=config.players[role];

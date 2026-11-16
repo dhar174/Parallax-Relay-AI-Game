@@ -12,7 +12,26 @@ const dist = join(root, 'build/workbench/dist');
 const contract = JSON.parse(await readFile(join(dist, 'contract.json'), 'utf8'));
 const fixture = JSON.parse(await readFile(join(dist, 'fixture.json'), 'utf8'));
 const smokeProfile = JSON.parse(await readFile(join(root, 'configs/live_smoke.json'), 'utf8'));
+smokeProfile.config.match.condition = null;
 let appInstance = 0;
+
+test('all evaluation conditions export Python-valid settings and reset approval', async t => {
+  const app = await workbench(t);
+  await app.click('live-smoke');
+  for (const condition of ['full', 'reduced', 'disabled', 'withheld', 'no_images']) {
+    await app.tab('live'); await app.click('approve');
+    await app.tab('scenario');
+    app.input({ dataset: { match: 'condition' }, value: condition });
+    const text = await app.exportConfig();
+    const parsed = spawnSync(process.env.PYTHON || 'python', ['-c',
+      'import sys,tomllib; from parallax_relay.config import GameConfig; c=GameConfig.model_validate(tomllib.loads(sys.stdin.read())); print(c.match.condition)'],
+      { cwd: root, input: text, encoding: 'utf8' });
+    assert.equal(parsed.status, 0, parsed.stderr);
+    assert.equal(parsed.stdout.trim(), condition);
+    await app.tab('live');
+    assert.doesNotMatch(app.node('panel').innerHTML, /approved-download/);
+  }
+});
 
 test('named live preset exports Python-valid settings and exact independent role models', async t => {
   const app = await workbench(t);
@@ -521,7 +540,7 @@ test('live approval requires a guard/rates and resets after every editable setti
     app.input({ dataset: { role, rate }, value: '1', valueAsNumber: 1 });
   }
   const edits = Object.keys(contract.defaults.match).map(key => ({ dataset: { match: key },
-    value: String(key === 'max_estimated_cost_usd' ? 1 : contract.defaults.match[key]),
+    value: key === 'condition' ? '' : String(key === 'max_estimated_cost_usd' ? 1 : contract.defaults.match[key]),
     valueAsNumber: key === 'max_estimated_cost_usd' ? 1 : contract.defaults.match[key] }));
   for (const role of ['SPECTRA', 'PYRA', 'FLUX']) {
     for (const key of ['provider', 'model_env', 'api_key_env']) edits.push({ dataset: { role, player: key }, value: contract.defaults.players[role][key] });
