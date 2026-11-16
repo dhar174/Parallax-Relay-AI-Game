@@ -45,6 +45,13 @@ class ProvenanceContext(BaseModel):
     requested_settings: MatchSettings | None = None
     policy: Literal['scripted', 'wait', 'uniform'] | None = None
 
+    @field_validator('requested_settings', mode='before')
+    @classmethod
+    def validated_settings(cls, value):
+        if isinstance(value, MatchSettings):
+            return MatchSettings.model_validate(value.model_dump())
+        return value
+
     @model_validator(mode='after')
     def policy_trial(self):
         if self.policy == 'uniform' and self.trial_id is None:
@@ -156,7 +163,7 @@ class RunProvenance:
     def __init__(self, context: ProvenanceContext | None = None, *, root: Path = ROOT):
         if context is not None and not isinstance(context, ProvenanceContext):
             raise ProvenanceError('Invalid provenance context')
-        context = context or ProvenanceContext()
+        context = ProvenanceContext.model_validate(context.model_dump()) if context is not None else ProvenanceContext()
         self.bound = False
         self._tick = None
         self._mode = context.mode
@@ -447,7 +454,7 @@ class _ExecutionValueV2(_RecordModel):
             expected = policy_identity(name, self.policy.get('trial_id'), settings.max_turns)
             if name == 'uniform':
                 recorded_python = self.policy.get('python_version')
-                if not isinstance(recorded_python, str) or not re.fullmatch(r'\d+\.\d+\.\d+[A-Za-z0-9.+_-]{0,80}', recorded_python):
+                if not isinstance(recorded_python, str) or not re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+[A-Za-z0-9.+_-]{0,80}', recorded_python):
                     raise ValueError('Invalid policy Python version')
                 expected['python_version'] = recorded_python
                 seeds = self.policy.get('commitment_seeds')
@@ -584,7 +591,7 @@ class ProvenanceRecord(_RecordModel):
                 notice = execution.conditions.model_dump(exclude={'arm'})
                 schemas = self.inputs['schemas'].value
                 if (schemas['request_format_version'] != 2 or
-                        schemas['request_structure'].get('condition_notice') != notice or
+                        canonical_hash(schemas['request_structure'].get('condition_notice')) != canonical_hash(notice) or
                         not self.inputs['prompt'].value.endswith('\n' + json.dumps(notice, sort_keys=True))):
                     raise ValueError('Contradictory condition notice or request version')
         return self

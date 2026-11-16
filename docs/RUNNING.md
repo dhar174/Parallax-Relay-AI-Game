@@ -208,6 +208,9 @@ model ID and key. Assignments can be rotated; exactly these three roles are requ
 | `image_token_reserve` | 8,192 | 1–1,000,000 |
 | `max_estimated_cost_usd` | Unset | Positive, with pricing for every role |
 
+Match numeric fields use strict types: booleans and numeric strings are rejected,
+and integer fields require integers. Optional spending limits may be unset.
+
 The TOML is validated first. `--max-turns`, `--max-calls` and `--condition` then
 override the corresponding match settings. `--fast` selects reduced communication
 and rejects a conflicting named/disabled condition. `--policy` chooses a mock-only
