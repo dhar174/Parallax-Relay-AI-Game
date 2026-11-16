@@ -181,6 +181,33 @@ file hashes across 13 distributions, with no unavailable entries. The frozen JSO
 snapshot retains the original collector digest; these changes harden subsequent
 collection without rewriting its package/advisory/license observations.
 
+### Windows CI portability follow-up — November 16, 2026 UTC
+
+Hosted [run 43960834905](https://github.com/dhar174/Parallax-Relay-AI-Game/actions/runs/43960834905)
+on assembled revision `2ac6df1c67735724c1ec00ce7e4faa1583545c22` passed six jobs,
+including Chromium, but its
+[Windows/Python 3.12 job](https://github.com/dhar174/Parallax-Relay-AI-Game/actions/runs/43960834905/job/133627458103)
+failed. Those job statuses were independently checked through GitHub. The supplied
+Windows diagnostics identified CRLF-dependent notice fixtures, a permission mock
+that missed Windows' resolved temporary-path spelling, and an unsuccessful
+inventory subprocess whose stderr had been hidden by `check=True`.
+
+A Linux regression with only a fake installed Unicode notice and
+`PYTHONIOENCODING=ascii` reproduced `UnicodeEncodeError` against the prior CLI.
+The CLI now emits ASCII-escaped JSON; JSON decoding preserves the original Unicode
+text, and collection still hashes the unmodified raw file bytes. Notice fixtures
+write explicit bytes, the permission mock compares resolved paths, and directory
+errors accept the platform's actual unavailable-file category. Mandatory traversal,
+private-metadata and absolute-path tests run independently of link-specific tests,
+which alone may skip when links cannot be created. Subprocess assertions now show
+return codes and captured stderr on failure.
+
+All seven focused tests and the full 371-test Python suite passed locally (the
+full suite took 55.085 seconds). Actual environment readback preserved all 34
+notice hashes across 13 distributions with no unavailable entries. A new
+hosted run on the patched assembled revision is required for Windows acceptance;
+the prior six passing jobs do not establish that acceptance.
+
 | Locked distribution | Version | Supplied license |
 |---|---|---|
 | Pillow | 13.0.0 | MIT-CMU, plus bundled notices |

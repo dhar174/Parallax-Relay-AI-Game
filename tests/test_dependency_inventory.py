@@ -20,6 +20,24 @@ class DependencyInventoryTests(unittest.TestCase):
         spec.loader.exec_module(module)
         return module
 
+    def test_cli_preserves_unicode_license_with_ascii_stdout(self):
+        import os
+        with tempfile.TemporaryDirectory() as tmp:
+            dist = Path(tmp) / "unicode_notice-1.0.dist-info"
+            (dist / "licenses").mkdir(parents=True)
+            (dist / "METADATA").write_bytes(b"Name: unicode-notice\nVersion: 1.0\n")
+            (dist / "licenses/LICENSE").write_bytes("Copyright © 2026 中文\n".encode("utf-8"))
+            (dist / "RECORD").write_bytes(b"unicode_notice-1.0.dist-info/licenses/LICENSE,,\n")
+            env = dict(os.environ, PYTHONPATH=tmp, PYTHONIOENCODING="ascii")
+            result = subprocess.run([sys.executable, "-S", str(SCRIPT)], capture_output=True,
+                                    text=True, encoding="utf-8", errors="replace", env=env)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        inventory = json.loads(result.stdout)
+        package = next(p for p in inventory["packages"] if p["name"] == "unicode-notice")
+        self.assertEqual(package["license_files"][0]["text"], "Copyright © 2026 中文\n")
+        self.assertEqual(package["license_files"][0]["sha256"],
+                         "f178e5b949b0ead4ecbbf598ec9ff6b84ba0a9efd4c1c39cf6129fdd246b716a")
+
     def test_record_paths_cannot_disclose_private_metadata_or_escape_license_area(self):
         module = self.load_collector()
         with tempfile.TemporaryDirectory() as tmp:
@@ -29,19 +47,11 @@ class DependencyInventoryTests(unittest.TestCase):
             (dist / "METADATA").write_text("Name: demo\nVersion: 1.0\n", encoding="utf-8")
             (dist / "direct_url.json").write_text("FAKE-PRIVATE-INSTALL-URL", encoding="utf-8")
             (root / "outside.txt").write_text("FAKE-OUTSIDE-CONTENT", encoding="utf-8")
-            (dist / "licenses/LICENSE").write_text("Legitimate notice\n", encoding="utf-8")
-            try:
-                (dist / "licenses/LICENSE-alias").symlink_to(dist / "direct_url.json")
-                (dist / "licenses/LICENSE-escape").symlink_to(root / "outside.txt")
-                (dist / "licenses/LICENSE-hardlink").hardlink_to(dist / "direct_url.json")
-            except (OSError, NotImplementedError) as error:
-                self.skipTest(f"filesystem link creation unavailable: {type(error).__name__}")
+            (dist / "licenses/LICENSE").write_bytes(b"Legitimate notice\n")
             entries = ["demo-1.0.dist-info/licenses/LICENSE",
                        "demo-1.0.dist-info/licenses/../direct_url.json",
                        "demo-1.0.dist-info/licenses/direct_url.json",
-                       "demo-1.0.dist-info/licenses/LICENSE-alias",
-                       "demo-1.0.dist-info/licenses/LICENSE-escape",
-                       "demo-1.0.dist-info/licenses/LICENSE-hardlink",
+                       "demo-1.0.dist-info/licenses/../../outside.txt",
                        str(dist / "direct_url.json")]
             (dist / "licenses/direct_url.json").write_text("FAKE-PRIVATE-COPY", encoding="utf-8")
             (dist / "RECORD").write_text("".join(path + ",,\n" for path in entries), encoding="utf-8")
@@ -51,6 +61,32 @@ class DependencyInventoryTests(unittest.TestCase):
             self.assertNotIn(sentinel, serialized)
         licenses = result["packages"][0]["license_files"]
         self.assertEqual([f["text"] for f in licenses if f["text"] is not None], ["Legitimate notice\n"])
+
+    def test_license_links_cannot_disclose_private_metadata_or_escape(self):
+        module = self.load_collector()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            dist = root / "demo-1.0.dist-info"
+            (dist / "licenses").mkdir(parents=True)
+            (dist / "METADATA").write_bytes(b"Name: demo\nVersion: 1.0\n")
+            (dist / "direct_url.json").write_bytes(b"FAKE-PRIVATE-INSTALL-URL")
+            (root / "outside.txt").write_bytes(b"FAKE-OUTSIDE-CONTENT")
+            try:
+                (dist / "licenses/LICENSE-alias").symlink_to(dist / "direct_url.json")
+                (dist / "licenses/LICENSE-escape").symlink_to(root / "outside.txt")
+                (dist / "licenses/LICENSE-hardlink").hardlink_to(dist / "direct_url.json")
+            except (OSError, NotImplementedError) as error:
+                self.skipTest(f"filesystem link creation unavailable: {type(error).__name__}")
+            (dist / "RECORD").write_bytes(
+                b"demo-1.0.dist-info/licenses/LICENSE-alias,,\n"
+                b"demo-1.0.dist-info/licenses/LICENSE-escape,,\n"
+                b"demo-1.0.dist-info/licenses/LICENSE-hardlink,,\n")
+            result = module.collect_inventory([tmp])
+        serialized = json.dumps(result)
+        self.assertNotIn("FAKE-PRIVATE-INSTALL-URL", serialized)
+        self.assertNotIn("FAKE-OUTSIDE-CONTENT", serialized)
+        self.assertEqual(len(result["packages"][0]["license_files"]), 3)
+        self.assertTrue(all(f["text_error"] for f in result["packages"][0]["license_files"]))
 
     def test_unavailable_license_files_do_not_abort_other_packages(self):
         module = self.load_collector()
@@ -75,7 +111,7 @@ class DependencyInventoryTests(unittest.TestCase):
             original = Path.read_bytes
             # Root can read chmod(000) files; reproduce that OS error at the I/O boundary.
             def read_bytes(path):
-                if path == denied:
+                if path.resolve() == denied.resolve():
                     raise PermissionError("FAKE-PRIVATE-PERMISSION-DETAIL")
                 return original(path)
             with patch.object(Path, "read_bytes", read_bytes):
@@ -84,12 +120,12 @@ class DependencyInventoryTests(unittest.TestCase):
         self.assertEqual([p["name"] for p in result["packages"]], ["broken", "good"])
         broken_files = {Path(f["path"]).name: f for f in result["packages"][0]["license_files"]}
         self.assertEqual(set(broken_files), {"LICENSE-denied", "LICENSE-directory", "LICENSE-missing"})
-        for name, error in [("LICENSE-denied", "PermissionError"),
-                            ("LICENSE-directory", "IsADirectoryError"),
-                            ("LICENSE-missing", "FileNotFoundError")]:
+        for name, errors in [("LICENSE-denied", ("PermissionError",)),
+                             ("LICENSE-directory", ("IsADirectoryError", "PermissionError")),
+                             ("LICENSE-missing", ("FileNotFoundError",))]:
             self.assertIsNone(broken_files[name]["text"])
             self.assertIsNone(broken_files[name]["sha256"])
-            self.assertEqual(broken_files[name]["text_error"], error)
+            self.assertIn(broken_files[name]["text_error"], errors)
         self.assertEqual(result["packages"][1]["license_files"][0]["text"], "Keep this notice")
         self.assertNotIn("FAKE-PRIVATE-PERMISSION-DETAIL", json.dumps(result))
 
@@ -119,7 +155,7 @@ class DependencyInventoryTests(unittest.TestCase):
                 "Metadata-Version: 2.4\nName: licensed-demo\nVersion: 1.2\n"
                 "License-Expression: BSD-3-Clause\nLicense-File: LICENSE\n"
                 "Author-email: private@example.invalid\n", encoding="utf-8")
-            (licensed / "licenses/LICENSE").write_text("Retain this notice.\n", encoding="utf-8")
+            (licensed / "licenses/LICENSE").write_bytes(b"Retain this notice.\n")
             (licensed / "licenses/NOTICE").write_bytes(b"\xa9 legacy notice")
             (licensed / "RECORD").write_text(
                 "licensed_demo-1.2.dist-info/licenses/LICENSE,,\n"
@@ -146,7 +182,8 @@ class DependencyInventoryTests(unittest.TestCase):
         import os
         env = dict(os.environ, INVENTORY_SECRET_SENTINEL="do-not-collect-this-value")
         result = subprocess.run([sys.executable, str(SCRIPT)], capture_output=True,
-                                text=True, env=env, check=True)
+                                text=True, encoding="utf-8", errors="replace", env=env)
+        self.assertEqual(result.returncode, 0, result.stderr)
         inventory = json.loads(result.stdout)
         self.assertIn("python", inventory)
         self.assertIn("platform", inventory)

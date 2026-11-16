@@ -99,4 +99,4 @@ def collect_inventory(paths=None):
 
 
 if __name__ == "__main__":
-    print(json.dumps(collect_inventory(), indent=2, ensure_ascii=False))
+    print(json.dumps(collect_inventory(), indent=2, ensure_ascii=True))
