@@ -8,9 +8,14 @@ phases and the final snapshot. Focused browser-module tests also reproduced the
 missing final/unfinished navigation, unsafe image reference, and missing-field
 failures. These tests passed after the changes. A further focused test failed on
 unlabelled stop reasons and blank missing-field panels, then passed after each fix.
+Independent review then reproduced incorrect labels for omitted resolved records,
+an exception on arbitrary phase metadata, and lost role-specific fallback labels.
+Focused regressions failed before these fixes and passed afterward, including
+conflicting checkpoint and replay evidence.
 
-- Full Python suite against the final code: 364 tests passed (68.972 s).
-- Built the workbench and ran the Node suite against the final UI: 66 tests passed.
+- Full Python suite passed 364 tests (62.673 s) during the review fixes; a final
+  rerun against the committed code was started separately.
+- Built the workbench and ran the Node suite against the final UI: 74 tests passed.
 - `compileall`, JavaScript syntax checks, both scripted mock checks, and the nine
   room certificates passed. Normal/fast mock runs produced 63/42 calls, seven
   turns, five energy and scores of 100.

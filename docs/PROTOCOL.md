@@ -102,8 +102,11 @@ phases for one role abort by default. Any successful phase resets that role's st
 Fatal setup/provider errors abort the unfinished round without resolving its actions.
 Already completed public messages and attempt metadata remain in the partial logs.
 The spectator viewer associates zero-based call and phase turns with one-based
-resolved round numbers. It exposes an unfinished round only when call or phase
-evidence exists, and labels completed commitments as unapplied until resolution.
+resolved round numbers. For evidence without a resolved record, matching result
+and final-state turn counts distinguish missing resolved records from an unfinished
+round. Conflicting or unavailable counts, a replay row beyond that checkpoint,
+or later evidence after a terminal checkpoint leave resolution unknown. The viewer
+labels completed commitments unapplied only for a confirmed unfinished round.
 The separately accessible final snapshot is the last resolved checkpoint, including
 the initial world when no turn resolved; it does not imply a fabricated round.
 Recording/progress failures stop the match and trigger bounded best-effort
