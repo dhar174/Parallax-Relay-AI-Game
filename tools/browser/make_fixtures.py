@@ -74,6 +74,14 @@ async def main(destination):
     viewer(out, data)
     (out / 'native.json').write_text(json.dumps(data), encoding='utf-8')
     inventory['legacy-v2'] = {'schema_version': 2, 'turns': data['result']['turns'], 'calls': len(data['calls'])}
+    for name in ('missing-replay', 'missing-middle-replay'):
+        out = destination / name
+        shutil.copytree(destination / 'legacy-v2', out)
+        data = read_run(out)
+        data['replay'] = [] if name == 'missing-replay' else [row for row in data['replay'] if row['turn'] != 4]
+        (out / 'replay.jsonl').write_text(''.join(json.dumps(row) + '\n' for row in data['replay']), encoding='utf-8')
+        viewer(out, data)
+        (out / 'native.json').write_text(json.dumps(data), encoding='utf-8')
     for name in ('malicious', 'malicious-import', 'missing-images'):
         out = destination / name
         shutil.copytree(destination / 'later-partial', out)

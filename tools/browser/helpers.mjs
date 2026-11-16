@@ -109,3 +109,23 @@ export async function layout(page, filename) {
 export async function settleImages(page) {
   await page.locator('img:visible').evaluateAll(images => Promise.all(images.map(image => image.decode())));
 }
+
+export async function textContrast(page, selector) {
+  return page.locator(selector).evaluate(element => {
+    const luminance = color => {
+      const [r,g,b] = color.match(/[\d.]+/g).slice(0,3).map(Number).map(value => {
+        value /= 255;
+        return value <= .04045 ? value / 12.92 : ((value + .055) / 1.055) ** 2.4;
+      });
+      return .2126*r + .7152*g + .0722*b;
+    };
+    let ancestor = element, background;
+    while (ancestor) {
+      background = getComputedStyle(ancestor).backgroundColor;
+      if (background !== 'rgba(0, 0, 0, 0)' && background !== 'transparent') break;
+      ancestor = ancestor.parentElement;
+    }
+    const foreground = luminance(getComputedStyle(element).color), behind = luminance(background);
+    return (Math.max(foreground, behind) + .05) / (Math.min(foreground, behind) + .05);
+  });
+}

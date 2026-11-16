@@ -33,8 +33,8 @@ artifact; the original six verification jobs retain their existing commands.
 Fixtures are generated in a fresh system temporary directory and removed after
 checks. They include a seven-turn scripted win, one-turn stop, call caps of 19,
 10 and 1, cooperative cancellation, a local recording error, malicious model text,
-missing PNGs, and actual historical schema-v2 files from `example_run/`. Counts
-are checked against native results; the call caps include phase reservation and
+missing PNGs, and actual historical schema-v2 files from `example_run/`, including
+archives with omitted resolved replay rows. Counts are checked against native results; the call caps include phase reservation and
 therefore do not equal attempts started.
 
 The browser context blocks service workers and WebSockets. Request interception

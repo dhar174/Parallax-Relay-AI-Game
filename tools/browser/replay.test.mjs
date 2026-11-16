@@ -3,7 +3,7 @@ import { before, after, test } from 'node:test';
 import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { provision, companion, pageFor, native, viewerURL, importJSON, finalFrame, layout, results, root, settleImages } from './helpers.mjs';
+import { provision, companion, pageFor, native, viewerURL, importJSON, finalFrame, layout, results, root, settleImages, textContrast } from './helpers.mjs';
 
 let environment;
 before(async () => {environment = await provision();});
@@ -101,12 +101,7 @@ for (const viewport of [{width: 1280, height: 800}, {width: 390, height: 844}]) 
     await layout(page, 'standalone-' + viewport.width);
     const label = page.locator('#roundLabel');
     assert.ok(await label.isVisible());
-    const contrast = await label.evaluate(el => {
-      const values = color => color.match(/[\d.]+/g).slice(0, 3).map(Number).map(c => {c /= 255; return c <= .04045 ? c / 12.92 : ((c + .055) / 1.055) ** 2.4;});
-      const luminance = c => {const [r,g,b] = values(c); return .2126*r+.7152*g+.0722*b;};
-      const foreground = luminance(getComputedStyle(el).color), background = luminance(getComputedStyle(document.documentElement).backgroundColor);
-      return (Math.max(foreground, background) + .05) / (Math.min(foreground, background) + .05);
-    });
+    const contrast = await textContrast(page, '#roundLabel');
     assert.ok(contrast >= 4.5, 'Round-label contrast ' + contrast);
     await writeFile(join(results, 'contrast-' + viewport.width + '.json'), JSON.stringify({viewport, roundLabelContrast: contrast}, null, 2));
   });
@@ -164,7 +159,8 @@ test('built workbench imports actual legacy v2 and new v3 directories and JSON',
     await importJSON(page, environment, name);
     const data = await native(environment, name);
     assert.deepEqual(JSON.parse(await page.locator('#final-state pre').textContent()), data.final_state);
-    const allPhases = page.locator('details').filter({has: page.getByText('All phase records, including unfinished rounds', {exact: true})}).locator('pre');
+    assert.equal(await page.locator('#final-spectator').getAttribute('src') === data.images['final_spectator.png'], true, 'Final PNG equals the native final artifact');
+    const allPhases = page.locator('details').filter({has: page.getByText('All phase records', {exact: true})}).locator('pre');
     assert.deepEqual(JSON.parse(await allPhases.textContent()), data.phases);
     if (name === 'later-partial' || name === 'zero-turn-partial') {
       assert.match(await page.locator('#partial-rounds').textContent(), /broadcast|negotiate/);
@@ -178,6 +174,9 @@ test('built workbench imports actual legacy v2 and new v3 directories and JSON',
   for (const viewport of [{width: 1280, height: 800}, {width: 390, height: 844}]) {
     await page.setViewportSize(viewport);
     await layout(page, 'workbench-' + viewport.width);
+    const contrast = await textContrast(page, '#final-state h2');
+    assert.ok(contrast >= 4.5, 'Final checkpoint heading contrast ' + contrast);
+    await writeFile(join(results, 'workbench-contrast-' + viewport.width + '.json'), JSON.stringify({viewport, finalHeadingContrast: contrast}, null, 2));
   }
 });
 
@@ -196,6 +195,7 @@ test('actual loopback companion executes one-turn mock through built workbench',
   assert.equal(data.calls.length, 9);
   await page.locator('#final-state').waitFor();
   assert.deepEqual(JSON.parse(await page.locator('#final-state pre').textContent()), data.final_state);
+  assert.equal(await page.locator('#final-spectator').getAttribute('src') === data.images['final_spectator.png'], true, 'Companion final PNG equals native final artifact');
   assert.ok(await page.locator('#final-spectator').evaluate(async image => {await image.decode(); return image.naturalWidth > 0;}));
 });
 
@@ -209,3 +209,55 @@ test('current file viewer reads actual legacy v2 final artifacts', async t => {
   assert.deepEqual(JSON.parse(await page.locator('#finalState').textContent()), data.final_state);
   assert.ok(await page.locator('#SPECTATOR').evaluate(async image => {await image.decode(); return image.naturalWidth > 0;}));
 });
+
+
+for (const name of ['missing-replay', 'missing-middle-replay']) {
+  test('omitted legacy replay rows retain known resolution and native evidence: ' + name, async t => {
+    const data = await native(environment, name);
+    assert.equal(data.result.turns, 7);
+    assert.equal(data.final_state.turn, 7);
+    const resolved = new Set(data.replay.map(record => record.turn - 1));
+    const orphan = [...new Set(data.calls.map(call => call.turn).filter(turn => !resolved.has(turn)))];
+    const page = await pageFor(t, environment);
+    await page.goto(viewerURL(environment, name));
+    const maximum = Number(await page.locator('#round').getAttribute('max'));
+    assert.equal(maximum, 7);
+    let shownCalls = 0, shownPhases = 0;
+    for (let index = 0; index < maximum; index++) {
+      await page.locator('#round').fill(String(index));
+      await page.locator('#round').dispatchEvent('input');
+      await settleImages(page);
+      const label = await page.locator('#roundLabel').textContent();
+      const selectedTurn = Number(label.match(/^Round (\d+)/)?.[1]) - 1;
+      if (orphan.includes(selectedTurn)) {
+        assert.match(label, /resolved round record unavailable/);
+        assert.doesNotMatch(label, /unfinished|unresolved|unknown/i);
+        assert.doesNotMatch(await page.locator('#actions').textContent(), /not applied|unresolved|unapplied/i);
+        assert.equal(await page.locator('#events .entry').count(), 0);
+      }
+      shownCalls += await page.locator('#diagnostics .entry').count();
+      shownPhases += await page.locator('#phases .entry').count();
+    }
+    assert.equal(shownCalls, 63);
+    assert.equal(shownPhases, 21);
+    await finalFrame(page);
+    assert.deepEqual(JSON.parse(await page.locator('#finalState').textContent()), data.final_state);
+    assert.ok(await page.locator('#SPECTATOR').evaluate(async image => {await image.decode(); return image.naturalWidth > 0;}));
+    const server = await companion();
+    t.after(() => server.close());
+    const workbench = await pageFor(t, environment, {origin: server.origin});
+    await workbench.goto(server.origin);
+    await importJSON(workbench, environment, name);
+    const summaries = await workbench.locator('#partial-rounds > details > summary').allTextContents();
+    for (const turn of orphan) {
+      const summary = summaries.find(text => text.startsWith('Round ' + (turn + 1) + ' '));
+      assert.ok(summary, 'Missing archive evidence for round ' + (turn + 1));
+      assert.match(summary, /resolved round record unavailable/);
+      assert.doesNotMatch(summary, /unfinished|unresolved|unknown/i);
+      const evidence = workbench.locator('#partial-rounds > details').filter({has: workbench.locator('summary').filter({hasText: new RegExp('^Round ' + (turn + 1) + ' ')})}).locator('pre');
+      assert.deepEqual(JSON.parse(await evidence.nth(0).textContent()), data.phases.filter(phase => phase.turn === turn));
+      assert.deepEqual(JSON.parse(await evidence.nth(1).textContent()), data.calls.filter(call => call.turn === turn));
+    }
+    assert.deepEqual(JSON.parse(await workbench.locator('#final-state pre').textContent()), data.final_state);
+  });
+}
