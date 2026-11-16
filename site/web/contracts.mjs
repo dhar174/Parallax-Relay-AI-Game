@@ -16,6 +16,7 @@ export function validate(config,contract,live=false){
  if(match.condition!=null&&!Object.hasOwn(match,'communication_rounds'))normalized.match.communication_rounds=conditionRounds(match.condition);
  for(const [key,s] of Object.entries(defs.MatchSettings.properties)){
   const value=normalized.match[key];
+  if(key==='room_id'){if(!(contract.rooms??[{id:'split_span',split:'development'}]).some(r=>r.id===value&&r.split==='development'))throw Error('Select a development room. Held-out execution requires a registered campaign.');continue;}
   if(key==='condition'){if(value!==null&&!conditions.includes(value))throw Error('Invalid condition');continue;}
   if(key==='max_estimated_cost_usd'){if(value!==null&&!(Number.isFinite(value)&&value>0))throw Error('Enter a positive spending limit.');continue;}
   if(!Number.isFinite(value)||(s.type==='integer'&&!Number.isInteger(value))||(s.minimum!==undefined&&value<s.minimum)||(s.maximum!==undefined&&value>s.maximum)||(s.exclusiveMinimum!==undefined&&value<=s.exclusiveMinimum)||(s.enum&&!s.enum.includes(value)))throw Error('Invalid '+key);
@@ -60,12 +61,12 @@ export function checkRun(data){
 
  object(data,'run');
  object(data.manifest,'manifest');
- field(data.manifest.schema_version,'manifest.schema_version',v=>v===2,'schema version 2');
+ field(data.manifest.schema_version,'manifest.schema_version',v=>v===2||v===3,'schema version 2 or 3');
  field(data.manifest.mode,'manifest.mode',v=>v==null||['mock','live','programmatic','unknown'].includes(v),'mock, live, programmatic or unknown');
  if(data.manifest.room!=null)string(data.manifest.room,'manifest.room');
  object(data.result,'result');
  const result=data.result;
- field(result.schema_version,'result.schema_version',v=>v===2,'schema version 2');
+ field(result.schema_version,'result.schema_version',v=>v===data.manifest.schema_version,'the manifest schema version');
  for(const key of ['win','loss','completed'])boolean(result[key],'result.'+key);
  count(result.turns,'result.turns');
  string(result.stop_reason,'result.stop_reason');
@@ -87,6 +88,41 @@ export function checkRun(data){
  }
 
  object(data.final_state,'final_state');
+ let checkState=()=>{};
+ if(data.manifest.schema_version===3){
+  const p=data.manifest.provenance;object(p,'provenance');
+  field(p.schema_version,'provenance.schema_version',v=>v===3,'schema version 3');
+  const identity=p.inputs?.room?.value;object(identity,'room identity');
+  const room=identity.definition;object(room,'room definition');
+  string(room.id,'room.id');count(room.width,'room.width',3);
+  field(room.width,'room.width',v=>v<=13,'width <= 13');
+  field(data.manifest.room,'manifest.room',v=>v===room.id&&identity.id===room.id,'the recorded room id');
+  field(room.version,'room.version',v=>v===1&&identity.version===v,'room version 1');
+  count(room.deadline,'room.deadline',1);array(room.bridges,'room.bridges');array(room.cells,'room.cells');
+  const position=(v,path)=>{count(v,path);field(v,path,n=>n<room.width,'a position inside the room');};
+  for(const key of ['exit','shard'])position(room[key],'room.'+key);
+  room.cells.forEach(v=>position(v,'room cell'));
+  room.bridges.forEach(b=>{object(b,'room bridge');position(b.motor,'room motor');array(b.gap,'room gap');b.gap.forEach(v=>position(v,'room gap position'));});
+  checkState=(state,path)=>{
+   object(state,path);
+   field(state.room_id,path+'.room_id',v=>v===room.id,'the recorded room');
+   field(state.room_version,path+'.room_version',v=>v===room.version,'the recorded room version');
+   for(const key of ['turn','energy','coolant'])count(state[key],path+'.'+key);
+   field(state.turn,path+'.turn',v=>v<=room.deadline,'a turn within the deadline');
+   object(state.robots,path+'.robots');
+   for(const role of roles){const robot=state.robots[role];object(robot,path+'.robot');field(robot.role,path+'.role',v=>v===role,'the matching role');position(robot.x,path+'.position');count(robot.damage,path+'.damage');}
+   const keys=room.bridges.map((_,i)=>'bridge_'+i);
+   object(state.motor_heats,path+'.motor_heats');
+   field(Object.keys(state.motor_heats),path+'.motor_heats',v=>v.length===keys.length&&keys.every(k=>Object.hasOwn(state.motor_heats,k)),'the room motors');
+   for(const heat of Object.values(state.motor_heats))count(heat,path+'.heat');
+   for(const [key,allowed] of [['powered_bridges',keys],['collected_cells',room.cells]]){array(state[key],path+'.'+key);field(state[key],path+'.'+key,v=>new Set(v).size===v.length&&v.every(x=>allowed.includes(x)),'unique room references');}
+   for(const key of ['exit_unlocked','shard_collected','win','loss'])boolean(state[key],path+'.'+key);
+   field(state.win,path+'.win',v=>!v||(!state.loss&&state.exit_unlocked&&roles.every(r=>state.robots[r].x===room.exit)&&(!room.requires_shard||state.shard_collected)),'a consistent room victory');
+   array(state.events,path+'.events');state.events.forEach(v=>string(v,path+'.event'));
+  };
+  checkState(identity.initial_state,'room initial_state');
+  checkState(data.final_state,'final_state');
+ }
  array(data.calls,'calls');
  data.calls.forEach((call,i)=>{
   const path='calls['+i+']';
@@ -103,6 +139,7 @@ export function checkRun(data){
   object(turn,path);
   count(turn.turn,path+'.turn',1);
   object(turn.state_after,path+'.state_after');
+  checkState(turn.state_after,path+'.state_after');
   count(turn.state_after.energy,path+'.state_after.energy');
   object(turn.observations,path+'.observations');
   for(const role of roles){

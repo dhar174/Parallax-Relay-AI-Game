@@ -22,7 +22,7 @@ from PIL import Image
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from parallax_relay.config import ConfigError, GameConfig, load_config
+from parallax_relay.config import MatchSettings, ConfigError, GameConfig, load_config
 from parallax_relay.play import load_env_file
 from parallax_relay.protocol import ROLES, parse_reply
 from parallax_relay.provenance import read_provenance, _WorldSnapshot
@@ -73,7 +73,11 @@ def load_profile(path: Path = PROFILE) -> dict:
                     isinstance(value, str) for value in source.values()):
                 raise ValueError
         # Normalize defaults once for both the launcher and generated Site contract.
+        if config.match.room_id != 'split_span':
+            raise ValueError
         profile['config'] = config.model_dump()
+        # Profile-v1 hashes predate room selection; retain that frozen shape.
+        profile['config']['match'].pop('room_id')
         profile_digest(profile)
         return profile
     except (OSError, ValueError, TypeError, KeyError, RecursionError):
@@ -126,9 +130,14 @@ def _role_map(value) -> None:
         raise ValueError('Incomplete role records')
 
 
-def _check_records(state, result, phases, replay) -> bool:
+def _check_records(state, result, phases, replay, provenance=None) -> bool:
     """Validate required native evidence without applying engine transitions."""
-    _WorldSnapshot.model_validate(state)
+    if provenance and provenance['schema_version'] == 3:
+        from parallax_relay.rooms import RoomDefinition, validate_snapshot
+        room = RoomDefinition.model_validate_json(json.dumps(provenance['inputs']['room']['value']['definition']))
+        validate_snapshot(state, room)
+    else:
+        _WorldSnapshot.model_validate(state)
     turn = replay[0]
     required = {'turn', 'observations', 'communications', 'sealed_actions',
                 'private_notes', 'fallbacks', 'events', 'state_after'}
@@ -219,16 +228,16 @@ def verify_run(directory: Path, profile: dict) -> dict:
         checks['launcher'] = (type(code) is int and code == 0 and receipt.get('schema_version') == 1
                               and receipt.get('profile_sha256') == profile_digest(profile))
         checks['configuration'] = (
-            manifest.get('schema_version') == 2 and manifest.get('mode') == 'live'
+            manifest.get('schema_version') in (2, 3) and (manifest['schema_version'] == 3) == (provenance['schema_version'] == 3) and manifest.get('mode') == 'live'
             and manifest.get('players') == expected_players
-            and _canonical(manifest.get('settings')) == _canonical(profile['config']['match'])
+            and MatchSettings.model_validate(manifest.get('settings')).model_dump() == cfg.match.model_dump()
             and execution['mode'] == 'live'
-            and _canonical(execution['settings']) == _canonical(profile['config']['match'])
+            and MatchSettings.model_validate(execution['settings']).model_dump() == cfg.match.model_dump()
             and execution['pricing'] == {r: cfg.players[r].pricing.model_dump() for r in ROLES}
             and all(all(execution['players'][r][k] == v for k, v in p.items())
                     for r, p in expected_players.items()))
         checks['outcome'] = (
-            result.get('schema_version') == 2 and result.get('stop_reason') == 'turn_limit'
+            result.get('schema_version') == manifest.get('schema_version') and result.get('stop_reason') == 'turn_limit'
             and result.get('completed') is False and result.get('win') is False
             and result.get('loss') is False and result.get('scores') is None
             and type(result.get('turns')) is int and result['turns'] == 1
@@ -247,7 +256,7 @@ def verify_run(directory: Path, profile: dict) -> dict:
                                    ('reported_input_tokens', 'reported_output_tokens', 'unknown_usage_calls')))
         checks['phases'] = (len(phases) == 3 and [p['phase'] for p in phases] == list(PHASES)
                             and all(type(p.get('turn')) is int and p['turn'] == 0 for p in phases))
-        checks['record_structure'] = len(replay) == 1 and len(phases) == 3 and _check_records(state, result, phases, replay)
+        checks['record_structure'] = len(replay) == 1 and len(phases) == 3 and _check_records(state, result, phases, replay, provenance)
         checks['lifecycle'] = (provenance['lifecycle']['stage'] == 'ended'
                                and provenance['lifecycle']['stop_reason'] == 'turn_limit'
                                and provenance['lifecycle']['execution_stop_reason'] == 'turn_limit')

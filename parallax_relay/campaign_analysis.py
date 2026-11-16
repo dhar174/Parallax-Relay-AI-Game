@@ -148,7 +148,9 @@ def _artifacts(root: Path, trial: dict, registration: dict) -> tuple[dict, list[
                 if p is None or p['trial_id'] != trial['trial_id'] or p['experiment_id'] != registration['experiment_id']:
                     raise ValueError()
                 execution = p['execution']['value'] if p['execution'] else None
-                if execution is None or execution['settings'] != settings.model_dump():
+                expected_settings = settings.model_dump()
+                if p['schema_version'] < 3: expected_settings.pop('room_id')
+                if execution is None or execution['settings'] != expected_settings:
                     raise ValueError()
                 if (p['lifecycle']['stage']!='ended' or str(UUID(p['run_id']))!=p['run_id'] or
                     execution['mode']!=('live' if trial['team']=='models' else 'mock')):
@@ -176,7 +178,12 @@ def _artifacts(root: Path, trial: dict, registration: dict) -> tuple[dict, list[
                 if not _valid_summary(data[name]):
                     raise ValueError()
             elif name == 'final_state':
-                _WorldSnapshot.model_validate(data[name])
+                if data.get('provenance', {}).get('schema_version') == 3:
+                    from .rooms import RoomDefinition, validate_snapshot
+                    room = RoomDefinition.model_validate_json(json.dumps(data['provenance']['inputs']['room']['value']['definition']))
+                    validate_snapshot(data[name], room)
+                else:
+                    _WorldSnapshot.model_validate(data[name])
             elif name == 'calls':
                 for call in data[name]:
                     if (call.get('role') not in ROLES or call.get('phase') not in CONDITIONS[trial['condition']].phases or

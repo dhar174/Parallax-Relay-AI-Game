@@ -41,7 +41,7 @@ class ProvenanceRecordingTests(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(data['lifecycle'][field].endswith('Z'))
         self.assertGreaterEqual(data['lifecycle']['elapsed_seconds'], 0)
         self.assertEqual(data['lifecycle']['stop_reason'], 'turn_limit')
-        self.assertEqual(result.summary()['schema_version'], 2)
+        self.assertEqual(result.summary()['schema_version'], 3)
         html = (self.out / 'index.html').read_text(encoding='utf-8')
         embedded = json.loads(html.split('const DATA=', 1)[1].split(';\nconst $=', 1)[0])
         self.assertEqual(embedded['manifest'], manifest)

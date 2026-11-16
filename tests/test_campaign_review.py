@@ -238,7 +238,7 @@ class CampaignReviewTests(unittest.IsolatedAsyncioTestCase):
                    ('phase_turn_range_mismatch','phases',lambda d:d[0].update(turn=-1)),
                    ('replay_turn_sequence_mismatch','replay',lambda d:d[0].update(turn=99)),
                    ('usage_totals_mismatch','result',lambda d:d['budget'].update(reported_input_tokens=1)),
-                   ('world_outcome_mismatch','final_state',lambda d:d.update(win=True)),
+                   ('final_state_inconsistent','final_state',lambda d:d.update(win=True)),
                    ('world_turn_mismatch','final_state',lambda d:d.update(turn=2)),
                    ('call_count_mismatch','calls',lambda d:d.pop()),
                    ('resolved_turn_count_mismatch','replay',lambda d:d.clear()),

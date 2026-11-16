@@ -34,7 +34,7 @@ class MatchResult:
 
     def summary(self) -> dict:
         terminal = self.world.win or self.world.loss
-        return {'schema_version': 2, 'win': self.world.win, 'loss': self.world.loss,
+        return {'schema_version': 3, 'win': self.world.win, 'loss': self.world.loss,
                 'completed': terminal, 'turns': self.world.turn,
                 'stop_reason': self.stop_reason,
                 'scores': score(self.world) if terminal else None,
@@ -169,7 +169,7 @@ async def _phase(agents: Mapping[str, Agent], requests: dict[str, AgentRequest],
 
 async def run_match(agents: Mapping[str, Agent], settings: MatchSettings | None = None, *,
                     rates: dict[str, Rates | None] | None = None, recorder=None,
-                    progress: Callable[[dict], None] | None = None) -> MatchResult:
+                    progress: Callable[[dict], None] | None = None, room_permit=None) -> MatchResult:
     """Run one fresh room. The caller owns/cleans up provider clients.
 
     Fatal provider failures and budget stops leave the world at the last fully
@@ -184,7 +184,12 @@ async def run_match(agents: Mapping[str, Agent], settings: MatchSettings | None 
     settings = settings or MatchSettings()
     settings = MatchSettings.model_validate(settings.model_dump())
     condition = resolve_condition(settings)
-    world = initial_world()
+    from .rooms import get_room
+    room=get_room(settings.room_id)
+    if room.split=='held_out':
+        if room_permit is None:raise ValueError('A held-out room requires a registered confirmatory campaign')
+        room_permit.validate(settings.room_id)
+    world = initial_world(settings.room_id)
     budget = Budget(settings, rates or {})
     histories: dict[str, list[dict]] = {r: [] for r in ROLES}
     notes = dict.fromkeys(ROLES, '')

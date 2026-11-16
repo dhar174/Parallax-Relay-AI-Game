@@ -116,3 +116,37 @@ def catalog_identity() -> dict:
     value={'id':'catalog_v1','version':1,'rooms':[r.model_dump(mode='json') for r in rooms()],
            'certificates':{r.id:certificate_hash(r.id) for r in rooms()}}
     return {'value':value,'sha256':digest(value)}
+
+
+def validate_snapshot(value: dict,room: RoomDefinition) -> None:
+    """Validate recorded geometry/state without constructing a live engine world."""
+    if not isinstance(value,dict):raise ValueError('Invalid room snapshot')
+    if value.get('room_id')!=room.id or type(value.get('room_version')) is not int or value['room_version']!=room.version:
+        raise ValueError('Snapshot room identity mismatch')
+    for key in ('turn','energy','coolant'):
+        if type(value.get(key)) is not int or value[key]<0:raise ValueError('Invalid room counter')
+    if value['turn']>room.deadline:raise ValueError('Room deadline exceeded')
+    robots=value.get('robots')
+    if not isinstance(robots,dict) or set(robots)!={'SPECTRA','PYRA','FLUX'}:raise ValueError('Invalid room roster')
+    for role,robot in robots.items():
+        if (not isinstance(robot,dict) or robot.get('role')!=role or type(robot.get('x')) is not int or
+            not 0<=robot['x']<room.width or type(robot.get('damage')) is not int or robot['damage']<0):
+            raise ValueError('Invalid recorded robot')
+    keys={f'bridge_{i}' for i in range(len(room.bridges))};heats=value.get('motor_heats')
+    if not isinstance(heats,dict) or set(heats)!=keys or any(type(v) is not int or v<0 for v in heats.values()):
+        raise ValueError('Invalid motor state')
+    for key,allowed in (('powered_bridges',keys),('collected_cells',set(room.cells))):
+        values=value.get(key)
+        if not isinstance(values,list) or any(type(v) is not (str if key=='powered_bridges' else int) for v in values):raise ValueError('Invalid room set')
+        if len(set(values))!=len(values) or not set(values)<=allowed:raise ValueError('Unknown room state reference')
+    for key in ('exit_unlocked','shard_collected','win','loss'):
+        if type(value.get(key)) is not bool:raise ValueError('Invalid room flag')
+    if value['win'] and (value['loss'] or not value['exit_unlocked'] or any(r['x']!=room.exit for r in robots.values()) or room.requires_shard and not value['shard_collected']):
+        raise ValueError('Contradictory room victory')
+    if value['loss'] and (value['win'] or value['turn']!=room.deadline):raise ValueError('Contradictory room defeat')
+    if not isinstance(value.get('events'),list) or any(not isinstance(e,str) for e in value['events']):raise ValueError('Invalid public events')
+    if len(room.bridges)==1:
+        aliases={'motor_heat':heats['bridge_0'],'bridge_extended':'bridge_0' in value['powered_bridges'],
+                 'cell_collected':set(room.cells)<=set(value['collected_cells'])}
+        for key,expected in aliases.items():
+            if key in value and (type(value[key]) is not type(expected) or value[key]!=expected):raise ValueError('Contradictory legacy alias')

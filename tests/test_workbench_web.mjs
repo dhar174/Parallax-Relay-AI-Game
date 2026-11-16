@@ -14,7 +14,18 @@ const contract = JSON.parse(await readFile(join(dist, 'contract.json'), 'utf8'))
 const fixture = JSON.parse(await readFile(join(dist, 'fixture.json'), 'utf8'));
 const smokeProfile = JSON.parse(await readFile(join(root, 'configs/live_smoke.json'), 'utf8'));
 smokeProfile.config.match.condition = null;
+smokeProfile.config.match.room_id = 'split_span';
 let appInstance = 0;
+
+test('development room selector exports strings, preserves selection for smoke and excludes held-out execution',async t=>{
+ const app=await workbench(t);await app.tab('scenario');
+ assert.match(app.node('panel').innerHTML,/<select data-match="room_id">/);
+ assert.doesNotMatch(app.node('panel').innerHTML,/<option value="ret_01"/);
+ app.input({dataset:{match:'room_id'},value:'dev_01'});
+ await app.click('smoke');assert.match(await app.exportConfig(),/room_id = "dev_01"/);
+ const bad=structuredClone(contract.defaults);bad.match.room_id='ret_01';
+ assert.throws(()=>validate(bad,contract),/room|held-out/);
+});
 
 test('workbench retains a historical v1 communication label',async t=>{
  const app=await workbench(t);const data=structuredClone(fixture);
@@ -738,7 +749,7 @@ test('actual one-turn and zero-turn CLI records remain importable', async t => {
   }
 });
 
-test('actual programmatic Recorder output without a room is importable', async t => {
+test('actual programmatic v3 Recorder binds room and rejects invalid embedded geometry', async t => {
   const directory = await mkdtemp(join(tmpdir(), 'parallax-programmatic-test-'));
   t.after(() => rm(directory, { recursive: true, force: true }));
   const output = join(directory, 'run');
@@ -760,6 +771,10 @@ print('{}')
   assert.equal(app.node('status').textContent, 'Imported native run records.');
   const exported = await app.exportJSON();
   assert.equal(exported.manifest.mode, 'programmatic');
-  assert.equal(exported.manifest.room, undefined);
-  assert.match(app.node('panel').innerHTML, /Room unspecified · programmatic/);
+  assert.equal(exported.manifest.room, 'split_span');
+  const bad=structuredClone(exported);bad.final_state.robots.SPECTRA.x=99;
+  assert.throws(()=>checkRun(bad),/room|position|state/);
+  const mismatched=structuredClone(exported);mismatched.manifest.provenance.inputs.room.value.definition.id='other';
+  assert.throws(()=>checkRun(mismatched),/room/);
+  assert.match(app.node('panel').innerHTML, /split_span · programmatic/);
 });

@@ -13,7 +13,7 @@ from .config import Rates
 from .protocol import Usage
 from .protocol import ROLES
 from .providers import provider_contract
-from .provenance import _SourceInfo, _Fingerprint, _EnvironmentValue, _SchemaValue, _RoomValue, _APIContract
+from .provenance import _SourceInfo, _Fingerprint, _EnvironmentValue, _SchemaValue, _RoomValue, _RoomValueV3, _APIContract
 
 TRIAL_STOPS = frozenset({'victory','defeat','turn_limit','call_budget','spend_budget','provider_error',
                          'unreliable_agent','internal_error','local_error','cancelled','setup_failure'})
@@ -67,7 +67,7 @@ class TrialSummary(BaseModel):
 
     @model_validator(mode='after')
     def consistent_outcome(self):
-        if self.schema_version!=2 or self.stop_reason not in TRIAL_STOPS:
+        if self.schema_version not in (2,3) or self.stop_reason not in TRIAL_STOPS:
             raise ValueError('Invalid outcome version/status')
         if self.win and self.loss or self.completed!=(self.win or self.loss):
             raise ValueError('Contradictory terminal outcome')
@@ -120,9 +120,10 @@ def validate_frozen(value,spec):
     for arm,inputs in value['inputs'].items():
         if not isinstance(inputs,dict) or not {'prompt','schemas','room'}<=set(inputs):raise ValueError('Missing input identity')
         fingerprints={k:_Fingerprint.model_validate(inputs[k]) for k in ('prompt','schemas','room')}
-        _SchemaValue.model_validate(fingerprints['schemas'].value);_RoomValue.model_validate(fingerprints['room'].value)
+        _SchemaValue.model_validate(fingerprints['schemas'].value)
+        (_RoomValueV3 if fingerprints['schemas'].value['request_format_version']==3 else _RoomValue).model_validate(fingerprints['room'].value)
         notice=CONDITIONS[arm].notice();schema=fingerprints['schemas'].value
-        if (schema['request_format_version']!=2 or json.dumps(schema['request_structure'].get('condition_notice'),sort_keys=True)!=json.dumps(notice,sort_keys=True) or
+        if (schema['request_format_version'] not in (2,3) or json.dumps(schema['request_structure'].get('condition_notice'),sort_keys=True)!=json.dumps(notice,sort_keys=True) or
             not isinstance(fingerprints['prompt'].value,str) or not fingerprints['prompt'].value.endswith('\n'+json.dumps(notice,sort_keys=True))):
             raise ValueError('Contradictory frozen condition')
     contracts=value['provider_contracts']

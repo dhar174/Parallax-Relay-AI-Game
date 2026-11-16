@@ -27,6 +27,7 @@ class Rates(Settings):
 
 class MatchSettings(Settings):
     model_config = ConfigDict(strict=True)
+    room_id: str = Field(default='split_span',pattern=r'^[a-z][a-z0-9_]{0,63}$')
     communication_rounds: Literal[0, 1, 2] = 2
     condition: ConditionName | None = None
     max_turns: int = Field(default=12, ge=1, le=12)
