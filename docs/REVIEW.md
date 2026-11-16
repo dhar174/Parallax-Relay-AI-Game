@@ -4,8 +4,12 @@ Reviewed **2026-11-13**, against runtime baseline
 [`719c7696c4bfe50934fc936bbccfb62812633164`](https://github.com/dhar174/Parallax-Relay-AI-Game/commit/719c7696c4bfe50934fc936bbccfb62812633164).
 This is a documentation and source review with offline reproductions. Runtime code,
 tests, dependencies, and committed fixtures were not changed during that review.
-Subsequent slice 1–5 resolutions are annotated below; in those sections the original
+Subsequent slice 1–9 resolutions are annotated below; in those sections the original
 evidence, suggested remedies, and reproductions are historical baseline records.
+
+The [November 16 delivery matrix](verification/2026-11-16-delivery-status.md) pins
+current implementation and issue status to merged source `4e0851b`. The original
+review coverage and test counts below describe November 13, not a fresh audit.
 
 ## Method and coverage
 
@@ -46,9 +50,9 @@ review; that is not a security assurance.
 | R03 | P2 | Confirmed defect | Recording errors bypass finalization | Fixed in PR #29 |
 | R04 | P3 | Documentation mismatch | Non-MOVE zero fields are requested but unenforced | Fixed in PR #27 |
 | R05 | P2 | Documentation mismatch | Legacy demo overwrites existing output | Fixed in PR #27 |
-| R06 | P1 | Unverified assumption | Offline wire tests do not establish live compatibility | Open validation gate |
-| R07 | P1 | Future enhancement | Fixed room cannot establish general cooperative ability | Protocol specified (#17); #9 research gate remains open |
-| R08 | P2 | Future enhancement | Run artifacts lack full experiment provenance | Run provenance implemented (#10); runner #19 pending |
+| R06 | P1 | Unverified assumption | Offline wire tests do not establish live compatibility | Scoped acceptance in PR #38; Anthropic live-unverified, #15 not planned |
+| R07 | P1 | Future enhancement | Fixed room cannot establish general cooperative ability | Controls/runner/rooms delivered (#18/#19/#20); #9 research gate open |
+| R08 | P2 | Future enhancement | Run artifacts lack full experiment provenance | Provenance #10 and runner #19 delivered; research claims unverified |
 | R09 | P2 | Test gap | CI, reproducibility, and missing audit coverage | Partially addressed; audits open |
 | R10 | P3 | Test gap / future enhancement | Replay browser coverage and partial-run inspection | Open |
 
@@ -240,10 +244,10 @@ agents and `gemini-3.5-flash-lite`, resolved one turn, and exited 0 at `turn_lim
 with no final score. The [acceptance record](VERIFICATION.md#provider-acceptance-and-scope-decision--november-15-2026)
 supports #14/#16 completion. The maintainer explicitly retired mandatory Anthropic
 task #15 as not planned; its adapter remains implemented/offline-tested/live-unverified.
-#8 may close for this revised scope after the evidence PR merges; it does not certify
-all providers/models or image understanding. [#37](https://github.com/dhar174/Parallax-Relay-AI-Game/issues/37)
-tracks future independent API/model/modality combinations. All four issues remain
-open pending that merge; original criteria are retained with the scope exception.
+Merged PR #38 closed #14/#16 and parent #8 as completed for this revised scope;
+#15 closed as not planned. This does not certify all providers/models or image understanding. [#37](https://github.com/dhar174/Parallax-Relay-AI-Game/issues/37)
+tracks future independent API/model/modality combinations. Original criteria are
+retained with the scope exception; no Anthropic request was made.
 
 **Historical entries below:** the open/blocked statuses describe their dated
 checkpoints, before the successful retry and revised acceptance scope.
@@ -306,6 +310,15 @@ adapters with offline coverage rather than verified model compatibility.
 
 ## R07: A fixed scripted room is insufficient research evidence
 
+**Current delivery, November 16, 2026:** controls/baselines #18, campaign runner
+#19, and room infrastructure #20 are closed following merged PRs #39/#40/#41.
+[Protocol 2](EVALUATION.md) and [catalog v1](ROOMS.md) define three development
+and six held-out curated rooms, with solvability/privacy checks and enforced
+pilot/confirmation workflow. Offline fixtures and diagnostics establish host
+behavior only. Parent #9 remains open: eligible controlled model campaigns and
+research reporting gates are still unmet. The dated Slice 5 status and original
+fixed-room evidence below are historical, not the current implementation state.
+
 **Slice 5 status (#17), November 14, 2026:** [evaluation protocol v1](EVALUATION.md)
 defines trial identity, balanced rotations, five arms, baseline policies, 5 pilot
 plus 30 confirmatory repetitions per assignment/condition, room-split gates,
@@ -328,6 +341,13 @@ This is a planned research capability, not a malfunction of the current demo.
 conditions, report all trial outcomes and assignments, and test held-out variants.
 
 ## R08: Run manifests lack reproducibility metadata
+
+**Current delivery, November 16, 2026:** #10 is closed by merged PR #31 and #19
+is closed by merged PR #40. The [campaign runner](CAMPAIGNS.md) now registers,
+schedules and aggregates trials with durable all-outcome evidence. PR #41 adds
+room-aware native/provenance format 3 while retaining historical readers. These
+features resolve the infrastructure gap; they do not establish an eligible model
+campaign or close parent #9. The dated Slice 5 record below is historical.
 
 **Slice 5 resolution (#10), November 14, 2026:** new main-recorder manifests carry
 version-1 provenance inside schema 2. CLI and programmatic paths record actual
@@ -416,7 +436,7 @@ text, missing images, and narrow-screen overflow. Existing runs remain readable.
   are trusted code. The public-event sanitizer is pattern-based, so new event types
   need explicit disclosure review and tests.
 
-## Recommended sequence
+## Historical recommended sequence (November 13 baseline)
 
 First fix R01–R03 with narrow regressions, settle R04, and align legacy output
 handling (R05). Add CI/environment coverage (R09) and validate real-provider behavior
