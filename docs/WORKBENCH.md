@@ -100,3 +100,6 @@ No-images retains spectator PNGs but sends no image parts to providers. Withheld
 communications are spectator-only; imported runs display their recorded arm.
 Historical imports without a condition label remain explicitly unspecified.
 Campaign registration/execution/analysis are CLI operations, not browser actions.
+New native records display known-usage-priced and retained unknown-usage estimates
+separately when present. Unpriced amounts remain unavailable. Imported historical
+records without the optional split remain readable and round-trip unchanged.

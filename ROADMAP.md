@@ -31,7 +31,7 @@ CI/lock work (#21/#22) was delivered in merged PR #30. Slice 6's independent
 provider-contract audit (#13) adds source-backed offline coverage and corrections;
 PR #32 review adds adversarial-envelope, retry, cleanup and priced-driver regressions.
 R06 has bounded live evidence for the selected OpenAI/Gemini roster and an explicit
-Anthropic scope exception; issue closure awaits the evidence PR. Source/privacy
+Anthropic scope exception; #14/#16/#8 are closed completed and #15 not planned. Source/privacy
 and dependency/license audits (#23/#24) remain open. See the verification guide for
 actual results.
 
@@ -46,9 +46,8 @@ unchanged. The initial attempt was blocked by six Gemini HTTP 429 failures; its
 historical evidence is preserved. A separately authorized retry on clean `d76be6c`
 completed all nine requests on their first attempts, resolved one turn, and stopped
 at `turn_limit` with no final score. The [acceptance record](docs/VERIFICATION.md#provider-acceptance-and-scope-decision--november-15-2026)
-supports closing #14/#16 as completed, retiring mandatory Anthropic validation #15
-as not planned (not verified), then closing #8 for the explicitly revised scope.
-All four remain open until the evidence PR merges. Anthropic remains implemented,
+records #14/#16/#8 completed for revised scope and #15 retired as not planned
+(not live-verified) after merged PR #38. Anthropic remains implemented,
 tested offline and live-unverified; ordinary defaults are unchanged. PR #33
 supplies the static workbench and mock-only companion; general release automation
 #34 and comprehensive browser coverage #35 remain separate.
@@ -91,21 +90,22 @@ this roadmap introduces no runtime feature, automatic fallback or paid execution
 
 **Status:** partly implemented. Slice 5 adds versioned run provenance (#10);
 the prospective evaluation protocol (#17) is specified. Slice 8 controls/baselines (#18) implement the five protocol arms and WAIT/uniform-v1
-policies. The experiment runner (#19) and controlled campaigns remain future work.
+policies. Slice 8 also adds campaign registration, a bounded serial trial runner
+and JSON/CSV aggregation (#19). Controlled model campaigns remain unrun.
 
 Run provenance (R08) now records source/configuration,
 prompt/schema/room versions, dependency environment, model identifiers, trial IDs,
 and sampling settings where supported. Store no credentials. A seed may describe
 room generation or a supported provider option; it cannot promise deterministic
-model output. See [Run provenance](docs/PROVENANCE.md). The experiment runner must
-still schedule/aggregate trials and preserve setup failures and missing artifacts.
+model output. See [Run provenance](docs/PROVENANCE.md). The [campaign runner](docs/CAMPAIGNS.md) schedules/aggregates trials and preserves
+setup failures and missing artifacts.
 
 [Evaluation protocol v1](docs/EVALUATION.md) specifies repeated trials, balanced
 role assignments, policy baselines and five comparison arms. Its selected design
 is 5 pilot plus 30 confirmatory trials per unique assignment/condition/room, with
 all-trial denominators, uncertainty and campaign budgets. The current `--fast`
-mode reduces communication but does not disable it; the five explicit controls now exist, while campaign
-machinery remains separate. No experimental results are claimed.
+mode reduces communication but does not disable it; the five explicit controls and campaign
+machinery now exist. No experimental results are claimed.
 
 **Completion gate:** another researcher can reconstruct experiment configuration and
 aggregate results from saved artifacts; the runner enforces a campaign budget;

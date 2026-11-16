@@ -186,3 +186,13 @@ while writable metadata/viewers refresh the final stop reason on recovery. See
 [Run provenance](PROVENANCE.md) for hook failures, compatibility, and unknown fields.
 Fresh caller cancellation during client shutdown still propagates, retaining an
 earlier host failure diagnostically rather than converting cancellation to exit 2.
+
+## Campaign accounting additions
+
+Calls add reservation quotes, complete-usage versus retained-estimate settlement
+basis and settled local USD (null if unpriced). Budget summaries retain the legacy
+estimate and separately expose both components, token coverage and reserved/released
+calls. Turn records add `action_outcomes` classifications from engine resolution;
+these are spectator metadata and never enter participant observations/history.
+Outer schema version 2 and existing custom recorder methods remain unchanged.
+See [campaigns](CAMPAIGNS.md) for whole-block reservation and two-axis reporting.

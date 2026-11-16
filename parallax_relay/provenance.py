@@ -574,6 +574,12 @@ class ProvenanceRecord(_RecordModel):
                 raise ValueError('Invalid prompt identity')
             _SchemaValue.model_validate(self.inputs['schemas'].value)
             _RoomValue.model_validate(self.inputs['room'].value)
+            if self.schema_version == 2 and self.execution is not None:
+                schemas = self.inputs['schemas'].value
+                notice = self.execution.value['conditions']
+                if (schemas['request_format_version'] != 2 or
+                    schemas['request_structure'].get('condition_notice') != {k: v for k, v in notice.items() if k != 'arm'}):
+                    raise ValueError('Contradictory condition notice')
         return self
 
 

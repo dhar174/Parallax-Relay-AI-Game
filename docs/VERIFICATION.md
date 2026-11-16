@@ -1,5 +1,38 @@
 # Verification record
 
+## Slice 8 campaign implementation — November 15, 2026 (EST)
+
+The serial campaign CLI implements registration, whole-block admission, durable
+pre-setup launches, cancellation/client cleanup and all-trial JSON/CSV analysis.
+No paid campaign or provider request was made. Model-shaped tests intercept HTTP
+or use fake agents; their identities/outcomes are synthetic verification evidence.
+
+A standalone diagnostic using the committed example specification registered and
+executed 15 trials across all three offline policies and five arms: 216 calls,
+15/15 available artifact sets, zero unknown-usage calls, all nonterminal at the
+intentional two-turn limit. Unpriced costs stayed null. JSON and three CSV readbacks
+passed; final analysis reconciled all 216 calls with zero remaining reservations.
+This dirty-source diagnostic is explicitly nonconfirmatory and is not model data.
+
+Fault tests cover pre-Recorder setup failure, cancellation/draining, duplicate-run
+rejection, ledger failure before launch/after a native engine win, missing/corrupt
+artifacts, whole-block call/dollar rejection, quote overruns and cleanup failure
+following victory. Accounting tests reconcile complete/partial/unknown usage and
+preserve null costs. A native baseline pilot-to-confirmation test exercises all
+35 pilot and 160 confirmation trials with mocked clean source identity, including
+the 10,000-resample analysis; it does not attest a real clean-source experiment.
+Actual HTTP serialization tests cover all three adapters and five arms over later
+turns and retry repairs without network access.
+
+The final local suite and hosted matrix must be checked for the submitted revision;
+results below are updated after inspecting their actual receipts. Chromium 156
+again exercised the five selectors, real no-images companion output, three PNGs,
+turn-limit/unscored labels and desktop/mobile overflow with no runtime exceptions.
+The workbench passed 54 Node tests with no skips. Dependency consistency,
+compilation, build, expected normal/fast mock outcomes, 120 local documentation
+links/anchors and whitespace checks passed. Broader browser/security/room work
+remains separately tracked; none of #20/#23/#24/#26/#34/#35 closes here.
+
 ## Slice 8 controls — November 16, 2026 UTC
 
 Baseline merged source `0b21a0b` passed 260 Python tests. The delivered controls
