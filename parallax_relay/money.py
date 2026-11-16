@@ -26,6 +26,7 @@ def json_fields(fields: dict) -> dict:
     result = dict(fields)
     for key, value in fields.items():
         if isinstance(value, Decimal):
+            if value.is_zero():value=Decimal(0)
             number = float(value)
             if not value.is_finite() or not math.isfinite(number) or value < 0:
                 raise ValueError('Invalid monetary estimate')

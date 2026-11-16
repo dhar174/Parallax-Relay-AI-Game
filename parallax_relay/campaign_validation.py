@@ -89,6 +89,9 @@ def validate_summary(value) -> TrialSummary:
         if key in value['budget'] and type(value['budget'][key]) is not int:
             raise ValueError('Invalid budget count')
     amounts={key:amount(value['budget'],key) for key in BUDGET_MONEY}
+    components=[key for key in BUDGET_MONEY[1:] if key in value['budget']]
+    if components and (len(components)!=2 or any((amounts[key] is None)!=(amounts['estimated_cost_usd'] is None) for key in components)):
+        raise ValueError('Inconsistent cost availability')
     if all(v is not None for v in amounts.values()):
         # Legacy floats carry only their recorded precision; exact annotations
         # are compared exactly, while numeric-only summaries tolerate their ULPs.
@@ -119,7 +122,7 @@ def validate_frozen(value,spec):
         fingerprints={k:_Fingerprint.model_validate(inputs[k]) for k in ('prompt','schemas','room')}
         _SchemaValue.model_validate(fingerprints['schemas'].value);_RoomValue.model_validate(fingerprints['room'].value)
         notice=CONDITIONS[arm].notice();schema=fingerprints['schemas'].value
-        if (schema['request_format_version']!=2 or schema['request_structure'].get('condition_notice')!=notice or
+        if (schema['request_format_version']!=2 or json.dumps(schema['request_structure'].get('condition_notice'),sort_keys=True)!=json.dumps(notice,sort_keys=True) or
             not isinstance(fingerprints['prompt'].value,str) or not fingerprints['prompt'].value.endswith('\n'+json.dumps(notice,sort_keys=True))):
             raise ValueError('Contradictory frozen condition')
     contracts=value['provider_contracts']
@@ -150,6 +153,8 @@ def equal_money(record,key,expected):
 def cross_artifacts(data,trial,settings):
     issues=[];result=data.get('result');calls=data.get('calls');phases=data.get('phases');replay=data.get('replay')
     if not result:return issues
+    full=amount(result['budget'],'estimated_cost_usd')
+    if (full is None)!=(trial['team']!='models'):issues.append('pricing_team_mismatch')
     if result['turns']>settings.max_turns:issues.append('result_turn_limit_mismatch')
     world=data.get('final_state');p=data.get('provenance')
     if world and world['energy']!=result['energy']:issues.append('world_energy_mismatch')
@@ -178,10 +183,11 @@ def cross_artifacts(data,trial,settings):
         usage=call.get('usage')
         if usage is not None and not isinstance(usage,dict):issues.append('usage_shape_mismatch');continue
         usage=usage or {}
+        bad_usage=False
         for key in ('input_tokens','output_tokens','cached_input_tokens','reasoning_output_tokens'):
             value=usage.get(key)
-            if value is not None and (type(value) is not int or value<0):issues.append('usage_shape_mismatch')
-        if 'usage_shape_mismatch' in issues:continue
+            if value is not None and (type(value) is not int or value<0):bad_usage=True
+        if bad_usage:issues.append('usage_shape_mismatch');continue
         inp,out=usage.get('input_tokens'),usage.get('output_tokens')
         known=inp is not None and out is not None
         counts['reported_input_tokens']+=inp or 0;counts['reported_output_tokens']+=out or 0
@@ -192,6 +198,7 @@ def cross_artifacts(data,trial,settings):
         basis='complete_usage' if known else 'retained_estimate'
         if call['settlement_basis']!=basis:issues.append('settlement_basis_mismatch')
         settled=amount(call,'settled_amount_usd');quote=amount(call,'reservation_quote_usd')
+        if trial['team']=='models' and quote is None:issues.append('missing_priced_quote')
         expected=(None if trial['team']!='models' else
                   _price(Usage(inp,out),Rates.model_validate(trial['players'][call['role']]['pricing'])) if known else quote)
         if not equal_money(call,'settled_amount_usd',expected):issues.append('attempt_settlement_mismatch')
@@ -199,7 +206,6 @@ def cross_artifacts(data,trial,settings):
     if len(call_keys)!=len(set(call_keys)):issues.append('duplicate_attempt')
     if not 'usage_shape_mismatch' in issues:
         if any(key in result['budget'] and result['budget'][key]!=value for key,value in counts.items()):issues.append('usage_totals_mismatch')
-    full=amount(result['budget'],'estimated_cost_usd')
     if full is None and any(amount(c,'settled_amount_usd') is not None for c in calls):issues.append('unpriced_settlement_mismatch')
     if full is not None:
         for key,basis in (('known_usage_estimated_usd','complete_usage'),('retained_estimate_usd','retained_estimate')):

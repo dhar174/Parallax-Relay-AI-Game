@@ -130,6 +130,9 @@ schedule can contain engine defeats or intentional turn-limit stops.
 Each file is written through a temporary file and atomic replacement; the four
 files are not a transaction. String CSV cells with formula prefixes are quoted
 with a leading apostrophe; JSON retains original values. Empty CSVs retain headers.
+CSV fields are always enclosed in double quotes, including carriage returns, for
+consistent readback on early Python 3.11 patch releases. Formula detection skips
+all Unicode whitespace before checking the prefix.
 Reports link registration and per-trial artifacts; model dialogue, HUDs, private
 notes and image contents remain in native spectator files rather than CSV rows.
 Review all spectator metadata before sharing. Reports keep:
@@ -160,6 +163,10 @@ Validation cross-checks ended lifecycles, scheduled mode/policy, run UUIDs, stop
 reasons, engine state/energy/turns, replay sequences, phase ranges and call/usage/
 cost conservation. Malformed ledgers, duplicate lifecycle events and unmatched
 launch/finish receipts prevent complete-cohort inference.
+Scheduled model trials require priced totals and per-attempt quotes; provided
+cost components must share the total's nullability. A null runner result cannot
+borrow operational success from a saved native result: the discrepancy is flagged,
+while explicit operational failures and known engine outcomes remain distinguishable.
 
 ## Accounting additions
 
@@ -172,6 +179,8 @@ remain reported distinctly from normalized zero defaults.
 Numeric dollar fields have additive `<field>_decimal` strings for exact local
 estimate persistence. New records reconcile those values with Decimal arithmetic;
 historical numeric-only ledgers disclose their bounded serialization uncertainty.
+Stop-total rounding has its own `legacy_settlement_rounding_uncertainty_usd`,
+including the final receipt's serialization precision.
 Partial per-role pricing keeps the overall total null, exposes `priced_roles`,
 `unpriced_roles` and `priced_role_estimated_usd`, and retains priced call amounts.
 Reports with no priced trials keep every cost aggregate null, including the known

@@ -44,11 +44,14 @@ def now() -> str:
 def atomic_json(path: Path, value) -> None:
     encoded = json.dumps(value, ensure_ascii=True, allow_nan=False, indent=2) + '\n'
     temporary = path.with_suffix(path.suffix + '.tmp')
-    with temporary.open('w', encoding='utf-8', newline='\n') as handle:
-        handle.write(encoded)
-        handle.flush()
-        os.fsync(handle.fileno())
-    temporary.replace(path)
+    try:
+        with temporary.open('w', encoding='utf-8', newline='\n') as handle:
+            handle.write(encoded)
+            handle.flush()
+            os.fsync(handle.fileno())
+        temporary.replace(path)
+    finally:
+        temporary.unlink(missing_ok=True)
 
 
 def read_json(path: Path):
@@ -356,7 +359,7 @@ async def run_campaign(root: Path, *, offline: bool = False, live: bool = False,
                     accounted_estimated_usd=dollars_used)
         raise
     finally:
-        lock.unlink()
+        lock.unlink(missing_ok=True)
 
 
 def main(argv: list[str] | None = None) -> int:

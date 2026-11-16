@@ -1,5 +1,13 @@
 # Verification record
 
+## Campaign re-review corrections — November 16, 2026 UTC
+
+The [campaign evidence](verification/2026-11-16-pr40-antigravity.md#re-review-follow-up)
+records reproduction of the early-Python CSV bug and the additional validation
+corrections. Final local checks passed 337 Python tests on both 3.11.2 and 3.12.14,
+plus 58 Node tests. Final hosted receipts are recorded in the PR response; older
+counts below remain evidence for the revisions they name.
+
 ## Controls review follow-up — November 16, 2026 UTC
 
 Revision `76fb564` passed all six jobs in

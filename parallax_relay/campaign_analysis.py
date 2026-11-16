@@ -53,8 +53,6 @@ def wilson(successes: int, total: int) -> list[float] | None:
         raise ValueError('Invalid binary counts')
     if total == 0:
         return None
-    if not 0 <= successes <= total:
-        raise ValueError('Invalid binary counts')
     z = NormalDist().inv_cdf(.975)
     rate = successes / total
     center = rate + z*z/(2*total)
@@ -64,7 +62,8 @@ def wilson(successes: int, total: int) -> list[float] | None:
 
 
 def success_summary(successes: int, launched: int, planned: int, unknown: int) -> dict:
-    if not (0 <= successes <= launched <= planned and 0 <= unknown <= launched-successes):
+    if (any(type(n) is not int for n in (successes,launched,planned,unknown)) or
+            not (0 <= successes <= launched <= planned and 0 <= unknown <= launched-successes)):
         raise ValueError('Invalid outcome counts')
     return {'successes': successes, 'launched': launched, 'planned': planned, 'unknown': unknown,
             'rate': successes / launched if launched else None,
@@ -337,6 +336,18 @@ def analyze(root: Path) -> dict:
                     break
     ids = {t['trial_id'] for t in registration['schedule']}
     expected_blocks={t['trial_id']:t['block_id'] for t in registration['schedule']}
+    block_ids=set(expected_blocks.values());reserved_blocks=set();released_blocks=set()
+    for event in events:
+        name=event['event'];block=event.get('block_id')
+        if name in ('block_reserved','block_released','trial_launched'):
+            if not isinstance(block,str) or block not in block_ids:
+                anomalies.append('block_event_mismatch');continue
+            if name=='block_reserved':
+                if block in reserved_blocks:anomalies.append('block_event_mismatch')
+                reserved_blocks.add(block)
+            elif block not in reserved_blocks or block in released_blocks:
+                anomalies.append('block_event_mismatch')
+            elif name=='block_released':released_blocks.add(block)
     if any(row.get('block_id')!=expected_blocks.get(key) for key,row in launched.items()):
         anomalies.append('launch_block_mismatch')
     if set(launched) - ids or set(finished) - ids:
@@ -388,9 +399,12 @@ def analyze(root: Path) -> dict:
             row.update({key:result['budget'].get(key) for key in BUDGET_COUNTS+BUDGET_MONEY})
             for key in BUDGET_MONEY:
                 row[key+'_decimal']=result['budget'].get(key+'_decimal')
-        if receipt and _valid_summary(receipt.get('result')) and data.get('result') and receipt['result'] != data['result']:
+        if receipt and data.get('result') and receipt.get('result') != data['result']:
             issues.append('ledger_artifact_disagreement')
-            row.update(operational_success=None, engine_outcome='unknown')
+            if receipt.get('result') is not None:
+                row.update(operational_success=None,engine_outcome='unknown')
+            elif row['operational_success'] is True:
+                row['operational_success']=None
         if receipt and data.get('provenance'):
             native=data['provenance'];life=native['lifecycle']
             if receipt['run_id']!=native['run_id']:issues.append('run_id_mismatch')
@@ -431,8 +445,10 @@ def analyze(root: Path) -> dict:
         if key in event and key+'_decimal' not in event)
     if balance_calls:anomalies.append('unbalanced_call_reservations')
     if abs(balance_usd)>uncertainty:anomalies.append('unbalanced_estimate_reservations')
+    settlement_uncertainty=money_total((uncertainty,Decimal(str(math.ulp(float(campaign_stop['accounted_estimated_usd']))))
+        if campaign_stop and 'accounted_estimated_usd_decimal' not in campaign_stop else Decimal(0)))
     if campaign_stop and (campaign_stop['accounted_calls']!=calls_accounted or
-            abs(difference(amount(campaign_stop,'accounted_estimated_usd'),dollars_accounted))>uncertainty):
+            abs(difference(amount(campaign_stop,'accounted_estimated_usd'),dollars_accounted))>settlement_uncertainty):
         anomalies.append('campaign_settlement_mismatch')
     complete = len(launched)==len(finished) and counts['launched'] == counts['planned'] and counts['unknown_operational'] == 0 and not anomalies and bool(
         campaign_stop and campaign_stop['reason'] == 'completed')
@@ -504,6 +520,7 @@ def analyze(root: Path) -> dict:
                   'reservation_balance_estimated_usd': float(balance_usd),
                   'reservation_balance_estimated_usd_decimal':str(balance_usd),
                   'legacy_rounding_uncertainty_usd':float(uncertainty),
+                  'legacy_settlement_rounding_uncertainty_usd':float(settlement_uncertainty),
                   'launched_without_finished_receipt': len(launched)-len(finished),
                   'interpretation': 'An interrupted ledger can retain reservations; balances beyond the reported legacy rounding uncertainty expose unmatched exposure. Monetary reservations are local estimates, not invoices.'},
               'limitations': ['No provider ranking or general cooperation/vision claim follows from this fixed room.',
@@ -530,12 +547,12 @@ def write_report(report: dict, out: Path) -> None:
         target=out/(name+'.csv');temporary=target.with_suffix('.csv.tmp')
         def cell(value):
             if isinstance(value,(dict,list)):return json.dumps(value,ensure_ascii=True,allow_nan=False)
-            if isinstance(value,str) and (value.startswith(('\t','\r','\n')) or value.lstrip(' \t\r\n').startswith(('=','+','-','@'))):
+            if isinstance(value,str) and (value.startswith(('\t','\r','\n')) or value.lstrip().startswith(('=','+','-','@'))):
                 return "'"+value
             return value
         try:
             with temporary.open('w',encoding='utf-8',newline='') as handle:
-                writer=csv.DictWriter(handle,fieldnames=fields,lineterminator='\n');writer.writeheader()
+                writer=csv.DictWriter(handle,fieldnames=fields,lineterminator='\n',quoting=csv.QUOTE_ALL);writer.writeheader()
                 writer.writerows({k:cell(v) for k,v in row.items()} for row in rows)
                 handle.flush();os.fsync(handle.fileno())
             temporary.replace(target)

@@ -13,6 +13,8 @@
 - Include an offline diagnostic example. No paid campaign or Site release was run.
 - Harden review-driven artifact/ledger validation, runner locking and credential
   preflight; preserve cancellation, exact estimate settlements and atomic safe CSVs.
+- Quote CSVs portably on early Python 3.11 releases and reject inconsistent
+  pricing/runner receipts; retain independent engine and operational outcomes.
 
 ### Slice 8 controls
 

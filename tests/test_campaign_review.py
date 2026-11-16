@@ -25,6 +25,122 @@ def rewrite_receipt(root,change):
 
 
 class CampaignReviewTests(unittest.IsolatedAsyncioTestCase):
+    async def test_null_receipt_cannot_borrow_a_saved_success(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp)/'campaign';register(spec(policies=['scripted'],conditions=['disabled'],match={'max_turns':7,'max_attempts':1}),root)
+            await run_campaign(root,offline=True)
+            self.assertTrue(analyze(root)['trials'][0]['operational_success'])
+            rewrite_receipt(root,lambda row:row.update(result=None))
+            row=analyze(root)['trials'][0]
+            self.assertIn('ledger_artifact_disagreement',row['artifact_issues'])
+            self.assertFalse(row['artifact_available']);self.assertIsNone(row['operational_success'])
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp)/'campaign';await self.setup_run(root);rewrite_receipt(root,lambda row:row.update(result=None))
+            self.assertFalse(analyze(root)['trials'][0]['operational_success'])
+
+    async def test_block_reservation_ids_must_be_registered(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp)/'campaign';await self.setup_run(root)
+            path=root/'ledger.jsonl';original=path.read_text(encoding='utf-8')
+            for event in ('block_reserved','block_released'):
+                rows=[json.loads(s) for s in original.splitlines()]
+                next(row for row in rows if row['event']==event)['block_id']=str(uuid4())
+                path.write_text(''.join(json.dumps(row)+'\n' for row in rows),encoding='utf-8')
+                with self.subTest(event=event):self.assertIn('block_event_mismatch',analyze(root)['anomalies'])
+
+    async def test_additional_cross_artifact_issue_codes_are_reported_independently(self):
+        mutations=[('result_turn_limit_mismatch','result',lambda d:d.update(turns=2)),
+                   ('lifecycle_stop_mismatch','result',lambda d:d.update(stop_reason='call_budget')),
+                   ('last_checkpoint_mismatch','replay',lambda d:d[0]['state_after'].update(energy=99)),
+                   ('duplicate_phase','phases',lambda d:d.append(copy.deepcopy(d[0]))),
+                   ('resolved_phase_missing','phases',lambda d:d.clear()),
+                   ('usage_shape_mismatch','calls',lambda d:d[0]['usage'].update(input_tokens='bad')),
+                   ('settlement_basis_mismatch','calls',lambda d:d[0].update(settlement_basis='retained_estimate')),
+                   ('attempt_settlement_mismatch','calls',lambda d:d[0].update(settled_amount_usd=1)),
+                   ('duplicate_attempt','calls',lambda d:d.append(copy.deepcopy(d[0]))),
+                   ('unpriced_settlement_mismatch','calls',lambda d:d[0].update(settled_amount_usd=1))]
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp)/'campaign';_,trial=await self.setup_run(root)
+            backups={p:p.read_bytes() for p in root.rglob('*') if p.is_file()}
+            for expected,name,change in mutations:
+                for p,content in backups.items():p.write_bytes(content)
+                path=trial/(name+('.json' if name=='result' else '.jsonl'))
+                data=json.loads(path.read_text(encoding='utf-8')) if name=='result' else [json.loads(s) for s in path.read_text(encoding='utf-8').splitlines()]
+                change(data);path.write_text(json.dumps(data) if name=='result' else ''.join(json.dumps(row)+'\n' for row in data),encoding='utf-8')
+                if name=='result':rewrite_receipt(root,lambda row:row.update(result=data))
+                with self.subTest(expected=expected):self.assertIn(expected,analyze(root)['trials'][0]['artifact_issues'])
+            for p,content in backups.items():p.write_bytes(content)
+            calls=[json.loads(s) for s in (trial/'calls.jsonl').read_text(encoding='utf-8').splitlines()]
+            calls[0]['usage']['input_tokens']='bad';calls[1]['settlement_basis']='retained_estimate'
+            (trial/'calls.jsonl').write_text(''.join(json.dumps(row)+'\n' for row in calls),encoding='utf-8')
+            issues=analyze(root)['trials'][0]['artifact_issues']
+            self.assertIn('usage_shape_mismatch',issues);self.assertIn('settlement_basis_mismatch',issues)
+            for key,expected,value in (('run_id','run_id_mismatch',str(uuid4())),('recording_stop_reason','recording_stop_mismatch','call_budget'),('execution_stop_reason','execution_stop_mismatch','call_budget')):
+                for p,content in backups.items():p.write_bytes(content)
+                rewrite_receipt(root,lambda row:row.update({key:value}))
+                with self.subTest(expected=expected):self.assertIn(expected,analyze(root)['trials'][0]['artifact_issues'])
+            for kind,expected in (('stop','campaign_settlement_mismatch'),('balance','unbalanced_estimate_reservations')):
+                for p,content in backups.items():p.write_bytes(content)
+                rows=[json.loads(s) for s in (root/'ledger.jsonl').read_text(encoding='utf-8').splitlines()]
+                event=rows[-1] if kind=='stop' else next(r for r in rows if r['event']=='block_reserved')
+                key='accounted_estimated_usd' if kind=='stop' else 'reserved_estimated_usd'
+                event[key]=1;event[key+'_decimal']='1'
+                (root/'ledger.jsonl').write_text(''.join(json.dumps(row)+'\n' for row in rows),encoding='utf-8')
+                with self.subTest(expected=expected):self.assertIn(expected,analyze(root)['anomalies'])
+
+    async def test_invalid_live_keys_and_cleanup_cancellation_are_explicit(self):
+        from parallax_relay.campaign import main
+        from parallax_relay.policies import WaitAgent
+        from contextlib import redirect_stderr
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp)/'campaign';register(live_spec(conditions=['disabled']),root)
+            for key in ('   ','FAKE\nKEY'):
+                with self.subTest(key=repr(key)),self.assertRaises(CampaignError):await run_campaign(root,live=True,environ={'TEST_KEY':key})
+                self.assertFalse((root/'started.json').exists())
+            error=io.StringIO()
+            with patch.dict('os.environ',{'TEST_KEY':'   '}),redirect_stderr(error):
+                self.assertEqual(await asyncio.to_thread(main,['run','--campaign',str(root),'--live']),2)
+            self.assertIn('Missing selected live credentials',error.getvalue())
+        class CancelClose(WaitAgent):
+            async def close(self):raise asyncio.CancelledError()
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp)/'campaign';register(spec(conditions=['disabled']),root)
+            with patch('parallax_relay.campaign.make_policy',side_effect=lambda n,r,t:CancelClose(r)):
+                await run_campaign(root,offline=True)
+            row=analyze(root)['trials'][0]
+            self.assertEqual(row['cleanup_status'],'failed');self.assertEqual(row['stop_reason'],'local_error')
+
+
+    async def test_priced_campaign_cannot_be_rewritten_as_unpriced(self):
+        from parallax_relay.policies import WaitAgent
+        from parallax_relay.campaign_validation import BUDGET_MONEY
+        class ZeroHTTP:
+            async def respond(self,request):return await WaitAgent(request.observation.role).respond(request)
+            async def close(self):pass
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp)/'campaign';registration=register(live_spec(conditions=['disabled']),root)
+            with patch('parallax_relay.campaign.HTTPAgent',side_effect=lambda *a,**k:ZeroHTTP()):
+                await run_campaign(root,live=True,environ={'TEST_KEY':'FAKE'})
+            self.assertEqual(analyze(root)['overall']['cost']['known_estimated_usd'],0)
+            trial=root/'trials'/registration['schedule'][0]['trial_id']
+            path=trial/'calls.jsonl';original=path.read_text(encoding='utf-8');calls=[json.loads(s) for s in original.splitlines()]
+            calls[0].update(settled_amount_usd=1,settled_amount_usd_decimal='1')
+            path.write_text(''.join(json.dumps(row)+'\n' for row in calls),encoding='utf-8')
+            self.assertIn('cost_component_mismatch',analyze(root)['trials'][0]['artifact_issues'])
+            calls=[json.loads(s) for s in original.splitlines()]
+            calls[0]['reservation_quote_usd']=None;calls[0].pop('reservation_quote_usd_decimal',None)
+            path.write_text(''.join(json.dumps(row)+'\n' for row in calls),encoding='utf-8')
+            self.assertIn('missing_priced_quote',analyze(root)['trials'][0]['artifact_issues'])
+            path.write_text(original,encoding='utf-8')
+            result=json.loads((trial/'result.json').read_text(encoding='utf-8'))
+            for key in BUDGET_MONEY:result['budget'][key]=None;result['budget'].pop(key+'_decimal',None)
+            (trial/'result.json').write_text(json.dumps(result),encoding='utf-8')
+            rewrite_receipt(root,lambda row:row.update(result=result) if row['trial_id']==registration['schedule'][0]['trial_id'] else None)
+            calls=[json.loads(s) for s in (trial/'calls.jsonl').read_text(encoding='utf-8').splitlines()]
+            for call in calls:
+                for key in ('reservation_quote_usd','settled_amount_usd'):call[key]=None;call.pop(key+'_decimal',None)
+            (trial/'calls.jsonl').write_text(''.join(json.dumps(row)+'\n' for row in calls),encoding='utf-8')
+            self.assertIn('pricing_team_mismatch',analyze(root)['trials'][0]['artifact_issues'])
     async def setup_run(self,root):
         data=register(spec(conditions=['disabled']),root)
         await run_campaign(root,offline=True)
@@ -170,6 +286,11 @@ class CampaignReviewTests(unittest.IsolatedAsyncioTestCase):
     async def test_lock_write_failure_removes_owned_lock_and_broken_markers_block(self):
         with tempfile.TemporaryDirectory() as temp:
             root=Path(temp)/'campaign';register(spec(),root);original=Path.open
+            lock=root/'.runner.lock'
+            try:lock.symlink_to(root/'missing')
+            except OSError:lock.write_text('other worker',encoding='utf-8')
+            with self.assertRaises(FileExistsError):await run_campaign(root,offline=True)
+            self.assertTrue(lock.is_symlink() or lock.exists());lock.unlink()
             class BrokenWriter:
                 def __init__(self,handle):self.handle=handle
                 def __enter__(self):return self
@@ -224,10 +345,11 @@ class CampaignReviewTests(unittest.IsolatedAsyncioTestCase):
         from parallax_relay.orchestrator import MatchResult
         from parallax_relay.state import initial_world
         from parallax_relay.protocol import ROLES
+        cost=Decimal('1e-17')
         async def execute(root,registration,configuration,trial,environ):
             budget=Budget(trial_settings(configuration,trial),{r:Rates(input_per_million=1,output_per_million=1) for r in ROLES})
             budget.calls_started=budget.calls_reserved_total=1
-            budget.spent=budget.known_usage_usd=Decimal('1e-17')
+            budget.spent=budget.known_usage_usd=cost
             result=MatchResult(initial_world(),'turn_limit',[],[],budget.summary()).summary()
             return {'trial_id':trial['trial_id'],'stage':'execution','stop_reason':'turn_limit','result':result,
                     'cleanup_status':'ok','elapsed_seconds':0,'run_id':None,'execution_stop_reason':'turn_limit',
@@ -241,6 +363,16 @@ class CampaignReviewTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(Decimal(accounting['reservation_balance_estimated_usd_decimal']),0)
             self.assertEqual(report['overall']['cost']['known_estimated_usd_decimal'],'3E-17')
             self.assertNotIn('unbalanced_estimate_reservations',report['anomalies'])
+        cost=Decimal('0.03333333333333333334')
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp)/'campaign';register(live_spec(conditions=['disabled']),root)
+            with patch('parallax_relay.campaign.execute_trial',side_effect=execute):await run_campaign(root,live=True,environ={'TEST_KEY':'FAKE'})
+            path=root/'ledger.jsonl';events=[json.loads(s) for s in path.read_text(encoding='utf-8').splitlines()]
+            events[-1].pop('accounted_estimated_usd_decimal')
+            path.write_text(''.join(json.dumps(row)+'\n' for row in events),encoding='utf-8')
+            report=analyze(root)
+            self.assertNotIn('campaign_settlement_mismatch',report['anomalies'])
+            self.assertGreater(report['campaign_accounting']['legacy_settlement_rounding_uncertainty_usd'],0)
 
     async def test_frozen_drift_stops_before_trial_setup(self):
         import parallax_relay.campaign as campaign
@@ -254,6 +386,45 @@ class CampaignReviewTests(unittest.IsolatedAsyncioTestCase):
 
 
 class ReportReviewTests(unittest.TestCase):
+    def test_atomic_json_failure_preserves_target_and_removes_temporary(self):
+        from parallax_relay.campaign import atomic_json
+        with tempfile.TemporaryDirectory() as temp:
+            target=Path(temp)/'record.json';target.write_text('{"original":true}',encoding='utf-8')
+            with patch('parallax_relay.campaign.os.fsync',side_effect=OSError('disk failure')),self.assertRaises(OSError):atomic_json(target,{'new':True})
+            self.assertEqual(json.loads(target.read_text(encoding='utf-8')),{'original':True})
+            self.assertFalse(target.with_suffix('.json.tmp').exists())
+    def test_mixed_cost_nullability_and_negative_zero(self):
+        from parallax_relay.orchestrator import MatchResult
+        from parallax_relay.budget import Budget
+        from parallax_relay.config import MatchSettings
+        from parallax_relay.state import initial_world
+        from parallax_relay.money import json_fields,amount
+        result=MatchResult(initial_world(),'turn_limit',[],[],Budget(MatchSettings(),{}).summary()).summary()
+        for key in ('estimated_cost_usd','known_usage_estimated_usd','retained_estimate_usd'):
+            bad=copy.deepcopy(result);bad['budget'][key]=0
+            with self.subTest(key=key):self.assertFalse(_valid_summary(bad))
+        self.assertEqual(amount(json_fields({'cost':Decimal('-0')}),'cost'),Decimal(0))
+
+    def test_csv_quotes_carriage_returns_and_neutralizes_all_whitespace_prefixes(self):
+        with tempfile.TemporaryDirectory() as temp:
+            out=Path(temp)/'report';values=['\rvalue','\v=1+1','\f+1','\u00a0@SUM(1)']
+            rows=[{'value':value,'nested':{'formula':'=1+1'},'list':['=1+1']} for value in values]
+            write_report({'trials':rows,'cells':[],'attempts':[]},out)
+            text=(out/'trials.csv').read_bytes().decode('utf-8')
+            self.assertTrue(text.startswith('"value","nested","list"\n'))
+            # Always quote cells, including CR, rather than relying on the
+            # QUOTE_MINIMAL behavior that changed after CPython 3.11.2.
+            self.assertIn('"\'\rvalue"',text)
+            with (out/'trials.csv').open(encoding='utf-8',newline='') as handle:exported=list(csv.DictReader(handle))
+            self.assertEqual(len(exported),len(rows));self.assertTrue(all(row['value'].startswith("'") for row in exported))
+            self.assertEqual(json.loads(exported[0]['nested']),{'formula':'=1+1'})
+            self.assertEqual(json.loads(exported[0]['list']),['=1+1'])
+
+    def test_success_counts_reject_boolean_denominators(self):
+        from parallax_relay.campaign_analysis import success_summary
+        for args in ((0,0,True,0),(0,1,1,False)):
+            with self.assertRaises(ValueError):success_summary(*args)
+
     def test_cli_exit_codes_and_actionable_safe_messages(self):
         from contextlib import redirect_stdout, redirect_stderr
         from parallax_relay.campaign import main
@@ -304,10 +475,11 @@ class ReportReviewTests(unittest.TestCase):
                 self.assertEqual(assignments(CampaignSpec.model_validate(p['spec'])),assignments(CampaignSpec.model_validate(c['spec'])))
                 altered=copy.deepcopy(confirmation);altered['roster'][0]['model']='changed-model'
                 with self.assertRaises(CampaignError):register(altered,base/'changed',pilot=pilot)
-            invalid=copy.deepcopy(c);invalid['pilot']['registration_sha256']='bad'
-            invalid['sha256']=canonical_hash({k:v for k,v in invalid.items() if k!='sha256'})
-            (base/'confirmation'/'registration.json').write_text(json.dumps(invalid),encoding='utf-8')
-            with self.assertRaises(CampaignError):read_registration(base/'confirmation')
+            for key,value in (('registration_sha256','bad'),('match_settings_changed',1),('changed_frozen_sections','source'),('changed_frozen_sections',['unknown'])):
+                invalid=copy.deepcopy(c);invalid['pilot'][key]=value
+                invalid['sha256']=canonical_hash({k:v for k,v in invalid.items() if k!='sha256'})
+                (base/'confirmation'/'registration.json').write_text(json.dumps(invalid),encoding='utf-8')
+                with self.subTest(key=key,value=value),self.assertRaises(CampaignError):read_registration(base/'confirmation')
 
     def test_monetary_annotations_reject_unbounded_exponents(self):
         from parallax_relay.money import amount
@@ -359,7 +531,8 @@ class ReportReviewTests(unittest.TestCase):
                 write_report({'trials':[{'value':'safe'}],'cells':[],'attempts':[]},out)
             self.assertFalse((out/'trials.csv').exists());self.assertFalse(list(out.glob('*.tmp')))
             fresh=Path(temp)/'empty';write_report({'trials':[],'cells':[],'attempts':[]},fresh)
-            self.assertEqual((fresh/'attempts.csv').read_text(encoding='utf-8').strip(),'trial_id,role,turn,phase,attempt,status')
+            with (fresh/'attempts.csv').open(encoding='utf-8',newline='') as handle:
+                self.assertEqual(next(csv.reader(handle)),['trial_id','role','turn','phase','attempt','status'])
     def test_csv_neutralizes_formulas_and_preserves_numeric_zero(self):
         strings=['=1+1','+1','-2','@SUM(1)','\tanything','\rvalue',' =1+1']
         with tempfile.TemporaryDirectory() as temp:

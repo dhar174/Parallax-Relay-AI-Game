@@ -43,3 +43,33 @@ The submitted revision's hosted matrix is reported with its actual receipts in
 the PR response. All verification is offline or uses
 intercepted HTTP/fake agents; no real provider request, paid run or deployment was
 performed. This does not close held-out room, general browser or security work.
+
+## Re-review follow-up
+
+The re-review of `2f81aeb` found a CSV readback failure on CPython 3.11.2 that
+newer CI patch releases did not reproduce. An isolated interpreter was built from
+the official 3.11.2 source with locked dependencies. Executing the old revision's
+write_report reproduced `Report readback failed`; the same input passed with
+always-quoted CSV fields. No global Python installation was changed.
+
+Additional corrections reject mixed cost availability and unpriced model trials,
+require priced quotes, flag null-result/native-result disagreements without
+erasing known failures, validate block reservation/release IDs and ordering, and
+continue checking later calls after malformed usage. Legacy stop uncertainty
+includes the final receipt's ULP. Negative monetary zero normalizes to zero;
+formula detection covers Unicode whitespace; count summaries reject booleans;
+JSON temporary files are cleaned on failure and a missing owned lock does not
+mask another error. The controls re-review fixes are integrated from `972dc8c`.
+
+Regression mutations cover the remaining artifact/receipt/accounting issue codes,
+broken lock symlinks, invalid-key CLI preflight, cancellation inside client close,
+pilot validation branches, priced zero versus null totals, nested JSON CSV cells,
+atomic JSON failure and final-receipt rounding. Final full-suite and hosted
+receipts are recorded in the PR response for the submitted revision.
+
+Local final verification passed **337 tests on CPython 3.11.2** (58.387 seconds)
+and **337 tests on CPython 3.12.14** (54.474 seconds). Node 24 passed **58 tests**
+with zero failures/skips. Both environments passed dependency consistency; Python
+compilation, workbench build/syntax, expected normal/fast mocks and whitespace
+checks passed. The old CSV implementation and fixed implementation were exercised
+on the same 3.11.2 interpreter/input, independently of the newer hosted matrix.
