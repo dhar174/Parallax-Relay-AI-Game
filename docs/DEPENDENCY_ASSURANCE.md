@@ -163,6 +163,24 @@ with the selected interpreter, preserving missing metadata and undecodable text
 as explicit unknowns. It does not read environment variables or direct-install
 URLs. License labels alone are not a redistribution checklist.
 
+Collector review follow-up: RECORD paths are checked against the distribution's
+own canonical metadata directory and license area before reading. Traversal,
+absolute paths, symlink escapes and direct_url.json aliases (including hard links)
+are rejected as unavailable evidence. Unreadable, missing and directory entries
+receive per-file error categories without exception messages, and collection
+continues. `License-File` declarations are also checked when RECORD is absent or
+omits them; `file_inventory_available` makes a missing file inventory explicit.
+The collector assumes an installed filesystem environment that is not concurrently
+being modified. It is not a sandbox for hostile installation processes.
+
+Five focused tests cover these cases using fake private metadata and temporary
+licenses; the full 369-test Python suite passed in 74.674 seconds. Link-specific
+tests skip when the filesystem does not permit creating links. The real patched
+environment still yields exactly the same 34 license
+file hashes across 13 distributions, with no unavailable entries. The frozen JSON
+snapshot retains the original collector digest; these changes harden subsequent
+collection without rewriting its package/advisory/license observations.
+
 | Locked distribution | Version | Supplied license |
 |---|---|---|
 | Pillow | 13.0.0 | MIT-CMU, plus bundled notices |
