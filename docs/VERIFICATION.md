@@ -1,5 +1,13 @@
 # Verification record
 
+## Campaign re-review corrections — November 16, 2026 UTC
+
+The [campaign evidence](verification/2026-11-16-pr40-antigravity.md#re-review-follow-up)
+records reproduction of the early-Python CSV bug and the additional validation
+corrections. Final local checks passed 337 Python tests on both 3.11.2 and 3.12.14,
+plus 58 Node tests. Final hosted receipts are recorded in the PR response; older
+counts below remain evidence for the revisions they name.
+
 ## Controls review follow-up — November 16, 2026 UTC
 
 Revision `76fb564` passed all six jobs in
@@ -13,6 +21,56 @@ receipts are recorded in the PR response. Local follow-up verification passed
 283 Python tests in 29.549 seconds and 57 Node tests, with zero failures/skips.
 Original delivery counts below remain
 historical evidence for `f9d035e`.
+
+## Antigravity review corrections — November 16, 2026 UTC
+
+The [controls follow-up](verification/2026-11-15-pr39-antigravity.md) and
+[campaign follow-up](verification/2026-11-16-pr40-antigravity.md) map the review
+findings to fixes and regressions. The campaign revision passed 325 local Python
+tests, 57 Node tests, a fresh offline CLI roundtrip and focused Chromium checks.
+The PR responses record the final hosted matrix receipts. Older evidence below
+continues to identify the revision it actually verified.
+
+## Slice 8 campaign implementation — November 15, 2026 (EST)
+
+The serial campaign CLI implements registration, whole-block admission, durable
+pre-setup launches, cancellation/client cleanup and all-trial JSON/CSV analysis.
+No paid campaign or provider request was made. Model-shaped tests intercept HTTP
+or use fake agents; their identities/outcomes are synthetic verification evidence.
+
+A standalone diagnostic using the committed example specification registered and
+executed 15 trials across all three offline policies and five arms: 216 calls,
+15/15 available artifact sets, zero unknown-usage calls, all nonterminal at the
+intentional two-turn limit. Unpriced costs stayed null. JSON and three CSV readbacks
+passed; final analysis reconciled all 216 calls with zero remaining reservations.
+This dirty-source diagnostic is explicitly nonconfirmatory and is not model data.
+
+Fault tests cover pre-Recorder setup failure, cancellation/draining, duplicate-run
+rejection, ledger failure before launch/after a native engine win, missing/corrupt
+artifacts, whole-block call/dollar rejection, quote overruns and cleanup failure
+following victory. Accounting tests reconcile complete/partial/unknown usage and
+preserve null costs. A native baseline pilot-to-confirmation test exercises all
+35 pilot and 160 confirmation trials with mocked clean source identity, including
+the 10,000-resample analysis; it does not attest a real clean-source experiment.
+Actual HTTP serialization tests cover all three adapters and five arms over later
+turns and retry repairs without network access.
+
+The final local suite passed **290 Python tests in 45.847 seconds**.
+The [sanitized clean-source diagnostic](verification/2026-11-15-slice8-offline-summary.json)
+records a second diagnostic on clean execution revision `58be0fd`, with the same
+15/15 artifact-complete outcomes, 216 calls and zero remaining reservations.
+[Workflow 43796878932](https://github.com/dhar174/Parallax-Relay-AI-Game/actions/runs/43796878932)
+at `58be0fd` passed all six jobs; every job log was inspected for 290 passing
+Python tests, dependency consistency, compilation, expected mocks and diff checks.
+Locked Ubuntu/Python 3.12 also passed all 54 Node tests with no skips.
+Controls-only [workflow 43793559788](https://github.com/dhar174/Parallax-Relay-AI-Game/actions/runs/43793559788)
+at `f9d035e` passed all six jobs with 268 Python tests and 53 Node tests; every
+log was inspected. Later evidence-only revisions need their own CI receipt.
+Chromium 156 again exercised the five selectors, real no-images companion output, three PNGs,
+turn-limit/unscored labels and desktop/mobile overflow with no runtime exceptions.
+Dependency consistency, compilation, build, expected normal/fast mock outcomes, 120 local documentation
+links/anchors and whitespace checks passed. Broader browser/security/room work
+remains separately tracked; none of #20/#23/#24/#26/#34/#35 closes here.
 
 ## Slice 8 controls — November 16, 2026 UTC
 

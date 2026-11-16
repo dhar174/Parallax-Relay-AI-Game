@@ -108,11 +108,18 @@ unverified unless separately tested. Additional hosted/local APIs, text-only,
 audio/video and non-chat models are a [future direction](ROADMAP.md#provider-and-model-extensibility),
 not current universal compatibility.
 
+## Controlled evaluation
+
+Slice 8 adds five evaluation arms, WAIT/uniform-v1 baselines and a registered,
+bounded serial campaign CLI. Start with the offline diagnostic in the
+[campaign guide](docs/CAMPAIGNS.md). Registration and analysis make no provider
+requests. Diagnostic fixtures do not establish model ability or benchmark results.
+
 ## Current limits and direction
 
 This release has one fixed room, three active roles, compatible objectives, and a
 known scripted solution. It has no platformer physics, procedural rooms, playable
-ECHO role, live dashboard, experiment runner, or validated benchmark results.
+ECHO role, live dashboard, or validated benchmark results.
 
 The [roadmap](ROADMAP.md) prioritizes reliable execution and reproducible evaluation
 before expanding the cooperative puzzles. The [verification record](docs/VERIFICATION.md)
@@ -127,6 +134,7 @@ separates original milestone evidence from subsequent checks.
 | [Architecture](docs/ARCHITECTURE.md) | Modules, data flow, and extension boundaries |
 | [Protocol](docs/PROTOCOL.md) | Player inputs, reply contracts, phases, and outcomes |
 | [Run provenance](docs/PROVENANCE.md) | Source, effective configuration, identities, timing, and compatibility |
+| [Campaign guide](docs/CAMPAIGNS.md) | Registration, offline trials, budgets and JSON/CSV analysis |
 | [Evaluation protocol](docs/EVALUATION.md) | Prospective trials, controls, denominators, uncertainty, and claim limits |
 | [Provider references](docs/API_SOURCES.md) | API assumptions and external sources |
 | [Review](docs/REVIEW.md) | Prioritized defects, evidence, and improvement opportunities |

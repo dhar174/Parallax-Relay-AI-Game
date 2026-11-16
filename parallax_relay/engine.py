@@ -13,30 +13,37 @@ from .state import (
 )
 
 
-def _move(world: WorldState, role: str, action: Action, events: list[str]) -> None:
+def _move(world: WorldState, role: str, action: Action, events: list[str], diagnostics: dict) -> None:
     robot = world.robots[role]
     if action.direction not in (-1, 1) or action.steps not in (1, 2):
         events.append(f"{role}: invalid MOVE parameters; no movement")
+        diagnostics[role] = 'invalid_parameters'
         return
     destination = robot.x + action.direction * action.steps
     if not 0 <= destination < WIDTH:
         events.append(f"{role}: movement blocked by outer wall")
+        diagnostics[role] = 'outer_wall'
         return
     crossed = range(robot.x + action.direction, destination + action.direction, action.direction)
     if not world.bridge_extended and any(x in GAP for x in crossed):
         events.append(f"{role}: movement blocked by unbridged gap")
+        diagnostics[role] = 'unbridged_gap'
         return
     robot.x = destination
+    diagnostics[role] = 'applied'
     events.append(f"{role}: moved to x={destination}")
 
 
-def resolve_turn(world: WorldState, actions: dict[str, Action]) -> WorldState:
+def resolve_turn(world: WorldState, actions: dict[str, Action], *, diagnostics: dict | None = None) -> WorldState:
     if world.win or world.loss:
         raise ValueError("Cannot submit actions after the game ends")
     if set(actions) != set(world.robots):
         raise ValueError("Exactly one sealed action for each active robot is required")
     w = deepcopy(world)
     events: list[str] = []
+    diagnostics = diagnostics if diagnostics is not None else {}
+    diagnostics.clear()
+    diagnostics.update({role: 'wait' if act.kind == 'WAIT' else 'applied' for role, act in actions.items()})
 
     # Parameters are game legality, not a reason to retry a model response.
     # Keep caller-owned commitments intact for histories and spectator records.
@@ -46,6 +53,7 @@ def resolve_turn(world: WorldState, actions: dict[str, Action]) -> WorldState:
             act.direction != 0 or act.steps != 0
         ):
             events.append(f'{role}: invalid {act.kind} parameters; treated as WAIT')
+            diagnostics[role] = 'invalid_parameters'
             actions[role] = Action('WAIT')
 
     # 1. Controls: VENT precedes REROUTE, independent of agent order.
@@ -54,8 +62,10 @@ def resolve_turn(world: WorldState, actions: dict[str, Action]) -> WorldState:
             continue
         if role != "PYRA" or abs(w.robots[role].x - MOTOR) > 1:
             events.append(f"{role}: VENT invalid (role/range)")
+            diagnostics[role] = 'role_or_range'
         elif w.coolant < 1:
             events.append(f"{role}: VENT failed; no coolant")
+            diagnostics[role] = 'insufficient_resource'
         else:
             w.coolant -= 1
             w.motor_heat = max(0, w.motor_heat - 3)
@@ -66,14 +76,18 @@ def resolve_turn(world: WorldState, actions: dict[str, Action]) -> WorldState:
             continue
         if role != "FLUX" or abs(w.robots[role].x - MOTOR) > 1:
             events.append(f"{role}: REROUTE invalid (role/range)")
+            diagnostics[role] = 'role_or_range'
         elif w.bridge_extended:
             events.append(f"{role}: bridge already powered")
+            diagnostics[role] = 'already_done'
         elif w.energy < 2:
             events.append(f"{role}: REROUTE failed; insufficient energy")
+            diagnostics[role] = 'insufficient_resource'
         else:
             w.energy -= 2
             w.motor_heat += 2
             if w.motor_heat > 4:
+                diagnostics[role] = 'overload'
                 # A wrong decision has a meaningful, reproducible consequence.
                 for victim in w.robots.values():
                     if abs(victim.x - MOTOR) <= 1:
@@ -86,7 +100,7 @@ def resolve_turn(world: WorldState, actions: dict[str, Action]) -> WorldState:
     # 2. Movement: collisions are not modeled in this first slice.
     for role, act in sorted(actions.items()):
         if act.kind == "MOVE":
-            _move(w, role, act, events)
+            _move(w, role, act, events, diagnostics)
 
     # 3. Interactions: only available if on the correct tile.
     for role, act in sorted(actions.items()):
@@ -101,19 +115,24 @@ def resolve_turn(world: WorldState, actions: dict[str, Action]) -> WorldState:
                 events.append(f"FLUX: recovered energy cell; energy now {w.energy}")
             else:
                 events.append(f"{role}: no collectable object available")
+                diagnostics[role] = 'nothing_to_collect'
         elif act.kind == "UNLOCK":
             if role != "FLUX" or w.robots[role].x != EXIT:
                 events.append(f"{role}: UNLOCK invalid (role/location)")
+                diagnostics[role] = 'role_or_range'
             elif w.exit_unlocked:
                 events.append(f"{role}: exit already unlocked")
+                diagnostics[role] = 'already_done'
             elif w.energy < 1:
                 events.append(f"{role}: insufficient energy to unlock exit")
+                diagnostics[role] = 'insufficient_resource'
             else:
                 w.energy -= 1
                 w.exit_unlocked = True
                 events.append("FLUX: extraction hatch unlocked")
         elif act.kind not in {"MOVE", "VENT", "REROUTE", "WAIT", "COLLECT"}:
             events.append(f"{role}: unknown action '{act.kind}'; treated as WAIT")
+            diagnostics[role] = 'unknown_action'
 
     w.turn += 1
     w.win = bool(w.exit_unlocked and all(r.x == EXIT for r in w.robots.values()))

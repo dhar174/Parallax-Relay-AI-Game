@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+### Slice 8 campaigns
+
+- Add frozen campaign registration, serial trial execution, durable lifecycle
+  receipts, full-block call/estimate admission and no automatic relaunch.
+- Preserve all planned/launched outcomes, setup failures, cancellation and missing
+  artifacts in JSON/CSV reports; add Wilson and prespecified paired-block analysis.
+- Record per-attempt quote/settlement and token coverage, separate known-price and
+  retained-estimate amounts, and spectator-only structured action diagnostics.
+- Include an offline diagnostic example. No paid campaign or Site release was run.
+- Harden review-driven artifact/ledger validation, runner locking and credential
+  preflight; preserve cancellation, exact estimate settlements and atomic safe CSVs.
+- Quote CSVs portably on early Python 3.11 releases and reject inconsistent
+  pricing/runner receipts; retain independent engine and operational outcomes.
+
 ### Slice 8 controls
 
 - Add five recorded evaluation arms, actual image omission, withheld-history

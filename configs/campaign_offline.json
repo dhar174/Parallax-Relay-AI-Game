@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "protocol_version": 1,
+  "stage": "diagnostic",
+  "mode": "offline",
+  "policies": ["scripted", "wait", "uniform"],
+  "conditions": ["full", "reduced", "disabled", "withheld", "no_images"],
+  "match": {"max_turns": 2, "max_attempts": 1},
+  "campaign_max_calls": 1000,
+  "scheduler_seed": 0
+}

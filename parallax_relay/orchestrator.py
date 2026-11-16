@@ -102,10 +102,10 @@ async def _ask(agent: Agent, request: AgentRequest, ticket: Ticket, settings: Ma
                 else:
                     parsed = parse_reply(reply.text, request.phase, request.turn)
             except asyncio.CancelledError:
-                ticket.settle(None)
+                settlement = ticket.settle(None)
                 record = {'role': request.role, 'turn': request.turn, 'phase': request.phase,
                           'attempt': attempt, 'status': 'cancelled', 'usage': None,
-                          'latency_seconds': round(perf_counter() - started, 4)}
+                          'latency_seconds': round(perf_counter() - started, 4), **settlement}
                 calls.append(record)
                 if recorder:
                     try:
@@ -122,11 +122,11 @@ async def _ask(agent: Agent, request: AgentRequest, ticket: Ticket, settings: Ma
                 error = str(exc)  # Fixed safe codes only, never response text.
             except Exception:
                 error, fatal, retryable = 'internal_error', True, False
-            ticket.settle(reply.usage if reply else None)
+            settlement = ticket.settle(reply.usage if reply else None)
             record = {'role': request.role, 'turn': request.turn, 'phase': request.phase,
                       'attempt': attempt, 'status': error or 'ok', 'http_status': status_code,
                       'usage': asdict(reply.usage) if reply else None,
-                      'latency_seconds': round(perf_counter() - started, 4)}
+                      'latency_seconds': round(perf_counter() - started, 4), **settlement}
             calls.append(record)
             if recorder: recorder.call(record)
             if parsed is not None:
@@ -149,14 +149,21 @@ async def _ask(agent: Agent, request: AgentRequest, ticket: Ticket, settings: Ma
 async def _phase(agents: Mapping[str, Agent], requests: dict[str, AgentRequest], budget: Budget,
                  settings: MatchSettings, calls: list[dict], recorder) -> dict[str, Outcome]:
     tickets = budget.reserve_phase(requests)
-    tasks = [asyncio.create_task(_ask(agents[r], requests[r], tickets[r], settings, calls, recorder)) for r in ROLES]
+    tasks = []
     try:
+        for role in ROLES:
+            tasks.append(asyncio.create_task(_ask(agents[role],requests[role],tickets[role],settings,calls,recorder)))
         outcomes = await asyncio.gather(*tasks)
     except BaseException:
         for task in tasks:
             task.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)
         raise
+    finally:
+        # A task cancelled before its first entry never runs _ask's finally.
+        # Release is idempotent, so this also covers partially-created phases.
+        for ticket in tickets.values():
+            ticket.release()
     return dict(zip(ROLES, outcomes))
 
 
@@ -243,7 +250,8 @@ async def run_match(agents: Mapping[str, Agent], settings: MatchSettings | None 
                 break
             actions = {r: o.parsed.action.to_engine() if isinstance(o.parsed, CommitReply) else Action('WAIT')
                        for r, o in outcomes.items()}
-            after = resolve_turn(world, actions)
+            action_outcomes = {}
+            after = resolve_turn(world, actions, diagnostics=action_outcomes)
             for role, outcome in outcomes.items():
                 if isinstance(outcome.parsed, CommitReply):
                     notes[role] = outcome.parsed.notes
@@ -256,6 +264,7 @@ async def run_match(agents: Mapping[str, Agent], settings: MatchSettings | None 
                 'private_notes': dict(notes),  # Privileged spectator output only.
                 'fallbacks': {r: o.error for r, o in outcomes.items() if o.parsed is None},
                 'events': after.events,
+                'action_outcomes': action_outcomes,  # Spectator-only engine classifications.
                 'state_after': after.snapshot(),  # Never used to build player input.
             }
             records.append(record)
@@ -271,7 +280,6 @@ async def run_match(agents: Mapping[str, Agent], settings: MatchSettings | None 
                         'events': public_events(after.events),
                     })
                     histories[role] = histories[role][-settings.history_turns:]
-            world = after
         if world.win:
             stop = 'victory'
         elif world.loss:

@@ -18,6 +18,7 @@ remains independent of the provider adapters.
 | Local interface | `config.py`, `play.py` | TOML/env resolution, CLI, provider-client ownership |
 | Spectator output | `recording.py`, `replay_template.html` | Incremental logs, images, final summary, static viewer |
 | Run identity | `provenance.py` | Versioned non-secret identities, canonical hashes, lifecycle, legacy-aware reader |
+| Campaigns | `campaign.py`, `campaign_models.py`, `campaign_analysis.py` | Frozen schedules, serial execution/ledger/budgets, all-trial reporting |
 | Legacy demo | `demo.py` | Direct scripted engine driver and older replay format |
 
 All module names above are relative to `parallax_relay/`.
@@ -149,3 +150,15 @@ capabilities only through a separately scoped design and the [roadmap](../ROADMA
 There is no package-install or console-script interface. Run modules from the
 checkout root. The legacy demo CLI returns an exit status and uses a unique default output path;
 its `run(out: Path) -> dict` interface still requires an explicit fresh destination.
+
+## Campaign boundary
+
+Campaign registration and analysis never create provider clients. The serial runner
+allocates/persists launch before setup and invokes the same match driver/recorder
+with fresh state and role-local contexts. It owns client teardown; full runner
+wall time differs from the match lifecycle clock. A failure before Recorder setup
+still has a ledger outcome. Cancellation and missing receipts retain unknowns.
+Whole-block campaign admission encloses existing whole-phase match reservations.
+Per-attempt settlement evidence reconciles known usage prices and retained quotes.
+Engine diagnostics are spectator-only and never become a policy legality oracle.
+See [campaigns](CAMPAIGNS.md) for the one-shot ownership and recovery limits.

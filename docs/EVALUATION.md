@@ -125,7 +125,7 @@ before setup. An experiment UUID groups the frozen campaign; every Recorder has
 its own run UUID. IDs label observations, not seeds or proof of independence. The
 current CLI UUID flags do not implement scheduling or deduplication.
 
-The future #19 ledger must record allocation, launch, setup failures, cancellations,
+The #19 ledger records allocation, launch, setup failures, cancellations,
 artifacts and missing-artifact status even if failure precedes Recorder creation.
 A rerun gets new trial/run IDs and an explicit link/reason to the original trial;
 it never overwrites or silently substitutes for it in the confirmatory analysis.
@@ -281,8 +281,8 @@ usage. Distinguish started attempts from reserved allowance and released capacit
 Use counts with their units/denominators; valid-but-illegal game actions receive no
 strategic retry. Preserve failed-trial diagnostics with sanitized stage/status data.
 
-Measure trial wall time from launch through finalization/client teardown in the
-future runner. Separately report provenance `lifecycle.elapsed_seconds`, which
+The campaign runner measures trial wall time from launch through finalization/client
+teardown. Separately report provenance `lifecycle.elapsed_seconds`, which
 covers match execution and cooperative task draining but excludes final artifact
 writes/client cleanup. Missing end times remain unknown, not zero. Give per-attempt
 latency and trial-duration distributions with counts and median/interquartile range;
@@ -298,14 +298,14 @@ Mocks with complete pricing report known zero usage/cost; unpriced mocks retain
 null. Report cost per launched trial and successful completion with explicit
 denominators and coverage; do not silently drop unknown-cost or failed trials.
 
-#19 needs additional accounting instrumentation before it can produce that split.
-Today's `estimated_cost_usd` merges known-usage prices and retained quotes, and
-`calls.jsonl` does not store each quote. Record the per-attempt reservation quote,
+#19 supplies additional accounting instrumentation for that split.
+The legacy `estimated_cost_usd` field merges known-usage prices and retained quotes;
+Slice 8 additionally records each call quote and settlement basis. Record the per-attempt reservation quote,
 whether settlement used complete usage or retained the estimate, and the settled
 amount; expose separate known-usage and retained-estimate totals in budget output.
 Their sum must reconcile with the existing estimate when fully priced. Preserve
 partial token coverage independently, and use null monetary amounts when unpriced.
-These are future runner/accounting requirements, not fields supplied by this PR.
+The Slice 8 campaign guide documents those additive accounting fields.
 
 ## Registration and campaign budgets
 
@@ -326,7 +326,7 @@ numeric limits. Retain and cross-tabulate those stops; a comparison with binding
 caps estimates success under those caps, not an uncensored communication effect.
 Do not raise a cap after observing confirmatory outcomes or drop capped trials.
 
-The future runner must reserve/check that a full next block fits registered
+The runner must reserve/check that a full next block fits registered
 remaining exposure before starting it, using the applicable per-arm maximum
 attempts and conservative dollar estimates. Keep per-match whole-phase reservation
 semantics intact. With 12 turns, 3 roles and 2 attempts, theoretical attempt bounds
@@ -334,7 +334,7 @@ are 216/full, 144/reduced, 72/disabled, 216/withheld and 216/no-images: **864 pe
 five-arm block**. For the six-assignment design this is at most **25,920 pilot and
 155,520 confirmatory attempts per room/roster**, before additional baselines or
 separately reported reruns. Actual calls may be lower. These figures are design
-bounds for future controls, not newly implemented limits or spending authorization.
+bounds for the implemented controls, not spending authorization.
 
 Report configured ceilings, planned maximum exposure, started/reserved/released
 calls, known/estimated/unknown dollar exposure, actual completion counts, and why
@@ -355,9 +355,9 @@ exploratory contrasts, baselines, role assignments and room splits. Synthetic
 examples and scripted verification stay labeled separately from model evidence.
 
 Current [provenance](PROVENANCE.md) supplies individual-run identity and lifecycle.
-#18 supplies tested policies and request controls; #19 must supply the pre-launch
-ledger, scheduling, campaign budgeting and aggregation/analysis; #20 must supply
-held-out families and solvability/privacy checks. #19 and #20 remain future work in this controls slice. None
+#18 supplies tested policies and request controls; #19 supplies the pre-launch
+ledger, scheduling, campaign budgeting and aggregation/analysis. #20 remains future
+work for held-out families and solvability/privacy checks. None
 of this protocol establishes live compatibility or requires a paid run in this PR.
 
 ## Slice 8 controls delivery
@@ -368,3 +368,13 @@ and provenance v2 with a frozen v1 reader. The workbench exports the same condit
 and invalidates live preparation after changes. The prospective requirements above
 remain the campaign acceptance specification; delivery does not establish model
 performance, held-out generalization or standing authorization for live requests.
+
+## Slice 8 campaign delivery
+
+The [campaign guide](CAMPAIGNS.md) documents implemented registration, scheduling,
+whole-block admission, durable launch/setup/failure receipts, bounded cleanup,
+all-outcome JSON/CSV reporting and protocol-defined statistics. The normative
+requirements above continue to apply where their original wording anticipated
+future implementation. Delivery is verified offline using scripted/intercepted
+agents; no model campaign, held-out evaluation or benchmark claim is established.
+Parent #9 remains open for #20 and its reporting gates.

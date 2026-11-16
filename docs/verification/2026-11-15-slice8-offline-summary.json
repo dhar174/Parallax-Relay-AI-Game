@@ -1,0 +1,102 @@
+{
+  "schema_version": 1,
+  "evidence_type": "offline_policy_diagnostic",
+  "source": {
+    "status": "clean",
+    "revision": "58be0fdbf498f7f823cf1dbf5a4cabe5d57e805e",
+    "reason": null
+  },
+  "registration_sha256": "f17b4440c2583e37f8f99d11976f88f4179bd36fc9841dbf3c545a81ca000efe",
+  "experiment_id": "5fc6283e-a1e5-4e76-8538-b24d21d3a8c4",
+  "created_at": "2026-11-16T03:13:43.987139Z",
+  "stage": "diagnostic",
+  "policies": [
+    "scripted",
+    "wait",
+    "uniform"
+  ],
+  "conditions": [
+    "full",
+    "reduced",
+    "disabled",
+    "withheld",
+    "no_images"
+  ],
+  "settings": {
+    "communication_rounds": 2,
+    "condition": null,
+    "max_turns": 2,
+    "max_calls": 216,
+    "max_attempts": 1,
+    "timeout_seconds": 60.0,
+    "max_output_tokens": 2048,
+    "history_turns": 4,
+    "retry_delay_seconds": 0.5,
+    "max_consecutive_failures": 3,
+    "max_estimated_cost_usd": null,
+    "image_token_reserve": 8192
+  },
+  "counts": {
+    "planned": 15,
+    "launched": 15,
+    "unlaunched": 0,
+    "artifact_available": 15,
+    "operational_successes": 0,
+    "known_operational_failures": 15,
+    "unknown_operational": 0,
+    "engine_win": 0,
+    "engine_defeat": 0,
+    "terminal": 0,
+    "nonterminal": 15,
+    "unknown_engine": 0,
+    "aborted": 0,
+    "cancelled": 0
+  },
+  "accounting": {
+    "configured_call_ceiling": 1000,
+    "configured_estimated_usd_ceiling": null,
+    "planned_maximum_exposure": {
+      "calls": 216,
+      "estimated_usd": 0.0,
+      "cost_is_estimate_not_billing_guarantee": true
+    },
+    "calls_reserved_total": 216,
+    "calls_released_total": 0,
+    "calls_accounted": 216,
+    "reservation_balance_calls": 0,
+    "estimated_usd_reserved_total": 0.0,
+    "estimated_usd_released_total": 0.0,
+    "estimated_usd_accounted": 0.0,
+    "reservation_balance_estimated_usd": 0.0,
+    "launched_without_finished_receipt": 0,
+    "interpretation": "An interrupted ledger can retain reservations; negative balances expose overruns. Monetary reservations are local estimates, not invoices."
+  },
+  "usage": {
+    "calls_started": 216,
+    "reported_input_tokens": 0,
+    "reported_output_tokens": 0,
+    "unknown_usage_calls": 0,
+    "input_usage_calls": 216,
+    "output_usage_calls": 216,
+    "reported_cached_input_tokens": 0,
+    "reported_reasoning_output_tokens": 0
+  },
+  "cost": {
+    "priced_trials": 0,
+    "unpriced_or_unknown_launched_trials": 15,
+    "known_estimated_usd": 0,
+    "known_usage_estimated_usd": null,
+    "retained_estimate_usd": null,
+    "per_launched_trial_usd": null,
+    "per_successful_completion_usd": null,
+    "cost_is_estimate_not_billing_guarantee": true
+  },
+  "cohort_eligible": true,
+  "confirmatory_eligible": false,
+  "limitations": [
+    "Offline scripted/WAIT/uniform policies only; not model performance evidence.",
+    "Two-turn diagnostic, not a pilot or confirmatory cohort.",
+    "Unpriced monetary amounts remain null; local estimates are not invoices.",
+    "Unsigned artifact checks establish consistency, not authenticity."
+  ]
+}

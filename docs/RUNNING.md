@@ -305,8 +305,8 @@ remain readable without provenance; missing identity is unknown.
 
 For comparative work, follow the prospective [evaluation protocol](EVALUATION.md).
 UUID flags label individual runs. All five controls and the WAIT/uniform-v1
-baselines are implemented. Campaign registration, scheduling and aggregation
-remain the separate #19 workstream.
+baselines are implemented. The [campaign CLI](CAMPAIGNS.md) implements registration,
+serial scheduling, whole-block admission and all-trial aggregation.
 
 Open `index.html` locally. The round slider and arrow buttons select resolved turns.
 Images show the state **before** that round; events describe its result. Calls and
@@ -387,3 +387,11 @@ omits provider image parts and image cost reserves while recording the unchanged
 role PNGs for spectators. All arms include the same factual condition-notice template.
 These interventions establish host behavior, not evidence of intelligence or a
 communication benefit. See [evaluation protocol](EVALUATION.md).
+
+## Repeated trials
+
+Use `python -m parallax_relay.campaign register|run|analyze` for registered serial
+campaigns. Follow the [campaign guide](CAMPAIGNS.md) for the offline quickstart,
+JSON specification, fresh paths, per-match/campaign limits, one-shot execution,
+interruption handling and report semantics. Registration and analysis are offline;
+new live campaigns require separate explicit authorization and bounded limits.

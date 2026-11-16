@@ -117,8 +117,8 @@ Use the actual results in your report; do not copy historical test counts.
 - Update protocol/running docs when changing schemas, defaults, CLI behavior,
   stop reasons, or recorded formats. Recheck provider sources for API changes.
 - Keep fixtures distinct from evidence of real model ability.
-- Follow docs/EVALUATION.md for evaluation claims; its future controls/runner/rooms
-  are specifications, not implemented capabilities or paid-run authorization.
+- Follow docs/EVALUATION.md for evaluation claims; controls and the campaign runner
+  are implemented, while held-out rooms remain specifications. Neither is paid-run authorization.
 - Preserve historical verification logs; add dated evidence and limitations.
 - Check git diff --check and inspect the final changed-file list.
 - Report what changed, the checks actually run, and unresolved limitations.

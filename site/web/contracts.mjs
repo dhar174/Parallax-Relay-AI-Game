@@ -81,6 +81,10 @@ export function checkRun(data){
  }
  field(result.budget.estimated_cost_usd,'result.budget.estimated_cost_usd',
   v=>v===null||(Number.isFinite(v)&&v>=0),'null or a nonnegative finite number');
+ for(const key of ['known_usage_estimated_usd','retained_estimate_usd','reserved_estimated_usd']){
+  if(Object.hasOwn(result.budget,key))field(result.budget[key],'result.budget.'+key,
+   v=>v===null||(Number.isFinite(v)&&v>=0),'null or a nonnegative finite number');
+ }
 
  object(data.final_state,'final_state');
  array(data.calls,'calls');

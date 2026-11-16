@@ -67,6 +67,26 @@ test('actual replay script labels policies and historical v1 conditions truthful
   }
 });
 
+test('additive settlement split is validated and retained on export', async t => {
+  const app = await workbench(t);
+  const data = structuredClone(fixture);
+  data.result.budget.known_usage_estimated_usd = 0;
+  data.result.budget.retained_estimate_usd = null;
+  await app.importJSON(data);
+  assert.deepEqual(await app.exportJSON(), data);
+  assert.match(app.node('panel').innerHTML, /Known-usage priced estimate/);
+  assert.match(app.node('panel').innerHTML, /Known-usage priced estimate: \$0/);
+  assert.match(app.node('panel').innerHTML, /Retained unknown-usage estimate: Unavailable/);
+  for(const key of ['known_usage_estimated_usd','retained_estimate_usd','reserved_estimated_usd']){
+    for(const value of [NaN,Infinity,-Infinity]){
+      const bad=structuredClone(fixture);bad.result.budget[key]=value;
+      assert.throws(()=>checkRun(bad),new RegExp(key));
+    }
+  }
+  data.result.budget.retained_estimate_usd = -1;
+  assert.throws(() => checkRun(data), /retained_estimate_usd/);
+});
+
 test('all evaluation conditions export Python-valid settings and reset approval', async t => {
   const app = await workbench(t);
   await app.click('live-smoke');
