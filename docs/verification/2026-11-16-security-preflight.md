@@ -1,6 +1,6 @@
 # Standard security/privacy scan prerequisite check — November 16, 2026
 
-**Disposition: blocked; no Standard scan or source review was started.** Issue
+**Disposition: blocked; no Standard scan or Standard-workflow source review was started.** Issue
 #23 and parent #11 remain open. This is missing assurance evidence, not a
 vulnerability finding or a clean security result.
 
@@ -43,3 +43,21 @@ regressions and repeat affected verification/audit on the resulting revision.
 Do not close #23, #11 or tracker #2 from this prerequisite receipt. Dependency
 advisory/license assessment (#24), replay work and documentation may proceed
 independently, with their own evidence and remaining gates.
+
+## Bundled-dependency static triage prerequisites
+
+The separate dependency report in [PR #47](https://github.com/dhar174/Parallax-Relay-AI-Game/pull/47)
+retains 39 advisory matches for nine inlined Playwright components as candidates,
+without claiming application reachability. A subsequent attempt to use
+`codex-security:triage-finding` loaded its main skill and result contract, but the
+mandatory shared references also failed through the provider:
+
+- `skill://Plugin_1e648473be9c8191a91ac3947151af55/references/security-guidance.md`
+- `skill://Plugin_1e648473be9c8191a91ac3947151af55/references/static-finding-assessment.md`
+
+The skill requires reviewing security guidance before tracing code or assigning
+verdicts. That workflow was therefore not continued and no formal per-finding
+triage verdicts were issued. Public package/advisory/license inventory results
+remain distinct from this unavailable additional assessment. Restore the required
+references, resolve actual bundled-code reachability and any applicable findings,
+and retain #24 open until its evidence gate is met.

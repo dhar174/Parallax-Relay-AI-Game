@@ -31,25 +31,29 @@ Anthropic request. `gh pr view` confirmed #39/#40/#41 merged respectively as
 ## Newly approved four-phase work
 
 The [approved plan](../superpowers/plans/2026-11-16-four-phase-completion.md) sets
-new acceptance gates. The rows below deliberately report preparation state; they
-must be updated with actual commits, checks, review and merge receipts before any
-new phase or issue closure claim.
+new acceptance gates. The rows below distinguish reviewed implementation from
+accepted delivery. The [integration receipt](2026-11-16-completion-integration.md)
+records the final source, actual checks and fresh diagnostic. No unmerged PR
+closes an issue.
 
 | Work | Status at preparation | Evidence still required |
 |---|---|---|
-| Phase 1: #25 replay inspection and #26 browser verification | **PENDING**; no new accepted delivery recorded here. | Actual implementation revisions, regression/full offline and browser results, fresh independent review and merged PRs before #12 closure. |
-| Phase 2: #9 evaluation | **PENDING**; qualification Q, development pilot P and held-out confirmation C spending are **not approved**. | Concrete separately approved spending receipts, frozen clean inputs, actual bounded executions, eligible complete cohorts and sanitized research report. No paid request is authorized by this document. |
-| Phase 3: #23 Standard source/privacy assurance | **BLOCKED**; [prerequisite check](2026-11-16-security-preflight.md) only. No scan or source review started. | Required resources and ready official preflight, then actual scoped scan/validation receipt for its exact clean revision. #23/#11 stay open. |
-| Phase 3: #24 dependency/license assurance | **PENDING**; no new audit result recorded here. | Dated tool/advisory/license inventory and coverage, validated findings/remediation and final-revision evidence; include new browser dependencies where applicable. |
-| Phase 4: #2 documentation/closure | **IN PREPARATION**; this matrix reconciles accepted baseline status. | Integrate actual phase evidence and final reviewed source pins. Close child/parent issues only after accepted criteria; #2 closes last. |
+| Phase 1: #25 replay inspection and #26 browser verification | **IMPLEMENTED FOR REVIEW** in [#43](https://github.com/dhar174/Parallax-Relay-AI-Game/pull/43) and [#44](https://github.com/dhar174/Parallax-Relay-AI-Game/pull/44); unmerged. | Scoped independent review fixes passed regressions. Final assembled source passed 382 Python, 74 Node and 22 real-browser tests across seven hosted jobs. Accepted merges still required before #12 closure. |
+| Phase 2: #9 evaluation | **PREPARED; LIVE EXECUTION NOT APPROVED** in [#46](https://github.com/dhar174/Parallax-Relay-AI-Game/pull/46). A new 45-trial offline diagnostic passed; Q is registered but unrun. | [Concrete Q proposal](2026-11-16-qualification-approval.md): 15 matches, at most 432 requests, $9.75 local estimate guard. Separate Q/P/C spending approvals, actual compatibility/pilot/confirmation executions and research reporting remain required. |
+| Phase 3: #23 Standard source/privacy assurance | **BLOCKED**; [prerequisite check](2026-11-16-security-preflight.md) only. No Standard scan or Standard-workflow source review started. | Required resources and ready official preflight, then actual scoped scan/validation receipt for its exact clean revision. #23/#11 stay open. |
+| Phase 3: #24 dependency/license assurance | **EVIDENCE AND REMEDIATION FOR REVIEW** in [#45](https://github.com/dhar174/Parallax-Relay-AI-Game/pull/45) and [#47](https://github.com/dhar174/Parallax-Relay-AI-Game/pull/47). Pillow 13.x passes; no blanket clearance. | Python and complete npm lock package checks are distinct from the 39 inlined-tool advisory candidates. Applicable bundled-code paths remain unresolved; required formal triage resources are unavailable. #24 stays open. |
+| Phase 4: #2 documentation/closure | **RECONCILED FOR REVIEW** in [#42](https://github.com/dhar174/Parallax-Relay-AI-Game/pull/42), preserving historical evidence. | Accepted merges and remaining live/audit gates still required. Remaining closure-gate issues stay open; #2 closes last. |
 
 ## Reconciliation checks
 
 Only current summaries in ROADMAP, REVIEW, EVALUATION and CHANGELOG are reconciled;
 original dated plans and verification receipts remain intact. No runtime code,
 provider calls, external issue updates, merges or deployments are part of this
-reconciliation. Readback and final diff inspection covered all five changed
-documents; 47 local links/anchors passed existence/heading checks using the shared
-locked Python interpreter. `git diff --check` passed. No runnable command changed,
-so runtime suites were not rerun for this documentation-only commit. Read-only
-`gh issue view`, `gh issue list` and `gh pr view` supplied the issue/merge receipts.
+reconciliation. The initial summary correction checked five documents and 47 local
+links/anchors. The final handoff checked all nine Markdown documents and 52 local
+paths/anchors, including the plan, prerequisites, integration receipt and proposed
+Q approval. Readback, final diff inspection and `git diff --check` passed. The
+proposed live command's parser was checked with `run --help`; no live invocation
+was performed. Runtime checks are recorded against the separate execution source,
+not attributed to these documentation commits. Read-only `gh issue view`,
+`gh issue list` and `gh pr view` supplied the issue/merge receipts.
