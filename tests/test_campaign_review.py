@@ -187,11 +187,11 @@ class CampaignReviewTests(unittest.IsolatedAsyncioTestCase):
     async def test_marker_is_rechecked_after_lock_acquisition(self):
         with tempfile.TemporaryDirectory() as temp:
             root=Path(temp)/'campaign';register(spec(),root)
-            original=Path.open
+            original=Path.mkdir
             def acquire(path,*args,**kwargs):
                 if path==root/'.runner.lock':(root/'started.json').write_text('{}',encoding='utf-8')
                 return original(path,*args,**kwargs)
-            with patch.object(Path,'open',acquire),patch('parallax_relay.campaign.execute_trial') as execute:
+            with patch.object(Path,'mkdir',acquire),patch('parallax_relay.campaign.execute_trial') as execute:
                 with self.assertRaises(CampaignError):await run_campaign(root,offline=True)
                 execute.assert_not_called()
             self.assertFalse((root/'.runner.lock').exists())
@@ -283,23 +283,21 @@ class CampaignReviewTests(unittest.IsolatedAsyncioTestCase):
                     self.assertFalse(report['cohort_eligible'])
                     self.assertEqual(report['completion_status'],'incomplete')
 
-    async def test_lock_write_failure_removes_owned_lock_and_broken_markers_block(self):
+    async def test_failed_initialization_removes_owned_lock_and_broken_markers_block(self):
         with tempfile.TemporaryDirectory() as temp:
-            root=Path(temp)/'campaign';register(spec(),root);original=Path.open
+            root=Path(temp)/'campaign';register(spec(),root)
             lock=root/'.runner.lock'
-            try:lock.symlink_to(root/'missing')
-            except OSError:lock.write_text('other worker',encoding='utf-8')
+            lock.mkdir();(lock/'owner').write_text('other worker',encoding='utf-8')
             with self.assertRaises(FileExistsError):await run_campaign(root,offline=True)
-            self.assertTrue(lock.is_symlink() or lock.exists());lock.unlink()
-            class BrokenWriter:
-                def __init__(self,handle):self.handle=handle
-                def __enter__(self):return self
-                def write(self,*args):raise OSError('SECRET_SENTINEL')
-                def __exit__(self,*args):self.handle.close()
-            def fail(path,*args,**kwargs):
-                handle=original(path,*args,**kwargs)
-                return BrokenWriter(handle) if path==root/'.runner.lock' else handle
-            with patch.object(Path,'open',fail),self.assertRaises(OSError):await run_campaign(root,offline=True)
+            self.assertEqual((lock/'owner').read_text(encoding='utf-8'),'other worker')
+            (lock/'owner').unlink();lock.rmdir()
+            for is_directory in (False,True):
+                try:lock.symlink_to(root/'missing',target_is_directory=is_directory)
+                except OSError:lock.write_text('other worker',encoding='utf-8')
+                with self.subTest(is_directory=is_directory),self.assertRaises(FileExistsError):await run_campaign(root,offline=True)
+                self.assertTrue(lock.is_symlink() or lock.exists());lock.unlink()
+            with patch('parallax_relay.campaign.atomic_json',side_effect=OSError('SECRET_SENTINEL')),self.assertRaises(OSError):
+                await run_campaign(root,offline=True)
             self.assertFalse((root/'.runner.lock').exists())
             for name in ('started.json','ledger.jsonl'):
                 marker=root/name

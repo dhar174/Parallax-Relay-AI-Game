@@ -61,15 +61,24 @@ formula detection covers Unicode whitespace; count summaries reject booleans;
 JSON temporary files are cleaned on failure and a missing owned lock does not
 mask another error. The controls re-review fixes are integrated from `972dc8c`.
 
+Windows CI additionally reproduced file open('x') following a broken lock symlink.
+Runner ownership now uses atomic directory creation, which rejects existing
+directory entries without following file symlinks. There is no separate lock-file
+write step; initialization failures still release ownership, existing legacy lock
+files still block new runners, and cleanup tolerates an already-missing directory.
+
 Regression mutations cover the remaining artifact/receipt/accounting issue codes,
 broken lock symlinks, invalid-key CLI preflight, cancellation inside client close,
 pilot validation branches, priced zero versus null totals, nested JSON CSV cells,
 atomic JSON failure and final-receipt rounding. Final full-suite and hosted
 receipts are recorded in the PR response for the submitted revision.
 
-Local final verification passed **337 tests on CPython 3.11.2** (58.387 seconds)
+Verification at `9e63970` passed **337 tests on CPython 3.11.2** (58.387 seconds)
 and **337 tests on CPython 3.12.14** (54.474 seconds). Node 24 passed **58 tests**
 with zero failures/skips. Both environments passed dependency consistency; Python
 compilation, workbench build/syntax, expected normal/fast mocks and whitespace
 checks passed. The old CSV implementation and fixed implementation were exercised
 on the same 3.11.2 interpreter/input, independently of the newer hosted matrix.
+After the atomic-directory lock correction, the full suite again passed 337 tests
+on 3.11.2 (56.854 seconds) and 3.12.14 (53.771 seconds). Contention coverage includes
+an existing directory owner and dangling file/directory symlinks.

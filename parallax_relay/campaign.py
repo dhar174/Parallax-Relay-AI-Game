@@ -270,17 +270,16 @@ async def run_campaign(root: Path, *, offline: bool = False, live: bool = False,
     if spec.stage != 'diagnostic' and not matches:
         raise CampaignError('Frozen source/environment/inputs changed; register a new cohort')
     lock = root / '.runner.lock'
-    # Exclusive creation also rejects broken symlinks and simultaneous workers.
+    # Atomic directory creation rejects every existing directory entry, including
+    # broken symlinks on Windows (where file open('x') can follow their target).
     ledger = Ledger(root)
     stop = 'completed'
     calls_used, dollars_used = 0, Decimal(0)
     last_launch = None
     active_block = None
     block_calls, block_dollars = 0, Decimal(0)
-    handle=lock.open('x', encoding='utf-8')
+    lock.mkdir()
     try:
-        with handle:
-            handle.write('exclusive campaign runner\n')
         if any(path.exists() or path.is_symlink() for path in (root/'started.json',root/'ledger.jsonl')):
             raise CampaignError('Campaign already attempted; analyze it without relaunching')
         atomic_json(root / 'started.json', {'registration_sha256': registration['sha256'], 'at': now()})
@@ -359,7 +358,10 @@ async def run_campaign(root: Path, *, offline: bool = False, live: bool = False,
                     accounted_estimated_usd=dollars_used)
         raise
     finally:
-        lock.unlink(missing_ok=True)
+        try:
+            lock.rmdir()
+        except FileNotFoundError:
+            pass
 
 
 def main(argv: list[str] | None = None) -> int:

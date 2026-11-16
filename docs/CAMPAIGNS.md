@@ -108,9 +108,10 @@ remains separate. Cleanup failure after engine victory is an operational failure
 Cancellation drains cooperative role tasks and attempts bounded client cleanup;
 cleanup failure remains recorded separately and does not relabel cancellation.
 
-Exclusive creation of `.runner.lock` prevents concurrent workers. Marker checks
-run inside the owned lock, include broken symlinks, and lock write/close failures
-release that lock. `started.json`
+Atomic creation of the `.runner.lock` directory prevents concurrent workers and
+rejects existing file/directory/symlink entries, including broken symlinks on
+Windows. Marker checks run inside the owned lock; initialization failures release
+that lock. Existing legacy lock files still block admission. `started.json`
 and the ledger prevent automatic reruns even after a crash. There is no v1 resume
 command. Analyze the existing directory; use new IDs/registration and explicit
 rerun linkage for an operational recheck. Never delete a marker to resume a cohort.
