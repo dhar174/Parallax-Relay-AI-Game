@@ -286,7 +286,7 @@ even if empty. Keep the files together when copying a replay.
 
 | File | Contents |
 |---|---|
-| `manifest.json` | Schema 2; mode, assignments, settings, room, privacy notice, plus independently versioned provenance; mock runs retain requested settings |
+| `manifest.json` | Schema 3; mode, assignments, settings, room, privacy notice, plus independently versioned provenance; mock runs retain requested settings |
 | `calls.jsonl` | Attempt statuses, latency, usage, sanitized HTTP metadata |
 | `phases.jsonl` | Completed message batches and sealed commitments after each barrier |
 | `replay.jsonl` | Fully resolved turns, observations, private notes, and world snapshots |
@@ -395,3 +395,14 @@ campaigns. Follow the [campaign guide](CAMPAIGNS.md) for the offline quickstart,
 JSON specification, fresh paths, per-match/campaign limits, one-shot execution,
 interruption handling and report semantics. Registration and analysis are offline;
 new live campaigns require separate explicit authorization and bounded limits.
+
+## Development room selection
+
+`python -m parallax_relay.play --list-rooms` lists all nine IDs with family/split
+metadata without credentials. Select a development room with `--room dev_01` or
+`[match] room_id = "dev_01"`; the default remains `split_span`. Held-out execution
+requires a protocol-2 registered confirmation through the [campaign CLI](CAMPAIGNS.md).
+Single-match `--mock`, `--live` and `--check` reject held-out selection before output
+or credential loading. The workbench selector lists development rooms only.
+New records use native/provenance/request version 3 and embed the actual room
+definition; archived version-2 runs remain importable. See [catalog details](ROOMS.md).

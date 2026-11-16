@@ -1,6 +1,6 @@
 # Cooperative-game evaluation protocol
 
-Protocol version **1**, November 14, 2026. This is a prospective specification for
+Current protocol **2**, November 16, 2026; protocol-1 historical semantics are retained. This is a prospective specification for
 #17, not benchmark results or authorization to spend money. It defines requirements
 for controls (#18), the campaign runner/analysis (#19), and held-out rooms (#20).
 Slice 8 controls implement all five arms, WAIT and uniform-v1 alongside the scripted
@@ -378,3 +378,33 @@ requirements above continue to apply where their original wording anticipated
 future implementation. Delivery is verified offline using scripted/intercepted
 agents; no model campaign, held-out evaluation or benchmark claim is established.
 Parent #9 remains open for #20 and its reporting gates.
+
+## Protocol-2 curated room extension
+
+[Catalog v1](ROOMS.md) fixes three development crossing rooms and six held-out
+retrieval/return or two-bridge rooms. Diagnostics/tuning use development rooms;
+pilots include all three. Confirmations include all six held-out rooms and must
+link a complete eligible development pilot. Do not use held-out observations to
+tune a treatment and then label the resulting confirmation as independent.
+
+The five arms, private goals, scoring weights, per-assignment repetitions,
+reservation/accounting rules and per-room contrast method above remain unchanged.
+Retrieval/return rooms explicitly require shard recovery for shared victory.
+The original fixed script remains unchanged and fails all six held-out missions;
+separate host-only certificates prove every room's solvability and private goals.
+
+Freeze catalog definitions/membership/certificate hashes, source, environment,
+prompt/schema contracts, roster/prices, policies and common match settings across
+the transition. Stage, selected split, repetitions, campaign exposure ceilings and
+scheduler seed may change. Any other change requires a new development pilot.
+Pilot data are never pooled into confirmation. Baseline schedules contain 105
+pilot and 960 confirmatory trials; model permutations add trials per room.
+
+Report room/family/split labels and descriptive family/split totals, retaining
+per-room statistics and all planned denominators. Curated rooms are not random
+independent draws from a task population: do not pool them into a generalization
+confidence interval. This infrastructure and offline proof suite establish no
+model-performance, difficulty, visual-ability or communication-benefit claim.
+Historical protocol-1 inputs remain Split Span-only with original counts; old
+registration version 1 can be analyzed but requires fresh registration to execute
+current code. See [campaign contracts](CAMPAIGNS.md).

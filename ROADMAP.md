@@ -114,9 +114,11 @@ Publish no claim of causal communication benefit without a controlled comparison
 
 ## 4. Meaningful cooperative challenges
 
-**Status:** proposed. Depends on the evaluation protocol.
+**Status:** issue #20 implementation adds nine curated rooms and enforced
+development/held-out workflow; empirical comparison remains gated by eligible
+campaigns. See [catalog](docs/ROOMS.md).
 
-Introduce explicit room definitions and variants whose hidden facts, resource
+Implemented explicit room definitions and variants whose hidden facts, resource
 choices, or compatible/competing objectives require different plans (R07). Preserve
 engine authority and role-specific observations. Separate development rooms from
 held-out evaluation rooms and retain a solvability oracle or scripted baseline for

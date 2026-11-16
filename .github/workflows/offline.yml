@@ -90,6 +90,8 @@ jobs:
         run: python -m compileall -q parallax_relay tests scripts site
       - name: Check normal and fast mock outcomes
         run: python scripts/check_mock_runs.py
+      - name: Verify curated room solvability certificates
+        run: python scripts/check_rooms.py
       - name: Set up Node for workbench regression tests
         if: matrix.os == 'ubuntu-24.04' && matrix.python == '3.12' && matrix.dependencies == 'locked'
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6

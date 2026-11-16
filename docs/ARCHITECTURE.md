@@ -142,10 +142,11 @@ A new provider should preserve the common contract, explicit usage/refusal statu
 bounded attempts, and sanitized failures; verify its wire format independently of
 its mock tests. A model or provider swap does not require an engine change.
 
-Adding a room or role is larger work: role names, world constants, prompts,
-schemas, renderer, configuration checks, fixtures, and viewer are currently coupled
-to three roles and one room. No level-loading interface exists yet. Add those
-capabilities only through a separately scoped design and the [roadmap](../ROADMAP.md).
+The finite [room catalog](ROOMS.md) supplies immutable geometry/resources to one
+shared resolver and renderer. Canonical heat/bridge/cell maps support independent
+controllers. Host-only certificates prove all rooms without entering participant
+construction. The roster remains fixed at three roles. New families, generation
+or extra roles require a separately scoped design and [roadmap](../ROADMAP.md) review.
 
 There is no package-install or console-script interface. Run modules from the
 checkout root. The legacy demo CLI returns an exit status and uses a unique default output path;
@@ -162,3 +163,11 @@ Whole-block campaign admission encloses existing whole-phase match reservations.
 Per-attempt settlement evidence reconciles known usage prices and retained quotes.
 Engine diagnostics are spectator-only and never become a policy legality oracle.
 See [campaigns](CAMPAIGNS.md) for the one-shot ownership and recovery limits.
+
+## Room execution boundary
+
+Single-match CLI/programmatic runs accept development rooms. Held-out runs require
+a `RoomExecutionPermit` bound to a validated protocol-2 confirmation/trial and the
+current frozen catalog/inputs. Campaign checks precede client/output construction
+and repeat before each launch. Pure engine/certificate APIs remain trusted host
+functions. See [rooms](ROOMS.md) and [campaigns](CAMPAIGNS.md).

@@ -1018,3 +1018,8 @@ new symlink cases because `readlink()` supplies a `\\?\` extended-path prefix.
 Those tests now snapshot the original link target before invoking the launcher
 and require exact equality afterward, alongside untouched-target checks. This
 verifies preservation without assuming the operating system's path spelling.
+
+## Curated rooms and split-aware campaigns — November 16, 2026
+
+See the [issue #20 verification record](verification/2026-11-16-issue20.md) for
+room proofs, schema compatibility, campaign gates, offline checks and limitations.

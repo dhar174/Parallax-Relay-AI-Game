@@ -1,6 +1,6 @@
 # Parallax Relay workbench
 
-The [private workbench](https://parallax-relay-lab.dhar174.chatgpt.site) is the browser interface for the Split Span experiment. Build it from the same checkout as the engine so that its configuration form, offline runner and replay viewer track repository changes. There are three active roles in Milestone 2. See [the player protocol](PROTOCOL.md) and [the running guide](RUNNING.md) for the game and CLI contracts.
+The [private workbench](https://parallax-relay-lab.dhar174.chatgpt.site) is the browser interface for development-room experiments. Build it from the same checkout as the engine so that its configuration form, offline runner and replay viewer track repository changes. There are three active roles in Milestone 2. See [the player protocol](PROTOCOL.md) and [the running guide](RUNNING.md) for the game and CLI contracts.
 
 ## Build and run locally
 
@@ -17,7 +17,7 @@ The build regenerates the ignored `build/workbench/dist/` directory. It contains
 
 Generated runs use temporary storage. Download **Export complete JSON** from Evaluation to keep the record, including images. To keep the native files separately, export the workbench TOML and invoke the CLI as described in the running guide. Import its output folder with **Evaluation → Import run folder**.
 
-Imports require well-formed schema-version-2 records. Invalid fields are reported before replacing the selected run, so its evaluation and exported data remain available after a rejected import. Empty logs, incomplete runs, missing optional images and additional metadata such as provenance remain supported. Folder imports preserve `final_spectator.png` along with turn images and reject duplicate accepted image filenames. PNG bytes are signature-checked and encoded independently of browser MIME metadata. File selections reset after each attempt so a corrected file can be selected again. The latest load intent wins, and background completions do not replace an active configuration form. Programmatic and unknown-mode records can omit the room label; exports retain their original metadata. The final image is retained in exports; the current workbench does not display a separate final-state view.
+Imports accept well-formed native schema-version-2 and version-3 records. Version 3 validates recorded room geometry and snapshot references before replacing the current run. Invalid fields are reported before replacing the selected run, so its evaluation and exported data remain available after a rejected import. Empty logs, incomplete runs, missing optional images and additional metadata such as provenance remain supported. Folder imports preserve `final_spectator.png` along with turn images and reject duplicate accepted image filenames. PNG bytes are signature-checked and encoded independently of browser MIME metadata. File selections reset after each attempt so a corrected file can be selected again. The latest load intent wins, and background completions do not replace an active configuration form. Programmatic and unknown-mode records can omit the room label; exports retain their original metadata. The final image is retained in exports; the current workbench does not display a separate final-state view.
 
 ## Focused frontend verification
 
@@ -46,7 +46,7 @@ No npm packages are needed. The Node tests execute the production modules and im
 | [site/web/](../site/web/) | Static UI, form checks, native run import | Copy, layout, accessibility and controls |
 | [site/build_workbench.py](../site/build_workbench.py) and [site/relay_workbench.py](../site/relay_workbench.py) | Build artifacts and loopback adapter | Packaging and integration against the actual CLI |
 
-The builder derives the Pydantic schema, TOML defaults and private goals directly from Python. Form hints, phase summaries and role-specific UI still need review when game semantics change. The fixed roster and player observations come from the engine. A total-token cap, arbitrary rooms, uploaded observations and extra players are beyond the current runtime contract.
+The builder derives the Pydantic schema, TOML defaults and private goals directly from Python. Form hints, phase summaries and role-specific UI still need review when game semantics change. The fixed roster and player observations come from the engine. A total-token cap, generated rooms, uploaded observations and extra players are beyond the current runtime contract.
 
 The loopback server handles connections on separate daemon threads with a 10-second socket timeout. It admits one offline execution at a time; a concurrent run receives HTTP 409. Host/Origin/token checks and strict request lengths apply before execution. The HTML responses deny framing.
 
@@ -104,3 +104,13 @@ Campaign registration/execution/analysis are CLI operations, not browser actions
 New native records display known-usage-priced and retained unknown-usage estimates
 separately when present. Unpriced amounts remain unavailable. Imported historical
 records without the optional split remain readable and round-trip unchanged.
+
+## Curated rooms
+
+The configuration contract includes metadata-only room IDs, versions, families
+and splits. The room selector/export/companion allow development rooms; smoke
+limits preserve the selected room and invalidate prior live approval. The named
+live-smoke preset resets to Split Span and retains its historical profile hash.
+Held-out execution is available only through registered protocol-2 confirmation,
+not the browser. New native imports preserve the embedded spectator definition;
+legacy imports retain their original shape. See [rooms](ROOMS.md).
