@@ -12,7 +12,7 @@ sys.path.insert(0, str(ROOT / 'site'))
 from parallax_relay.agents import ScriptedAgent
 from parallax_relay.config import MatchSettings
 from parallax_relay.orchestrator import MatchExecutionError, run_match
-from parallax_relay.protocol import ROLES
+from parallax_relay.protocol import ModelReply, ROLES, Usage
 from parallax_relay.recording import Recorder
 from run_records import read_run
 
@@ -35,10 +35,23 @@ async def main(destination):
                            ('later-partial', {'max_calls': 19}),
                            ('zero-turn-partial', {'max_calls': 10}),
                            ('zero-call', {'max_calls': 1}),
-                           ('local-error', {}), ('cancelled', {})]:
+                           ('local-error', {}), ('cancelled', {}),
+                           ('retry-shape', {'max_turns': 2, 'retry_delay_seconds': 0}),
+                           ('commit-unresolved', {'max_turns': 1})]:
         out = destination / name
         recorder = Recorder(out, {'mode': 'mock'})
         agents = {role: ScriptedAgent(role) for role in ROLES}
+        if name == 'retry-shape':
+            class RetryShape(ScriptedAgent):
+                failed_shape = False
+
+                async def respond(self, request):
+                    if self.role == 'SPECTRA' and request.turn == 0 and request.phase == 'broadcast' and not self.failed_shape:
+                        self.failed_shape = True
+                        return ModelReply('invalid JSON fixture', Usage(0, 0))
+                    return await super().respond(request)
+
+            agents = {role: RetryShape(role) for role in ROLES}
         if name == 'cancelled':
             started = asyncio.Event()
             class Slow(ScriptedAgent):
@@ -54,15 +67,26 @@ async def main(destination):
                 pass
         else:
             try:
-                if name == 'local-error':
+                if name == 'commit-unresolved':
+                    with patch('parallax_relay.orchestrator.resolve_turn', side_effect=RuntimeError('synthetic browser fixture resolution failure')):
+                        await run_match(agents, MatchSettings(**settings), recorder=recorder)
+                elif name == 'local-error':
                     with patch.object(recorder, 'phase', side_effect=OSError('synthetic browser fixture write failure')):
                         await run_match(agents, recorder=recorder)
                 else:
                     await run_match(agents, MatchSettings(**settings), recorder=recorder)
             except MatchExecutionError:
-                if name != 'local-error':
+                if name not in ('local-error', 'commit-unresolved'):
                     raise
         data = read_run(out)
+        if name == 'commit-unresolved':
+            assert data['replay'] == [] and data['final_state']['turn'] == 0
+            assert len(data['calls']) == 9 and len(data['phases']) == 3
+            assert set(data['phases'][-1]['sealed_actions']) == set(ROLES)
+        if name == 'retry-shape':
+            retry = [row for row in data['calls'] if row['role'] == 'SPECTRA' and row['turn'] == 0 and row['phase'] == 'broadcast']
+            assert [(row['attempt'], row['status']) for row in retry] == [(1, 'invalid_json_schema'), (2, 'ok')]
+            assert data['phases'][0]['statuses']['SPECTRA'] == 'ok'
         (out / 'native.json').write_text(json.dumps(data), encoding='utf-8')
         inventory[name] = {'turns': data['result']['turns'], 'calls': len(data['calls']),
                            'phases': len(data['phases']), 'stop_reason': data['result']['stop_reason']}

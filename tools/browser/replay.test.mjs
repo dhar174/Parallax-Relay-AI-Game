@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { selectedDiagnostics, assertFrameDiagnostics, rotateDiagnosticRounds, assertFinalImage } from './diagnostics.mjs';
 import { before, after, test } from 'node:test';
 import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -13,7 +14,8 @@ const cases = [
   ['win', 'victory', 7, 63, 21], ['turn-limit', 'turn_limit', 1, 9, 3],
   ['later-partial', 'call_budget', 1, 15, 5], ['zero-turn-partial', 'call_budget', 0, 6, 2],
   ['zero-call', 'call_budget', 0, 0, 0], ['local-error', 'local_error', 0, 3, 1],
-  ['cancelled', 'cancelled', 0, 3, 0],
+  ['cancelled', 'cancelled', 0, 3, 0], ['retry-shape', 'turn_limit', 2, 19, 6],
+  ['commit-unresolved', 'internal_error', 0, 9, 3],
 ];
 
 for (const [name, stop, turns, calls, phases] of cases) {
@@ -32,8 +34,7 @@ for (const [name, stop, turns, calls, phases] of cases) {
     await finalFrame(page);
     assert.match(await page.locator('#roundLabel').textContent(), /final/i);
     assert.deepEqual(JSON.parse(await page.locator('#finalState').textContent()), data.final_state);
-    assert.match(await page.locator('#SPECTATOR').getAttribute('src'), /final_spectator\.png$/);
-    assert.ok(await page.locator('#SPECTATOR').evaluate(async image => {await image.decode(); return image.naturalWidth > 0;}));
+    await assertFinalImage(page, new URL('final_spectator.png', viewerURL(environment, name)).href);
     // Every recorded call/phase is available when its actual frame is selected.
     let shownCalls = 0, shownPhases = 0;
     const callText = [], phaseText = [];
@@ -41,13 +42,21 @@ for (const [name, stop, turns, calls, phases] of cases) {
       await page.locator('#round').fill(String(index));
       await page.locator('#round').dispatchEvent('input');
       await settleImages(page);
+      const frame = await selectedDiagnostics(page);
+      assertFrameDiagnostics(data, frame);
       callText.push(...await page.locator('#diagnostics .entry').allTextContents());
       phaseText.push(...await page.locator('#phases .entry').allTextContents());
       shownCalls += await page.locator('#diagnostics .entry').count();
       shownPhases += await page.locator('#phases .entry').count();
-      if (index >= turns) {
-        assert.equal(await page.locator('#actions .entry').count(), 0, 'Partial phase has no invented actions');
+      if (!resolved.has(frame.turn)) {
+        const commitments = data.phases.filter(row => row.turn === frame.turn && row.phase === 'commit')
+          .flatMap(row => Object.entries(row.sealed_actions ?? {}));
+        const actionRows = await page.locator('#actions .entry').allTextContents();
+        assert.equal(actionRows.length, commitments.length, 'Partial phase shows only actual completed commitments');
+        for (const [role, action] of commitments) assert.ok(actionRows.some(text => text.startsWith(role + ':') && text.includes(JSON.stringify(action))));
+        if (commitments.length) assert.match(await page.locator('#actions').textContent(), /not applied \(round unresolved\)/);
         assert.equal(await page.locator('#events .entry').count(), 0, 'Partial phase has no invented engine events');
+        assert.equal(await page.locator('#private .entry').count(), 0, 'Partial phase has no invented HUD or private-note rows');
       }
     }
     assert.equal(shownCalls, calls, 'Each native attempt must remain visible exactly once');
@@ -207,7 +216,7 @@ test('current file viewer reads actual legacy v2 final artifacts', async t => {
   await page.goto(viewerURL(environment, 'legacy-v2'));
   await finalFrame(page);
   assert.deepEqual(JSON.parse(await page.locator('#finalState').textContent()), data.final_state);
-  assert.ok(await page.locator('#SPECTATOR').evaluate(async image => {await image.decode(); return image.naturalWidth > 0;}));
+  await assertFinalImage(page, new URL('final_spectator.png', viewerURL(environment, 'legacy-v2')).href);
 });
 
 
@@ -228,7 +237,9 @@ for (const name of ['missing-replay', 'missing-middle-replay']) {
       await page.locator('#round').dispatchEvent('input');
       await settleImages(page);
       const label = await page.locator('#roundLabel').textContent();
-      const selectedTurn = Number(label.match(/^Round (\d+)/)?.[1]) - 1;
+      const frame = await selectedDiagnostics(page);
+      assertFrameDiagnostics(data, frame);
+      const selectedTurn = frame.turn;
       if (orphan.includes(selectedTurn)) {
         assert.match(label, /resolved round record unavailable/);
         assert.doesNotMatch(label, /unfinished|unresolved|unknown/i);
@@ -242,7 +253,7 @@ for (const name of ['missing-replay', 'missing-middle-replay']) {
     assert.equal(shownPhases, 21);
     await finalFrame(page);
     assert.deepEqual(JSON.parse(await page.locator('#finalState').textContent()), data.final_state);
-    assert.ok(await page.locator('#SPECTATOR').evaluate(async image => {await image.decode(); return image.naturalWidth > 0;}));
+    await assertFinalImage(page, new URL('final_spectator.png', viewerURL(environment, name)).href);
     const server = await companion();
     t.after(() => server.close());
     const workbench = await pageFor(t, environment, {origin: server.origin});
@@ -261,3 +272,67 @@ for (const name of ['missing-replay', 'missing-middle-replay']) {
     assert.deepEqual(JSON.parse(await workbench.locator('#final-state pre').textContent()), data.final_state);
   });
 }
+
+
+test('per-frame checks reject a rotating call and phase mutant accepted by aggregate checks', async t => {
+  const data = await native(environment, 'win');
+  const page = await pageFor(t, environment);
+  await page.goto(viewerURL(environment, 'win'));
+  await rotateDiagnosticRounds(page, data.result.turns);
+  const frames = [];
+  for (let index = 0; index < data.result.turns; index++) {
+    await page.locator('#round').fill(String(index));
+    await page.locator('#round').dispatchEvent('input');
+    await settleImages(page);
+    frames.push(await selectedDiagnostics(page));
+  }
+  // These are the former aggregate assertions: every original row still appears once.
+  const calls = frames.flatMap(frame => frame.calls), phases = frames.flatMap(frame => frame.phases);
+  assert.equal(calls.length, 63);
+  assert.equal(phases.length, 21);
+  for (const call of data.calls) assert.ok(calls.some(row => JSON.stringify(row) === JSON.stringify(call)));
+  for (const phase of data.phases) assert.ok(phases.some(row => JSON.stringify(row) === JSON.stringify(phase)));
+  t.diagnostic('OLD aggregate assertions ACCEPT the rotated mutant: 63 calls and 21 phases retained');
+  for (const frame of frames) {
+    assert.throws(() => assertFrameDiagnostics(data, frame), /Native calls for displayed turn/);
+    const callsCorrected = {...frame, calls: data.calls.filter(row => row.turn === frame.turn)};
+    assert.throws(() => assertFrameDiagnostics(data, callsCorrected), /Native phases for displayed turn/);
+  }
+  t.diagnostic('NEW per-frame assertions REJECT all seven rotated call groups and all seven rotated phase groups');
+});
+
+
+test('native shape-error retry retains attempts one and two in their actual round and phase', async t => {
+  const data = await native(environment, 'retry-shape');
+  const attempts = data.calls.filter(row => row.role === 'SPECTRA' && row.turn === 0 && row.phase === 'broadcast');
+  assert.deepEqual(attempts.map(row => [row.attempt, row.status]), [[1, 'invalid_json_schema'], [2, 'ok']]);
+  assert.equal(data.calls.length, 19);
+  assert.equal(data.phases.length, 6);
+  assert.equal(data.phases.find(row => row.turn === 0 && row.phase === 'broadcast').statuses.SPECTRA, 'ok');
+  const page = await pageFor(t, environment);
+  await page.goto(viewerURL(environment, 'retry-shape'));
+  const first = await selectedDiagnostics(page);
+  assert.equal(first.turn, 0);
+  assertFrameDiagnostics(data, first);
+  assert.deepEqual(first.calls.filter(row => row.role === 'SPECTRA' && row.phase === 'broadcast'), attempts);
+  await page.locator('#next').click();
+  await settleImages(page);
+  const second = await selectedDiagnostics(page);
+  assert.equal(second.turn, 1);
+  assertFrameDiagnostics(data, second);
+  assert.equal(second.calls.some(row => row.attempt === 2), false);
+});
+
+
+test('exact final PNG URL rejects a pre-action image disguised with a final-image query', async t => {
+  const page = await pageFor(t, environment);
+  await page.goto(viewerURL(environment, 'win'));
+  await finalFrame(page);
+  await page.locator('#SPECTATOR').evaluate(image => {image.src = 'turn_00_spectator.png?final_spectator.png';});
+  // Both former checks pass even though the rendered bytes are from turn zero.
+  assert.match(await page.locator('#SPECTATOR').getAttribute('src'), /final_spectator\.png$/);
+  assert.ok(await page.locator('#SPECTATOR').evaluate(async image => {await image.decode(); return image.naturalWidth > 0;}));
+  t.diagnostic('OLD suffix plus PNG-decode assertions ACCEPT the wrong pre-action PNG');
+  await assert.rejects(() => assertFinalImage(page, new URL('final_spectator.png', viewerURL(environment, 'win')).href), /Final spectator URL must equal/);
+  t.diagnostic('NEW exact final-artifact URL assertion REJECTS the wrong pre-action PNG');
+});
