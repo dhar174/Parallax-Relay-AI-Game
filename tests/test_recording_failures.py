@@ -121,6 +121,9 @@ class RecordingFailureTests(unittest.IsolatedAsyncioTestCase):
                     self.assertEqual(json.loads((out / 'result.json').read_text(encoding='utf-8')), error.result.summary())
                     data = json.loads((out / 'index.html').read_text(encoding='utf-8').split('const DATA=', 1)[1].split(';\nconst $=', 1)[0])
                     self.assertEqual(data['records'], error.result.records)
+                    self.assertEqual(data.get('phases'), error.result.phases)
+                    self.assertEqual(data['calls'], error.result.calls)
+                    self.assertEqual(data.get('final_state'), error.result.world.snapshot())
                     self.assertEqual(data['result'], error.result.summary())
                     import traceback
                     self.assertNotIn('SECRET_SENTINEL', ''.join(traceback.format_exception(error)))

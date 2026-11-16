@@ -96,6 +96,104 @@ test('actual replay script labels policies and historical v1 conditions truthful
   }
 });
 
+// Exercise the standalone script and its navigation handlers with a minimal DOM.
+async function standaloneReplay(data){
+ const template=await readFile(join(root,'parallax_relay/replay_template.html'),'utf8');
+ class Element{
+  constructor(){this.value='0';this.children=[];this.listeners={};this.hidden=false;this._text='';this.panel={hidden:false};}
+  set textContent(value){this._text=String(value);this.children=[];}
+  get textContent(){return this._text+this.children.map(child=>child.textContent).join('');}
+  append(...children){this.children.push(...children);}
+  replaceChildren(...children){this._text='';this.children=children;}
+  addEventListener(name,handler){this.listeners[name]=handler;}
+  closest(){return this.panel;}
+  removeAttribute(name){delete this[name];}
+ }
+ const nodes=new Map(),node=id=>{if(!nodes.has(id))nodes.set(id,new Element());return nodes.get(id);};
+ const document={getElementById:node,createElement:()=>new Element(),createTextNode:text=>{const el=new Element();el.textContent=text;return el;}};
+ const script=template.match(/<script>([\s\S]*?)<\/script>/)[1].replace('__REPLAY_DATA__',JSON.stringify(data));
+ runInNewContext(script,{document});
+ return {node,next(){node('next').listeners.click();},prev(){node('prev').listeners.click();}};
+}
+
+test('standalone replay navigates before-action, unfinished and final states without applying commitments',async()=>{
+ const record=structuredClone(fixture.replay[0]);
+ record.observations.SPECTRA.image='https://invalid.example/tracker.png';
+ const data={manifest:fixture.manifest,result:{...fixture.result,stop_reason:'local_error'},records:[record],
+  calls:[{turn:0,role:'SPECTRA',phase:'broadcast',attempt:1,status:'ok'},
+         {turn:1,role:'PYRA',phase:'commit',attempt:1,status:'timeout'},
+         {turn:1,role:'PYRA',phase:'commit',attempt:2,status:'ok'}],
+  phases:[{turn:1,phase:'commit',statuses:{PYRA:'ok'},sealed_actions:{PYRA:{kind:'VENT',direction:0,steps:0}}}],
+  final_state:{turn:1,energy:4,events:['final checkpoint']}};
+ const app=await standaloneReplay(data),n=app.node;
+ assert.match(n('roundLabel').textContent,/Round 1.*before actions/i);
+ assert.equal(n('SPECTRA').src,'turn_00_spectra.png');
+ assert.match(n('events').textContent,/vented motor/);
+ assert.match(n('outcome').textContent,/Victory/i);
+ assert.match(n('stopReason').textContent,/local error/i);
+ assert.match(n('diagnostics').textContent,/attempt 1/);
+ app.next();
+ assert.match(n('roundLabel').textContent,/Round 2.*unfinished.*before actions/i);
+ assert.equal(n('SPECTATOR').src,'turn_01_spectator.png');
+ assert.match(n('phases').textContent,/commit/);
+ assert.match(n('actions').textContent,/VENT/);
+ assert.match(n('actions').textContent,/not (?:applied|resolved)/i);
+ assert.doesNotMatch(n('events').textContent,/vented motor/);
+ assert.match(n('diagnostics').textContent,/attempt 1/);
+ assert.match(n('diagnostics').textContent,/attempt 2/);
+ assert.doesNotMatch(n('private').textContent,/Next plan index|your_private_goal/);
+ app.next();
+ assert.match(n('roundLabel').textContent,/Final.*last resolved/i);
+ assert.equal(n('SPECTATOR').src,'final_spectator.png');
+ assert.match(n('finalState').textContent,/final checkpoint/);
+ assert.match(n('private').textContent,/100/);
+ assert.equal(n('next').disabled,true);
+ app.prev();assert.match(n('roundLabel').textContent,/Round 2/);
+});
+
+test('standalone zero-turn replay shows only evidence actually present and keeps final state available',async()=>{
+ const result={...fixture.result,win:false,loss:false,completed:false,scores:null,turns:0,stop_reason:'call_budget'};
+ const app=await standaloneReplay({manifest:fixture.manifest,result,records:[],calls:[],phases:[],final_state:{turn:0,energy:6}}),n=app.node;
+ assert.equal(Number(n('round').max),0);
+ assert.match(n('roundLabel').textContent,/Final.*last resolved/i);
+ assert.equal(n('SPECTATOR').src,'final_spectator.png');
+ assert.match(n('finalState').textContent,/"turn": 0/);
+ assert.doesNotMatch(n('actions').textContent,/WAIT|MOVE|VENT/);
+ assert.doesNotMatch(n('private').textContent,/score: 0|notes: \[Empty\]/i);
+ assert.match(n('outcome').textContent,/Incomplete/i);
+});
+
+test('standalone tolerates omitted optional fields and unavailable image files',async()=>{
+ const record={turn:1};
+ const app=await standaloneReplay({manifest:fixture.manifest,result:{stop_reason:'turn_limit',turns:1},records:[record],calls:[]}),n=app.node;
+ assert.match(n('roundLabel').textContent,/Round 1/);
+ assert.match(n('private').textContent,/unavailable/i);
+ assert.match(n('actions').textContent,/unavailable/i);
+ n('SPECTRA').onerror();
+ assert.equal(n('SPECTRA').src,undefined);
+ app.next();
+ assert.match(n('finalState').textContent,/unavailable/i);
+});
+
+test('workbench inspects final checkpoint and actual unfinished phases while retaining ungrouped records',async t=>{
+ const app=await workbench(t),data=structuredClone(fixture);
+ data.replay=data.replay.slice(0,1);
+ data.calls=[{turn:1,role:'PYRA',phase:'commit',attempt:1,status:'timeout'},
+             {turn:1,role:'PYRA',phase:'commit',attempt:2,status:'ok'}];
+ data.phases=[{turn:1,phase:'commit',sealed_actions:{PYRA:{kind:'VENT'}}},{unknown:'<unsafe>'},{}];
+ data.result.stop_reason='local_error';
+ await app.importJSON(data);
+ const panel=app.node('panel').innerHTML;
+ assert.match(panel,/id="final-state"/);
+ assert.match(panel,/id="final-spectator"[^>]+src="data:image\/png;base64,/);
+ assert.match(panel,/id="partial-rounds"[\s\S]*Round 2[\s\S]*commit/i);
+ assert.match(panel,/not (?:applied|resolved)/i);
+ assert.match(panel,/attempt[\s\S]*1[\s\S]*attempt[\s\S]*2/i);
+ assert.match(panel,/id="ungrouped-phases"[\s\S]*&lt;unsafe&gt;/);
+ assert.match(panel,/Victory[\s\S]*Stop reason: local_error/);
+ assert.deepEqual(await app.exportJSON(),data);
+});
+
 test('additive settlement split is validated and retained on export', async t => {
   const app = await workbench(t);
   const data = structuredClone(fixture);
@@ -558,7 +656,7 @@ test('empty MIME metadata keeps observations visible and corrupt PNGs are reject
   const files = await nativeFiles(join(root, 'example_run'));
   assert(files.filter(file => file.name.endsWith('.png')).every(file => file.type === ''));
   await app.select('directory', files);
-  assert.equal((app.node('panel').innerHTML.match(/<img /g) || []).length, 21);
+  assert.equal((app.node('panel').innerHTML.match(/<img /g) || []).length, 22);
   const previous = await app.exportJSON();
   const invalid = files.filter(file => file.name !== 'final_spectator.png');
   invalid.push(new File(['invalid PNG'], 'final_spectator.png', { type: 'image/png' }));

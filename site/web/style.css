@@ -5,3 +5,4 @@
 header{gap:12px}
 button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible,a:focus-visible{outline:2px solid var(--blue);outline-offset:3px}
 #status.warn{color:#fbd48e}
+#final-spectator{display:block;width:100%;height:auto;max-height:none}
