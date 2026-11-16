@@ -36,6 +36,11 @@ class CampaignPreparationTests(unittest.TestCase):
                 self.assertEqual(spec['campaign_max_calls'], calls)
                 self.assertEqual(row['assignments'], 3)
                 self.assertEqual(spec['campaign_max_estimated_cost_usd'], models * spec['match']['max_estimated_cost_usd'])
+                self.assertEqual(spec['match']['max_estimated_cost_usd'],
+                                 0.65 if stage == 'qualification' else 9.85)
+                self.assertEqual(spec['campaign_max_estimated_cost_usd'],
+                                 {'qualification': 9.75, 'pilot': 2216.25, 'confirmatory': 26595.0}[stage])
+                self.assertEqual(spec['roster'][0]['pricing']['input_per_million'], 0.1)
             self.assertFalse((bundle / 'registration.json').exists())
             self.assertFalse((bundle / 'ledger.jsonl').exists())
 
@@ -53,6 +58,63 @@ class CampaignPreparationTests(unittest.TestCase):
             result = self.command('check', '--bundle', bundle)
             self.assertNotEqual(result.returncode, 0)
 
+    def test_checker_rejects_json_numeric_type_drift_in_specs_and_receipt(self):
+        # Python equality conflates 2/2.0 and 1/True; registration and hashes do not.
+        from scripts import prepare_campaign as prep
+        with tempfile.TemporaryDirectory() as temp:
+            bundle = Path(temp) / 'candidate'
+            prep.write_bundle(bundle)
+            originals = {name: (bundle / name).read_text() for name in ('qualification.json', 'receipt.json')}
+            cases = [('qualification.json', ('match', 'max_turns'), 2.0),
+                     ('qualification.json', ('schema_version',), 2.0),
+                     ('qualification.json', ('repetitions',), True),
+                     ('receipt.json', ('schema_version',), True),
+                     ('receipt.json', ('stages', 'qualification', 'trials'), 15.0)]
+            for filename, keys, replacement in cases:
+                with self.subTest(filename=filename, keys=keys, replacement=replacement):
+                    data = json.loads(originals[filename])
+                    target = data
+                    for key in keys[:-1]:
+                        target = target[key]
+                    target[keys[-1]] = replacement
+                    (bundle / filename).write_text(json.dumps(data))
+                    with self.assertRaises(ValueError):
+                        prep.check_bundle(bundle)
+                    (bundle / filename).write_text(originals[filename])
+
+    def test_receipt_leaves_operational_approval_gates_unverified(self):
+        from scripts import prepare_campaign as prep
+        _, receipt = prep.build_bundle()
+        self.assertEqual(receipt.get('operational_planning'), {
+            'status': 'not_started', 'offline_diagnostic_evidence': 'not_started',
+            'time_projection': 'not_started', 'storage_projection': 'not_started',
+            'disk_free_check': 'not_started', 'provider_account_quota': 'unverified',
+            'planned_q_output_paths': 'not_started', 'exact_q_command': 'not_started',
+            'launch_checkpoint': 'not_started', 'heartbeat': 'not_started'})
+
+    def test_cache_write_scenario_prices_openai_input_without_changing_nominal_rates(self):
+        from decimal import Decimal
+        from scripts import prepare_campaign as prep
+        from parallax_relay.budget import Budget
+        from parallax_relay.config import MatchSettings
+        from parallax_relay.protocol import AgentRequest, Observation, Usage, ROLES
+        rate_builder = getattr(prep, 'quotation_rates', None)
+        self.assertTrue(callable(rate_builder), 'Missing explicit quotation-only pricing scenario')
+        _, _, roster = prep.load_inputs()
+        players = dict(zip(ROLES, roster))
+        for override, expected in ((None, Decimal('.0105')), (0.125, Decimal('.013'))):
+            with self.subTest(openai_input_rate=override):
+                rates = rate_builder(players, openai_input_rate=override)
+                budget = Budget(MatchSettings(), rates)
+                request = AgentRequest(Observation('SPECTRA', 0, '{}', b''), 'commit')
+                ticket = budget.reserve_phase({'SPECTRA': request})['SPECTRA']
+                ticket.start()
+                ticket.settle(Usage(100000, 1000))
+                ticket.release()
+                self.assertEqual(budget.spent, expected)
+                self.assertEqual(rates['FLUX'].input_per_million, 0.3)
+        self.assertEqual(players['SPECTRA']['pricing']['input_per_million'], 0.1)
+
     def test_worksheet_covers_unicode_history_and_complete_retry_phases(self):
         # Forgetting escaping, history, image reserve, or whole-phase retries
         # would understate the maximum retained local reservation exposure.
@@ -61,8 +123,8 @@ class CampaignPreparationTests(unittest.TestCase):
             result = self.command('prepare', '--out', bundle)
             self.assertEqual(result.returncode, 0, result.stderr)
             receipt = json.loads((bundle / 'receipt.json').read_text())
-            q = receipt['stages']['qualification']['worksheet']
-            p = receipt['stages']['pilot']['worksheet']
+            q = receipt['stages']['qualification']['nominal_configured_rate_scenario']['worksheet']
+            p = receipt['stages']['pilot']['nominal_configured_rate_scenario']['worksheet']
             self.assertGreater(q['maximum_request_input_quote_tokens'], 50000)
             self.assertGreater(p['maximum_request_input_quote_tokens'], q['maximum_request_input_quote_tokens'])
             self.assertLess(p['maximum_request_input_quote_tokens'], 272000)
@@ -71,6 +133,17 @@ class CampaignPreparationTests(unittest.TestCase):
                 self.assertGreaterEqual(row['match_guard_usd'], row['retained_quote_bound_usd'])
                 self.assertEqual(row['phase_retry_attempts'], 6)
                 self.assertTrue(row['cost_is_estimate_not_billing_guarantee'])
+            for stage in ('qualification', 'pilot', 'confirmatory'):
+                row = receipt['stages'][stage]
+                nominal = row['nominal_configured_rate_scenario']
+                scenario = row.get('all_openai_input_at_cache_write_rate')
+                self.assertIsNotNone(scenario, 'Nominal input rates omit possible cache-write premiums')
+                self.assertGreater(scenario['worksheet']['retained_quote_bound_usd'], nominal['worksheet']['retained_quote_bound_usd'])
+                self.assertEqual(scenario['worksheet']['maximum_request_input_quote_tokens'],
+                                 nominal['worksheet']['maximum_request_input_quote_tokens'])
+                self.assertGreater(scenario['campaign_guard_usd'], nominal['campaign_guard_usd'])
+                self.assertGreaterEqual(row['campaign_estimate_guard_usd'], scenario['campaign_guard_usd'])
+                self.assertGreaterEqual(row['match_estimate_guard_usd'], scenario['worksheet']['match_guard_usd'])
 
     def test_smoke_profile_cannot_silently_change_approved_common_limits(self):
         # Reusing a later smoke profile must not silently change the Q/P/C plan.

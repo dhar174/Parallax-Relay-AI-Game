@@ -102,14 +102,25 @@ def envelope(role, turn, phase, condition, history_turns):
         include_image=CONDITIONS[condition].include_image, condition=condition)
 
 
-def worksheet(spec):
+def quotation_rates(players, *, openai_input_rate=None):
+    """Scenario-only prices; never mutate the configured roster or wire options."""
+    rates = {}
+    for role, player in players.items():
+        value = dict(player['pricing'])
+        if player['provider'] == 'openai' and openai_input_rate is not None:
+            value['input_per_million'] = openai_input_rate
+        rates[role] = Rates.model_validate(value)
+    return rates
+
+
+def worksheet(spec, *, openai_input_rate=None):
     rows = []
     maximum_input = 0
     bound = Decimal(0)
-    # No model agent or execution function is imported or called. Exercise the
+    # No model agent is constructed or trial execution function called. Exercise the
     # real phase reservation and unknown-usage settlement path on size envelopes.
     for assignment in assignments(spec):
-        rates = {r: Rates.model_validate(p['pricing']) for r, p in assignment['players'].items()}
+        rates = quotation_rates(assignment['players'], openai_input_rate=openai_input_rate)
         for condition in spec.conditions:
             settings = MatchSettings.model_validate({**spec.match.model_dump(),
                 'max_estimated_cost_usd': None})
@@ -142,6 +153,7 @@ def worksheet(spec):
         'guard_margin': '10 percent, rounded upward to the next cent',
         'image_token_reserve': spec.match.image_token_reserve,
         'output_token_allowance_each_attempt': spec.match.max_output_tokens,
+        'openai_short_context_threshold_tokens': 272000,
         'event_ascii_byte_bound': EVENT_BYTES, 'event_count_bound': 12,
         'history_action_padding_bytes_each_turn': MAX_REPLY_CHARS,
         'cost_is_estimate_not_billing_guarantee': True, 'phase_quotes': rows}
@@ -165,21 +177,36 @@ def build_bundle():
             'campaign_max_estimated_cost_usd': 10**9,
             'scheduler_seed': 0, 'min_trial_interval_seconds': 1.0,
         })
-        sheet = worksheet(spec) if stage != 'confirmatory' else stages['pilot']['worksheet']
+        sheet = (worksheet(spec) if stage != 'confirmatory' else
+                 stages['pilot']['nominal_configured_rate_scenario']['worksheet'])
+        write_rate = sources['models']['openai/gpt-6-luna']['cache_write_input_per_million']
+        write_sheet = (worksheet(spec, openai_input_rate=write_rate) if stage != 'confirmatory' else
+                       stages['pilot']['all_openai_input_at_cache_write_rate']['worksheet'])
         trials = schedule(spec)
         model_count = sum(t['team'] == 'models' for t in trials)
         calls = sum(trial_exposure(spec, trial)[0] for trial in trials)
         provider_attempts = sum(trial_exposure(spec, trial)[0] for trial in trials if trial['team'] == 'models')
         value = spec.model_dump(mode='json')
-        value['match']['max_estimated_cost_usd'] = sheet['match_guard_usd']
+        selected_guard = max(sheet['match_guard_usd'], write_sheet['match_guard_usd'])
+        value['match']['max_estimated_cost_usd'] = selected_guard
         value['campaign_max_calls'] = calls
-        value['campaign_max_estimated_cost_usd'] = float(Decimal(str(sheet['match_guard_usd'])) * model_count)
+        value['campaign_max_estimated_cost_usd'] = float(Decimal(str(selected_guard)) * model_count)
         value = CampaignSpec.model_validate(value).model_dump(mode='json')
         specs[stage + '.json'] = value
         stages[stage] = {'spec_file': stage + '.json', 'spec_sha256': canonical_hash(value),
             'trials': len(trials), 'model_trials': model_count, 'baseline_trials': len(trials) - model_count,
             'assignments': len(assignments(spec)), 'max_calls': calls,
-            'max_provider_attempts': provider_attempts, 'worksheet': sheet,
+            'max_provider_attempts': provider_attempts,
+            'match_estimate_guard_usd': selected_guard,
+            'selected_guard_basis': 'Maximum of nominal and all-OpenAI-input-cache-write scenario margin guards; configured token rates unchanged.',
+            'nominal_configured_rate_scenario': {
+                'worksheet': sheet,
+                'campaign_guard_usd': float(Decimal(str(sheet['match_guard_usd'])) * model_count)},
+            'all_openai_input_at_cache_write_rate': {
+                'assumption': 'All OpenAI input priced at the default 30-minute cache-write rate; Gemini/output rates unchanged.',
+                'openai_input_per_million': write_rate, 'actual_cache_activity': 'unknown',
+                'configured_runtime_rates_changed': False, 'worksheet': write_sheet,
+                'campaign_guard_usd': float(Decimal(str(write_sheet['match_guard_usd'])) * model_count)},
             'campaign_estimate_guard_usd': value['campaign_max_estimated_cost_usd']}
     frozen = frozen_inputs(CampaignSpec.model_validate(specs['pilot.json']))
     receipt = {'schema_version': 1, 'kind': 'offline_preparation_candidate',
@@ -187,8 +214,18 @@ def build_bundle():
         'sources': sources, 'source_record_sha256': canonical_hash(sources),
         'smoke_profile_sha256': canonical_hash(profile),
         'source': frozen['source'], 'environment': frozen['environment'],
+        'pricing_limitations': [
+            'Runtime Budget prices OpenAI input at configured .10/M and does not distinguish cache-write charges.',
+            'Implicit caching/default 30-minute writes can bill OpenAI input at .125/M; actual cache activity is unknown.',
+            'Selected runtime guards include the all-input-write scenario; configured token rates and cache controls remain unchanged. Neither scenario is an invoice ceiling.'],
         'catalog_sha256': frozen['catalog']['sha256'], 'frozen_inputs_sha256': canonical_hash(frozen),
         'stages': stages,
+        'operational_planning': {
+            'status': 'not_started', 'offline_diagnostic_evidence': 'not_started',
+            'time_projection': 'not_started', 'storage_projection': 'not_started',
+            'disk_free_check': 'not_started', 'provider_account_quota': 'unverified',
+            'planned_q_output_paths': 'not_started', 'exact_q_command': 'not_started',
+            'launch_checkpoint': 'not_started', 'heartbeat': 'not_started'},
         'remaining_gates': ['Integrate Phase1 and freeze clean source/environment, then regenerate and check.',
             'Review a current numeric Q receipt and obtain separate Q spending approval before registration/run.',
             'Complete Q model/arm compatibility review before requesting separate pilot spending approval.',
@@ -202,7 +239,7 @@ def write_bundle(out):
     for filename, data in {**specs, 'receipt.json': receipt}.items():
         path = out / filename
         path.write_text(json.dumps(data, indent=2, allow_nan=False) + '\n', encoding='utf-8')
-        if json.loads(path.read_text(encoding='utf-8')) != data:
+        if canonical_hash(json.loads(path.read_text(encoding='utf-8'))) != canonical_hash(data):
             raise ValueError('Candidate write/readback mismatch')
     check_bundle(out, require_clean=False)
     return receipt
@@ -211,10 +248,14 @@ def write_bundle(out):
 def check_bundle(bundle, require_clean=False):
     specs, expected = build_bundle()
     receipt = json.loads((bundle / 'receipt.json').read_text(encoding='utf-8'))
-    if receipt != expected:
+    if canonical_hash(receipt) != canonical_hash(expected):
         raise ValueError('Receipt differs from current source/environment/inputs or worksheet')
     for filename, value in specs.items():
-        if json.loads((bundle / filename).read_text(encoding='utf-8')) != value:
+        candidate = json.loads((bundle / filename).read_text(encoding='utf-8'))
+        # Validate the unnormalized input just as registration does, then compare
+        # raw canonical hashes so 2/2.0 and True/1 cannot compare equal.
+        CampaignSpec.model_validate(candidate, strict=True)
+        if canonical_hash(candidate) != canonical_hash(value):
             raise ValueError('Candidate spec differs from qualified design')
     if require_clean and (receipt['source']['status'] != 'clean' or
                          receipt['environment']['value']['status'] != 'complete'):
@@ -235,7 +276,10 @@ def main(argv=None):
         receipt = write_bundle(args.out) if args.command == 'prepare' else check_bundle(args.bundle, args.require_clean)
         print(json.dumps({'kind': receipt['kind'], 'spending_authorized': False,
             'source': receipt['source'], 'receipt_sha256': canonical_hash(receipt),
-            'guards_usd': {stage: row['campaign_estimate_guard_usd'] for stage, row in receipt['stages'].items()}}))
+            'guards_usd': {stage: row['campaign_estimate_guard_usd'] for stage, row in receipt['stages'].items()},
+            'nominal_configured_rate_comparison_usd': {
+                stage: row['nominal_configured_rate_scenario']['campaign_guard_usd']
+                for stage, row in receipt['stages'].items()}}))
         return 0
     except (OSError, ValueError, KeyError, TypeError):
         print('Preparation failed: existing destination, invalid/drifted inputs, receipt, or worksheet; inspect offline.', file=sys.stderr)

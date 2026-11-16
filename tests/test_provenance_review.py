@@ -1,5 +1,6 @@
 """Regression coverage for source availability and internally consistent readers."""
 import copy
+from collections.abc import Mapping
 import json
 import os
 from pathlib import Path
@@ -15,6 +16,59 @@ from parallax_relay.state import initial_world
 
 
 class SourceReviewTests(unittest.TestCase):
+    def test_git_probes_lookup_only_public_environment_keys(self):
+        root, revision = Path.cwd(), 'd' * 40
+        secrets = {key: 'FAKE_SECRET_SENTINEL' for key in (
+            'OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'GEMINI_API_KEY',
+            'GH_TOKEN', 'GITHUB_TOKEN', 'HTTPS_PROXY', 'ALL_PROXY', 'GIT_DIR')}
+        public_cases = [
+            {'PATH': '/usr/bin', 'HOME': '/public-home', 'LANG': 'C.UTF-8',
+             'LC_ALL': 'C', 'TMPDIR': '/public-tmp', 'XDG_CONFIG_HOME': '/public-config'},
+            {'PATH': r'C:\Windows\System32', 'USERPROFILE': r'C:\Users\Public',
+             'HOMEDRIVE': 'C:', 'HOMEPATH': r'\Users\Public',
+             'SYSTEMROOT': r'C:\Windows',
+             'WINDIR': r'C:\Windows', 'COMSPEC': r'C:\Windows\System32\cmd.exe',
+             'PATHEXT': '.COM;.EXE;.BAT;.CMD', 'APPDATA': r'C:\Public\AppData\Roaming',
+             'LOCALAPPDATA': r'C:\Public\AppData\Local', 'TEMP': r'C:\Temp', 'TMP': r'C:\Tmp'},
+        ]
+        class ObservedEnvironment(Mapping):
+            def __init__(self, values):
+                self.values, self.lookups = values, []
+            def __getitem__(self, key):
+                self.lookups.append(key)
+                return self.values[key]
+            def __iter__(self):
+                return iter(self.values)
+            def __len__(self):
+                return len(self.values)
+        for public in public_cases:
+            with self.subTest(platform='windows' if 'SYSTEMROOT' in public else 'linux'):
+                environment = ObservedEnvironment({**public, **secrets})
+                children = []
+                def probe(args, *, env, **kwargs):
+                    children.append(env)
+                    return SimpleNamespace(returncode=0, stdout=(
+                        f'{root}\n{revision}\n' if 'rev-parse' in args else ''))
+                with patch.object(p.os, 'environ', environment), \
+                     patch.object(p.subprocess, 'run', side_effect=probe):
+                    result = p.collect_source(root)
+                self.assertEqual(result, {'status': 'clean', 'revision': revision, 'reason': None})
+                self.assertEqual(len(children), 2)
+                for child in children:
+                    self.assertEqual(child, {**public, 'GIT_OPTIONAL_LOCKS': '0'})
+                self.assertTrue(set(environment.lookups).isdisjoint(secrets))
+
+    def test_mixed_case_windows_system_root_is_preserved_without_duplicates(self):
+        root, revision = Path.cwd(), 'e' * 40
+        def probe(args, *, env, **kwargs):
+            self.assertEqual(env, {'PATH': 'public-path', 'SYSTEMROOT': r'C:\Windows',
+                                   'GIT_OPTIONAL_LOCKS': '0'})
+            return SimpleNamespace(returncode=0, stdout=(
+                f'{root}\n{revision}\n' if 'rev-parse' in args else ''))
+        with patch.object(p.os, 'environ', {'PATH': 'public-path', 'SystemRoot': r'C:\Windows'}), \
+             patch.object(p.subprocess, 'run', side_effect=probe):
+            self.assertEqual(p.collect_source(root)['status'], 'clean')
+
     def test_status_failure_retains_verified_revision(self):
         root, revision = Path.cwd(), 'a' * 40
         identity = SimpleNamespace(returncode=0, stdout=f'{root}\n{revision}\n')

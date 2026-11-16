@@ -20,10 +20,15 @@ python scripts/prepare_campaign.py check --bundle runs/phase2-candidate --requir
 
 The first command writes three candidate specs and `receipt.json`, then reads and
 checks every file back. The checker independently rebuilds them using current
-code, catalog, smoke profile, source-verification record and environment. It rejects
-edits or drift; `--require-clean` also requires clean Git and complete environment
+code, catalog, smoke profile, source-verification record and environment. It strictly
+validates each candidate against `CampaignSpec` and compares raw canonical hashes
+for specs, receipt and write/readback, rejecting integer/float/boolean substitutions
+as well as edits or drift. `--require-clean` also requires clean Git and complete environment
 identity. It never reads credential files, resolves keys, constructs HTTP agents,
-registers campaigns or executes trials. Schedule construction counts exposure;
+registers campaigns or executes trials. Shared Git provenance probes look up only
+the [public process settings allowlist](PROVENANCE.md), rather than copying the
+whole process environment into Git children. This is a privacy boundary, not a
+sandbox or an audit of Git configuration files. Schedule construction counts exposure;
 its temporary UUIDs are discarded, and no trial allocation or launch is recorded.
 
 `qualification.json` is explicitly a **protocol-2 diagnostic** with only Split Span,
@@ -63,9 +68,28 @@ confirming stable model code, text/image input, structured outputs and standard
 paid input/output rates of $0.30/$2.50 per million, including output thinking.
 This verifies public documentation, not account access, quota or live behavior.
 Unknown remote revisions and provider-default sampling/reasoning remain disclosed.
-No free-tier, caching, batch or flex reduction is assumed. Recheck documentation
+No free-tier, cache-read, batch or flex reduction is assumed. Recheck documentation
 before spending; update the public verification record if rates or support changed,
 then regenerate. The offline checker does not retrieve current remote documents.
+
+The official [prompt-caching guide](https://developers.openai.com/api/docs/guides/prompt-caching.md)
+and model page were rechecked on **2026-11-16**: implicit caching is enabled by
+default, and a default 30-minute cache write uses **$0.125/M OpenAI input**. This
+is a total input rate, not a surcharge added to $0.10. The adapter does not disable
+caching or distinguish write charges, and runtime `Budget` still uses the configured
+nominal $0.10/M rate. Thus its local estimate can understate billed cache-write
+input. Omitting cache-read discounts does not remove this possible write premium.
+Actual cache activity remains unknown; no cache setting, wire option or core billing
+feature is changed by preparation.
+
+Each stage also has a separately labeled **all OpenAI input at $0.125/M** scenario,
+with Gemini and output rates unchanged. It uses the same request-size envelope,
+retry simulation, short-context threshold and upward-rounded 10% margin. For
+100,000 OpenAI input plus 1,000 output tokens, nominal arithmetic is **$0.0105**;
+all-input-write arithmetic is **$0.013**. Review both scenario exposures and the
+known runtime-estimate limitation before approval. Neither scenario is an invoice
+ceiling. Configured token prices stay unchanged; the known write-premium scenario
+is explicitly included when choosing the actual match/campaign estimate guards.
 
 `Budget.reserve_phase` counts UTF-8 bytes of system rules, `prompt_text()` and the
 response schema, adds 2048 framing tokens plus the configured image reserve when
@@ -97,20 +121,29 @@ reachable maximum state:
   tokens per attempt, and the whole phase's retry allowance before any starts.
 
 Sum retained quotes over the full match and take the maximum over all assignments
-and arms. Set the common match guard to that bound plus 10%, rounded upward to a
-cent. The same 12-turn guard is frozen for pilot and confirmation. The current
+and arms separately for each pricing scenario. Add 10% and round upward to a cent,
+then choose the **maximum of the nominal and write-scenario margin guards** for the
+actual spec. The same selected 12-turn guard is frozen for pilot and confirmation. The current
 envelope's maximum input quote is 257,400 tokens, under OpenAI's 272K short-context
 threshold; the tool refuses preparation if that threshold is reached. The image
 reserve and byte heuristic remain local estimates, not a provider tokenizer or
 invoice guarantee. New engine templates/protocol/room bounds require reviewing
 this derivation as well as regenerating checksums.
 
-With the recorded prices and current code, the two-turn bound is **$0.5461948**,
-giving **Mq=$0.61** and **Q=15Mq=$9.15**. The 12-turn bound is **$8.2329486**,
-giving **M=$9.06**, **P=225M=$2,038.50**, and **C=2700M=$24,462.00**. The largest
-whole-phase retry quote is $0.1368122 for Q and $0.2860566 for P/C. These conservative
-admission guards are **not expected invoices or provider billing ceilings**. Use
-the regenerated receipt's numbers if code, inputs or verified prices change.
+With the recorded prices and current code, the **nominal comparison only** has a
+two-turn bound of $0.5461948, margin guard $0.61 and Q exposure $9.15. Its 12-turn
+bound is $8.2329486, margin guard $9.06, P exposure $2,038.50 and C exposure $24,462.00.
+Its largest whole-phase retry quotes are $0.1368122 for Q and $0.2860566 for P/C.
+These nominal comparison amounts are not the selected approval guards.
+
+The all-OpenAI-input-write scenario has a two-turn bound of **$0.5836073** and a
+12-turn bound of **$8.9529555**. It selects the actual specs' **Mq=$0.65**,
+**Q=15Mq=$9.75**, **M=$9.85**, **P=225M=$2,216.25** and **C=2700M=$26,595.00**.
+Maximum whole-phase retry quotes are $0.14762535 for Q and $0.31179275 for P/C.
+Show the nominal comparison and selected write-scenario amounts with the known
+billing-estimate gap, using these selected guards as the spending-approval request.
+The guards are **not expected invoices or provider billing ceilings**. Use the
+regenerated receipt's numbers if code, inputs or verified prices change.
 
 ## Frozen review and separate spending gates
 
@@ -120,6 +153,42 @@ limits and exposure calculations. It saves sizes and quotes only, without actual
 provider prompts, private user data or credentials. Hashes establish consistency,
 not authenticity. A dirty preview is useful development output but cannot be the
 final spending-review identity.
+
+The generated receipt explicitly leaves `operational_planning` **not_started** and
+provider account/quota access **unverified**. A passing cost/hash check does not
+complete operational approval. Before any paid request, prepare a separate ignored
+approval brief linked to the unchanged receipt hash, covering all of the following:
+
+- Current frozen source/environment/spec hashes and documentation date, both nominal
+  and all-input-write exposures, all match/campaign guards, and the independent
+  approval requested for Q alone.
+- The bounded 45-trial offline development diagnostic's evidence path, elapsed time,
+  artifact bytes and trial/call counts; conservative Q duration/storage projections
+  with stated assumptions and headroom. Do not duplicate the full pilot/confirmatory
+  baseline cohorts to obtain these projections.
+- Current disk-free measurement for the actual planned output filesystem and enough
+  headroom for projected artifacts. Record timestamp, bytes/units and assumptions;
+  do not substitute a historical measurement or leave this check implicit.
+- Account/model quota details available from an authorized dashboard, including
+  relevant request/token limits and the serial launch/timeout/retry plan. If the
+  dashboard is unavailable, report quota and account access as **unverified** in the
+  Q approval request. Do not perform live provider queries before Q approval.
+- Fresh planned Q candidate/registration/trial/report/progress-log output paths,
+  exact intended commands and interpreter, monitoring/checkpoint responsibility,
+  and stop/report procedure. Root must populate these concrete values before asking
+  for paid-run approval; placeholders and cost calculations do not mark them ready.
+- After an approved launch actually starts, immediately record its real PID, start
+  time, command/output locations and first checkpoint. PID is **not_started** during
+  preparation. For a long-running command that becomes idle, send checkpoints at
+  least every ten minutes, reporting elapsed time, observable progress/call/estimate
+  totals, output status and any stop or uncertainty. Keep notes sanitized and retain
+  partial/stopped evidence rather than relaunching automatically.
+
+The immutable generated receipt records what this offline tool can verify. The
+separate approval brief supplies operational observations; do not edit the receipt
+to claim them complete. Unfinished operational checks block a ready claim, while
+unavailable dashboard/quota facts must remain explicit uncertainties in the approval
+request. Qualification is the eventual approved test of remote account/model access.
 
 1. Integrate the latest Phase-1 runtime, replay and dependency-remediation work;
    commit preparation; freeze a clean checkout and environment. Regenerate into a
