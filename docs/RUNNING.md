@@ -195,7 +195,8 @@ model ID and key. Assignments can be rotated; exactly these three roles are requ
 
 | Match setting | Default | Accepted bounds |
 |---|---:|---|
-| `communication_rounds` | 2 | 1 or 2 |
+| `communication_rounds` | 2 | Integer 0, 1 or 2; booleans rejected |
+| `condition` | Unset | full, reduced, disabled, withheld, no_images |
 | `max_turns` | 12 | 1–12 |
 | `max_calls` | 216 | 1–10,000 |
 | `max_attempts` | 2 | 1–3, including the initial attempt |
@@ -207,9 +208,14 @@ model ID and key. Assignments can be rotated; exactly these three roles are requ
 | `image_token_reserve` | 8,192 | 1–1,000,000 |
 | `max_estimated_cost_usd` | Unset | Positive, with pricing for every role |
 
-The TOML is validated first. `--max-turns`, `--max-calls`, and `--fast` then override
-its corresponding match settings; `--fast` sets one communication round. Other
-settings require TOML edits. Unknown configuration fields are rejected.
+Match numeric fields use strict types: booleans and numeric strings are rejected,
+and integer fields require integers. Optional spending limits may be unset.
+
+The TOML is validated first. `--max-turns`, `--max-calls` and `--condition` then
+override the corresponding match settings. `--fast` selects reduced communication
+and rejects a conflicting named/disabled condition. `--policy` chooses a mock-only
+scripted, WAIT or uniform policy; uniform requires `--trial-id`. Other settings
+require TOML edits. Unknown configuration fields are rejected.
 `--quiet` suppresses the banner and phase progress, but still prints the result and
 replay path. Select exactly one of `--mock`, `--check`, or `--live`.
 
@@ -298,8 +304,9 @@ and dirty or unavailable source still limit reconstruction. Historical fixtures
 remain readable without provenance; missing identity is unknown.
 
 For comparative work, follow the prospective [evaluation protocol](EVALUATION.md).
-Current UUID flags label single runs; they do not implement its future campaign
-ledger, budget scheduler, baseline policies or missing ablation controls.
+UUID flags label individual runs. All five controls and the WAIT/uniform-v1
+baselines are implemented. Campaign registration, scheduling and aggregation
+remain the separate #19 workstream.
 
 Open `index.html` locally. The round slider and arrow buttons select resolved turns.
 Images show the state **before** that round; events describe its result. Calls and
@@ -353,3 +360,30 @@ use 12 turns. No experiment-horizon override is currently sent to the players.
   never include raw exceptions.
 
 For current defects and their proposed acceptance tests, see [Review](REVIEW.md).
+
+## Evaluation conditions and offline controls
+
+`--condition full|reduced|disabled|withheld|no_images` selects a protocol-v1 arm.
+Legacy communication rounds 2/1 still select full/reduced; 0 means disabled.
+An explicit condition normalizes an omitted round count and rejects a conflicting
+explicit count. CLI `--condition` overrides the configuration; `--fast` is the
+reduced arm and rejects a conflicting named condition. Ordinary defaults stay full.
+
+```bash
+python -m parallax_relay.play --mock --policy wait --condition disabled
+python -m parallax_relay.play --mock --policy uniform --condition no_images \
+  --trial-id b81b3e0a-61cc-45fd-83c6-f871291c98af
+```
+
+`--policy` is mock-only; default scripted is the known solvability oracle. WAIT
+and uniform-v1 use empty messages/private notes and the normal engine consequences.
+Uniform requires a trial UUID. It samples canonical role action kinds without
+hidden-state legality filtering; an illegal game action consumes the normal turn.
+
+Disabled skips communication calls. Withheld runs and records communication but
+removes all public messages, including own public scratchpad and metadata, from
+current and later player inputs. Own commitment notes remain local. No-images
+omits provider image parts and image cost reserves while recording the unchanged
+role PNGs for spectators. All arms include the same factual condition-notice template.
+These interventions establish host behavior, not evidence of intelligence or a
+communication benefit. See [evaluation protocol](EVALUATION.md).

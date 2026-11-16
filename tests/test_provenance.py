@@ -43,7 +43,7 @@ class ProvenanceTests(unittest.TestCase):
         self.assertEqual(data['requested_settings']['max_estimated_cost_usd'], 0.001)
         self.assertEqual(data['players']['FLUX']['provider'], 'unknown')
         self.assertIsNone(data['players']['FLUX']['model_revision'])
-        self.assertEqual(data['schema_version'], 1)
+        self.assertEqual(data['schema_version'], 2)
         self.assertEqual(self.p.read_provenance({'schema_version': 2, 'provenance': data}), data)
         with self.assertRaises(ValueError):
             self.p.ProvenanceContext(api_key='SECRET_SENTINEL')

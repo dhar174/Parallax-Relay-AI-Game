@@ -42,6 +42,7 @@ No npm packages are needed. The Node tests execute the production modules and im
 | [recording.py](../parallax_relay/recording.py) and [example_run/](../example_run/) | Run import, observations, evaluation and fixture playback | Schema versions, names, record fields, terminal versus partial runs and old replay compatibility |
 | [provenance.py](../parallax_relay/provenance.py) | Native manifest identity and programmatic recordings | Preserve optional provenance, programmatic/unknown modes and absent room labels; never infer live execution from missing identity |
 | [runtime_contract.py](../site/runtime_contract.py) and [run_records.py](../site/run_records.py) | Build/runtime identity and native record packaging | Project-root Git checks, archive fallback, normalized fingerprint, object records and allowlisted PNGs |
+| [conditions.py](../parallax_relay/conditions.py) and [policies.py](../parallax_relay/policies.py) | Condition selector and phase/call estimates; native replay policy labels in replay_template.html | Keep the condition mapping in contracts.mjs synchronized; preserve policy identity and keyboard focus |
 | [site/web/](../site/web/) | Static UI, form checks, native run import | Copy, layout, accessibility and controls |
 | [site/build_workbench.py](../site/build_workbench.py) and [site/relay_workbench.py](../site/relay_workbench.py) | Build artifacts and loopback adapter | Packaging and integration against the actual CLI |
 
@@ -91,3 +92,12 @@ an older checkout produce a clear compatibility mismatch without a traceback.
 5. Confirm the deployment succeeded, then load the Site as its owner. Check the displayed source revision, native fixture and companion download. Record the game revision **G** embedded in `contract.json` and the separate Site-source revision **S** used for the saved version/deployment, plus the archive hash and deployment receipt. Verify hosted contract G and the built fingerprint; the saved Site version must identify S. These are different repositories, so the SHAs need not match. To roll back, republish the previous known-good saved Sites version and verify the revision and fixture again.
 
 There is no automatic deployment on merge. The game repository contains the source and build procedure. It does not contain Sites credentials or provider secrets.
+
+## Evaluation conditions
+
+The condition selector exports the same five protocol arms as the CLI. Selecting
+an arm updates its communication-round count and invalidates live preparation.
+No-images retains spectator PNGs but sends no image parts to providers. Withheld
+communications are spectator-only; imported runs display their recorded arm.
+Historical imports without a condition label remain explicitly unspecified.
+Campaign registration/execution/analysis are CLI operations, not browser actions.

@@ -13,6 +13,8 @@ from uuid import UUID, uuid4
 from pydantic import ValidationError
 
 from .agents import ScriptedAgent
+from .conditions import CONDITIONS
+from .policies import make_policy
 from .config import ConfigError, MatchSettings, load_config
 from .orchestrator import MatchExecutionError, run_match
 from .protocol import ROLES
@@ -84,6 +86,8 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument('--max-turns', type=int, choices=range(1,13))
     p.add_argument('--max-calls', type=int)
     p.add_argument('--fast', action='store_true', help='One communication pass instead of two.')
+    p.add_argument('--condition', choices=tuple(CONDITIONS), help='Protocol-v1 evaluation treatment.')
+    p.add_argument('--policy', choices=('scripted', 'wait', 'uniform'), help='Offline policy; uniform requires --trial-id.')
     p.add_argument('--quiet', action='store_true', help='Only print the result and replay path.')
     p.add_argument('--experiment-id', type=_uuid, help='Optional experiment UUID; does not start a campaign.')
     p.add_argument('--trial-id', type=_uuid, help='Optional trial UUID; does not resume a match.')
@@ -98,7 +102,9 @@ async def _run(args, cfg, settings, runtime) -> int:
         settings = settings.model_copy(update={'max_estimated_cost_usd': None})
     out = args.out or Path('runs')/(datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')+'_'+uuid4().hex[:6])
     mode = 'mock' if args.mock else 'live'
-    players = ({r: {'provider':'mock','model':'scripted-fixture'} for r in ROLES} if args.mock else
+    policy = getattr(args, 'policy', None) or 'scripted'
+    policy_model = 'scripted-fixture' if policy == 'scripted' else policy + '-v1'
+    players = ({r: {'provider':'mock','model':policy_model} for r in ROLES} if args.mock else
                {r: {'provider':p.provider,'model':p.model} for r,p in runtime.items()})
     manifest = {'schema_version':2, 'mode':mode, 'players':players,
                 'settings':settings.model_dump(), 'room':'The Split Span'}
@@ -106,7 +112,8 @@ async def _run(args, cfg, settings, runtime) -> int:
         manifest['requested_settings'] = requested_settings
     context = ProvenanceContext(mode=mode, experiment_id=args.experiment_id, trial_id=args.trial_id,
                                 players={r: PlayerIdentity(**p) for r, p in players.items()},
-                                requested_settings=MatchSettings.model_validate(requested_settings))
+                                requested_settings=MatchSettings.model_validate(requested_settings),
+                                policy=policy if args.mock else None)
     try:
         recorder = Recorder(out, manifest, context=context)
     except FileExistsError:
@@ -121,7 +128,7 @@ async def _run(args, cfg, settings, runtime) -> int:
     try:
         for role in ROLES:
             if args.mock:
-                agents[role] = ScriptedAgent(role)
+                agents[role] = ScriptedAgent(role) if policy == 'scripted' else make_policy(policy, role, args.trial_id)
             else:
                 p = runtime[role]
                 agents[role] = HTTPAgent(p.provider, p.model, p.api_key, timeout_seconds=settings.timeout_seconds)
@@ -178,7 +185,16 @@ def main(argv: list[str] | None = None) -> int:
     try:
         cfg = load_config(args.config)
         values = cfg.match.model_dump()
-        if args.fast: values['communication_rounds'] = 1
+        if args.policy and not args.mock:
+            raise ConfigError('--policy requires --mock')
+        if args.policy == 'uniform' and args.trial_id is None:
+            raise ConfigError('Uniform policy requires --trial-id')
+        if args.condition:
+            values.update(condition=args.condition, communication_rounds=CONDITIONS[args.condition].communication_rounds)
+        if args.fast:
+            if values['condition'] not in (None, 'reduced') or values['communication_rounds'] == 0:
+                raise ConfigError('--fast conflicts with the selected condition')
+            values.update(condition='reduced', communication_rounds=1)
         if args.max_turns is not None: values['max_turns'] = args.max_turns
         if args.max_calls is not None: values['max_calls'] = args.max_calls
         settings = MatchSettings.model_validate(values)
@@ -194,7 +210,7 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps({r: {'provider':p.provider,'model':p.model} for r,p in runtime.items()},indent=2))
             return 0
         if not args.quiet:
-            print('MOCK scripted fixture; no network calls.' if args.mock else
+            print('MOCK offline policy; no network calls.' if args.mock else
                   'LIVE API mode: calls may be billable. Limits and usage are recorded.')
         return asyncio.run(_run(args,cfg,settings,runtime))
     except FileExistsError:

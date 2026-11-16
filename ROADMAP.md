@@ -90,8 +90,8 @@ this roadmap introduces no runtime feature, automatic fallback or paid execution
 ## 3. Reproducible evaluation
 
 **Status:** partly implemented. Slice 5 adds versioned run provenance (#10);
-the prospective evaluation protocol (#17) is specified. Controls/baselines (#18),
-the experiment runner (#19) and controlled campaigns remain future work.
+the prospective evaluation protocol (#17) is specified. Slice 8 controls/baselines (#18) implement the five protocol arms and WAIT/uniform-v1
+policies. The experiment runner (#19) and controlled campaigns remain future work.
 
 Run provenance (R08) now records source/configuration,
 prompt/schema/room versions, dependency environment, model identifiers, trial IDs,
@@ -104,8 +104,8 @@ still schedule/aggregate trials and preserve setup failures and missing artifact
 role assignments, policy baselines and five comparison arms. Its selected design
 is 5 pilot plus 30 confirmatory trials per unique assignment/condition/room, with
 all-trial denominators, uncertainty and campaign budgets. The current `--fast`
-mode reduces communication but does not disable it; the other controls and campaign
-machinery still need implementation. No experimental results are claimed.
+mode reduces communication but does not disable it; the five explicit controls now exist, while campaign
+machinery remains separate. No experimental results are claimed.
 
 **Completion gate:** another researcher can reconstruct experiment configuration and
 aggregate results from saved artifacts; the runner enforces a campaign budget;

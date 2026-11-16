@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Slice 8 controls
+
+- Add five recorded evaluation arms, actual image omission, withheld-history
+  isolation, and WAIT/uniform-v1 offline policies without changing engine rules.
+- Version prompt/request and provenance identities; retain historical provenance
+  and recording readers. Update CLI/workbench condition exports and replay labels.
+
 - Publish a separately authorized successful live retry: nine first-attempt
   responses, one resolved turn, zero unknown usage and a $0.0038577 local estimate
   (not an invoice total), with sanitized provenance and native-artifact checks.

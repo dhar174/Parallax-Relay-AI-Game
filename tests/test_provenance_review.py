@@ -206,7 +206,7 @@ class ReaderReviewTests(unittest.TestCase):
 
     def test_guarded_pricing_and_communication_mismatch_rejected(self):
         for field, value in [('settings', {'max_estimated_cost_usd': 1.0}),
-                             ('conditions', {'communication': 'reduced'})]:
+                             ('conditions', {'arm': 'reduced'})]:
             with self.subTest(field=field):
                 data = copy.deepcopy(self.running)
                 data['execution']['value'][field].update(value)

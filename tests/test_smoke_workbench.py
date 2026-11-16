@@ -21,6 +21,7 @@ class SmokeWorkbenchTests(unittest.TestCase):
             contract = json.loads((output / 'contract.json').read_text(encoding='utf-8'))
             self.assertIn('live_smoke', contract, 'The browser preset is missing')
             profile = json.loads((ROOT / 'configs/live_smoke.json').read_text(encoding='utf-8'))
+            profile['config']['match']['condition'] = None
             self.assertEqual(contract['live_smoke'], profile)
             self.assertEqual(contract['defaults']['match']['max_turns'], 12)
             self.assertEqual(contract['defaults']['players']['PYRA']['provider'], 'anthropic')

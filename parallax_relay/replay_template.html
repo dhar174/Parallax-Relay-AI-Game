@@ -11,7 +11,7 @@ header{display:flex;justify-content:space-between;align-items:center;gap:20px;fl
 @media(max-width:850px){body{padding:16px}.summary{grid-template-columns:repeat(2,1fr)}.sensors,.logs{grid-template-columns:1fr}h1{font-size:24px}.panel,.log{padding:12px}}
 </style></head><body>
 <header><div><div class="eyebrow">Multimodal multi-agent test chamber</div><h1>PARALLAX RELAY</h1><p>The Split Span · Milestone 2 · recorded match</p></div><div class="badge" id="mode"></div></header>
-<p id="roster"></p><p class="warning">Spectator access: every sensor feed and private objective is visible here. This page is never sent to a player.</p>
+<p id="roster"></p><p id="condition"></p><p class="warning">Spectator access: every sensor feed and private objective is visible here. This page is never sent to a player.</p>
 <section class="summary" aria-label="Match summary"><div class="metric"><span>Outcome</span><strong id="outcome"></strong></div><div class="metric"><span>Resolved turns</span><strong id="turnCount"></strong></div><div class="metric"><span>Model call attempts</span><strong id="calls"></strong></div><div class="metric"><span>Team energy remaining</span><strong id="energy"></strong></div></section>
 <div id="empty" class="empty" hidden>No turn was fully resolved. The final image shows the unchanged state. Inspect <code>calls.jsonl</code> and <code>phases.jsonl</code> for the partial turn.</div>
 <div class="toolbar" id="controls"><button id="prev" type="button" aria-label="Previous round">←</button><label id="roundLabel" for="round"></label><input id="round" type="range" min="0" max="0" value="0" aria-label="Recorded round"><button id="next" type="button" aria-label="Next round">→</button></div>
@@ -25,13 +25,15 @@ header{display:flex;justify-content:space-between;align-items:center;gap:20px;fl
 const DATA=__REPLAY_DATA__;
 const $=id=>document.getElementById(id),records=DATA.records,result=DATA.result;
 const provenance=DATA.manifest.provenance,mode=DATA.manifest.mode??provenance?.execution?.value?.mode;
-$('mode').textContent=mode==='mock'?'MOCK · SCRIPTED FIXTURE':mode==='live'?'LIVE API RUN':mode==='programmatic'?'PROGRAMMATIC RUN':'RUN MODE UNKNOWN';
+const policy=provenance?.execution?.value?.policy?.name;
+$('mode').textContent=mode==='mock'?(policy==='scripted'?'MOCK · SCRIPTED FIXTURE':policy?'MOCK · '+policy.toUpperCase()+' POLICY':'MOCK · OFFLINE POLICY'):mode==='live'?'LIVE API RUN':mode==='programmatic'?'PROGRAMMATIC RUN':'RUN MODE UNKNOWN';
 $('outcome').textContent=result.stop_reason.replaceAll('_',' ');
 $('turnCount').textContent=result.turns;$('calls').textContent=result.budget.calls_started;$('energy').textContent=result.energy;
 $('roster').textContent=['SPECTRA','PYRA','FLUX'].map(role=>{const p=DATA.manifest.players?.[role]??provenance?.players?.[role]??{};return role+': '+(p.provider??'unknown')+' / '+(p.model??'unknown')}).join('  ·  ');
 const slider=$('round');slider.max=Math.max(0,records.length-1);
 function line(parent,label,value){const el=document.createElement('div');el.className='entry';const key=document.createElement('b');key.textContent=label+' ';el.append(key,document.createTextNode(String(value)));parent.append(el)}
 function heading(parent,label){const el=document.createElement('div');el.className='subhead';el.textContent=label;parent.append(el)}
+$('condition').textContent='Condition: '+(provenance?.execution?.value?.conditions?.arm??provenance?.execution?.value?.conditions?.communication??'Historical / unspecified')+' · recorded messages may be spectator-only';
 function draw(){
  const i=Number(slider.value),r=records[i];
  for(const id of ['chat','actions','events','private','diagnostics'])$(id).replaceChildren();

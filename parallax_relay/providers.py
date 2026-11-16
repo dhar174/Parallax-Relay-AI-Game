@@ -184,7 +184,7 @@ class HTTPAgent:
         self._client = client or httpx.AsyncClient(timeout=timeout_seconds, follow_redirects=False)
 
     def _wire_request(self, request: AgentRequest) -> tuple[str, dict, dict]:
-        png = base64.b64encode(request.observation.image_png).decode('ascii')
+        png = base64.b64encode(request.observation.image_png).decode('ascii') if request.include_image else ''
         text, schema = request.prompt_text(), response_schema(request.phase)
         headers = {'content-type': 'application/json'}
         if self.provider == 'openai':
@@ -220,6 +220,13 @@ class HTTPAgent:
                                      'responseMimeType': 'application/json',
                                      'responseJsonSchema': schema, 'candidateCount': 1},
             }
+        if not request.include_image:
+            if self.provider == 'openai':
+                body['input'][0]['content'] = [p for p in body['input'][0]['content'] if p['type'] != 'input_image']
+            elif self.provider == 'anthropic':
+                body['messages'][0]['content'] = [p for p in body['messages'][0]['content'] if p['type'] != 'image']
+            else:
+                body['contents'][0]['parts'] = [p for p in body['contents'][0]['parts'] if 'inlineData' not in p]
         return ENDPOINTS[self.provider].format(model=self.model), headers, body
 
     async def respond(self, request: AgentRequest) -> ModelReply:

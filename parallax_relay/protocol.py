@@ -11,13 +11,14 @@ from typing import Literal, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from .state import Action
+from .conditions import CONDITIONS, ConditionName
 
 ROLES = ('SPECTRA', 'PYRA', 'FLUX')
 Phase = Literal['broadcast', 'negotiate', 'commit']
 MAX_MESSAGE_CHARS = 400
 MAX_NOTES_CHARS = 1000
 MAX_REPLY_CHARS = 16384
-REQUEST_FORMAT_VERSION = 1
+REQUEST_FORMAT_VERSION = 2
 
 
 @dataclass(frozen=True)
@@ -51,6 +52,18 @@ class AgentRequest:
     private_notes: str = ''
     repair: str = ''
     max_output_tokens: int = 2048
+    include_image: bool = True
+    condition: ConditionName = 'full'
+
+    def __post_init__(self):
+        if not isinstance(self.condition, str) or self.condition not in CONDITIONS or type(self.include_image) is not bool:
+            raise ValueError('Invalid request condition or image flag')
+        if self.condition == 'no_images':
+            object.__setattr__(self, 'include_image', False)
+        elif self.condition == 'full' and not self.include_image:
+            object.__setattr__(self, 'condition', 'no_images')
+        elif not self.include_image:
+            raise ValueError('Unsupported combined request treatment')
 
     @property
     def role(self) -> str:
@@ -70,6 +83,7 @@ class AgentRequest:
             'your_recent_history': json.loads(self.history_json),
             'your_private_notes': self.private_notes,
             'format_repair': self.repair,
+            'condition_notice': CONDITIONS[self.condition].notice(),
         }, ensure_ascii=True, separators=(',', ':'))
 
 

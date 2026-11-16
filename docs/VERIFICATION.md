@@ -1,5 +1,38 @@
 # Verification record
 
+## Controls review follow-up — November 16, 2026 UTC
+
+Revision `76fb564` passed all six jobs in
+[workflow 43804721583](https://github.com/dhar174/Parallax-Relay-AI-Game/actions/runs/43804721583),
+with 280 Python tests per job and 56 Node tests on locked Ubuntu/Python 3.12.
+Antigravity independently reverified 280 Python / 56 Node tests and cleared the
+original findings. Subsequent non-blocking concerns have focused regressions for
+exact notice JSON types, copied context settings, numeric booleans, ASCII Python
+version labels and independent condition/round DOM controls. Final revision
+receipts are recorded in the PR response. Local follow-up verification passed
+283 Python tests in 29.549 seconds and 57 Node tests, with zero failures/skips.
+Original delivery counts below remain
+historical evidence for `f9d035e`.
+
+## Slice 8 controls — November 16, 2026 UTC
+
+Baseline merged source `0b21a0b` passed 260 Python tests. Original controls revision `f9d035e`
+passed 268 Python tests (26.303 seconds), dependency consistency, compilation,
+workbench build, 53 Node tests with zero skips/failures, and normal/fast mock
+victories (seven turns, 63/42 calls, five energy, all scores 100).
+
+Chromium 156.0.8078.79 exercised all five selectors and synchronized round counts,
+then ran the real companion's one-turn no-images mock: condition label, turn-limit
+outcome, absent terminal scores and three spectator PNGs were checked. Desktop
+1440x1000 and mobile 390x844 had no horizontal overflow; runtime exceptions were
+absent. This is local focused browser evidence, not comprehensive #26/#35 closure.
+
+The regression suite covers later-turn withheld inputs and retry repairs, actual
+adapter image omission, image-quote removal, canonical uniform draws/retries,
+normal WAIT defeat, CLI argument guards, provenance v1 compatibility and v2 policy
+identity. No provider request or deployment was made. Hosted matrix results must
+be checked for the PR's actual revision; historical results are not copied forward.
+
 ## Provider acceptance and scope decision — November 15, 2026
 
 The separately authorized retry ran on **clean merged source
