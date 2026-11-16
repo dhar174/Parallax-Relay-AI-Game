@@ -68,5 +68,12 @@
     "Built-in policies only; no provider calls.",
     "Two-turn truncation intentionally leaves all 45 trials nonterminal.",
     "No model performance, pilot/confirmation, or difficulty claims."
-  ]
+  ],
+  "reanalysis_source": {
+    "status": "clean",
+    "revision": "decdcca4aba667ff0d20b681d5032360787936ce",
+    "reason": null
+  },
+  "aggregate_confidence_intervals_omitted": true,
+  "per_room_cell_intervals_retained": true
 }
