@@ -18,3 +18,8 @@ dist/
 *.egg-info/
 .DS_Store
 Thumbs.db
+
+# Isolated development-only real-browser coverage
+node_modules/
+test-results/
+playwright-report/
