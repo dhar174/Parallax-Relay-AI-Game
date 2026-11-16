@@ -136,13 +136,17 @@ set and evidence; incompatible objectives require an explicit scoring design.
 
 ## 5. Later exploration
 
-**Status:** deferred until earlier gates justify expansion.
+**Status:** replay inspection and browser verification (R10, #25/#26) are approved
+and pending implementation/evidence under Phase 1 of the
+[completion plan](docs/superpowers/plans/2026-11-16-four-phase-completion.md).
+Parent #12 remains open. Optional expansion below remains deferred.
 
-Improve replay accessibility and unfinished-run inspection (R10). Consider a live
+Complete replay accessibility and unfinished-run inspection against their issue
+acceptance criteria, including actual browser evidence. Consider a live
 spectator interface, additional roles including ECHO, richer mechanics, or deployment
 only through separate proposals that state their effect on reproducibility and
 information boundaries.
 
 **Completion gate for starting a proposal:** describe the intended user, concrete
 problem, maintenance cost, security boundary changes, and success criteria. These
-items are not scheduled deliverables of the current documentation work.
+optional expansion items are not scheduled deliverables of the completion plan.
