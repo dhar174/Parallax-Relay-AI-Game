@@ -277,8 +277,10 @@ Report degenerate bootstrap intervals explicitly; identical outcomes and zero
 observed differences do not establish equivalence or absence of an effect. This
 fixed sample design has no prespecified minimum detectable effect. Treat secondary
 contrasts and score/efficiency comparisons as exploratory, without a significance
-claim selected from multiple comparisons. Do not extend fixed-room intervals to a
-room population; a future held-out-family design needs its own clustered analysis.
+claim selected from multiple comparisons. Protocol 2 retains per-room inference
+and descriptive family/split totals for the finite curated catalog. Do not extend
+these intervals to a room population. Any later design sampling a task population
+requires its own prespecified sampling and inference method.
 
 ## Reliability, efficiency, usage, and cost
 
