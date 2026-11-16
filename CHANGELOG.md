@@ -1,6 +1,8 @@
 # Changelog
 
-## Slice 8 campaigns
+## Unreleased
+
+### Slice 8 campaigns
 
 - Add frozen campaign registration, serial trial execution, durable lifecycle
   receipts, full-block call/estimate admission and no automatic relaunch.
@@ -12,12 +14,12 @@
 
 ## Slice 8 controls
 
+### Slice 8 controls
+
 - Add five recorded evaluation arms, actual image omission, withheld-history
   isolation, and WAIT/uniform-v1 offline policies without changing engine rules.
 - Version prompt/request and provenance identities; retain historical provenance
   and recording readers. Update CLI/workbench condition exports and replay labels.
-
-## Unreleased
 
 - Publish a separately authorized successful live retry: nine first-attempt
   responses, one resolved turn, zero unknown usage and a $0.0038577 local estimate

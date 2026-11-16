@@ -16,6 +16,13 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class MockCheckTests(unittest.TestCase):
+    def test_quiet_guard_rejects_current_policy_banner(self):
+        def noisy(command, **kwargs):
+            proc=self.fake_run(command,**kwargs)
+            proc.stdout='MOCK offline policy; no network calls.\n'+proc.stdout
+            return proc
+        self.assertEqual(self.run_check(noisy),1)
+        self.assertIn('--quiet emitted banner',self.diagnostics.getvalue())
     def test_real_helper_handles_unicode_paths_with_ascii_parent_stdio(self):
         with tempfile.TemporaryDirectory(prefix='relay-鏡-') as tmp:
             env = {**os.environ, 'TMPDIR': tmp, 'TEMP': tmp, 'TMP': tmp,

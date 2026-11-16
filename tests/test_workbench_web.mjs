@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import test from 'node:test';
+import {runInNewContext} from 'node:vm';
 import { checkRun, validate, toml } from '../site/web/contracts.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
@@ -14,6 +15,46 @@ const fixture = JSON.parse(await readFile(join(dist, 'fixture.json'), 'utf8'));
 const smokeProfile = JSON.parse(await readFile(join(root, 'configs/live_smoke.json'), 'utf8'));
 smokeProfile.config.match.condition = null;
 let appInstance = 0;
+
+test('workbench retains a historical v1 communication label',async t=>{
+ const app=await workbench(t);const data=structuredClone(fixture);
+ data.manifest.provenance={schema_version:1,execution:{value:{conditions:{communication:'reduced'}}}};
+ await app.importJSON(data);assert.match(app.node('panel').innerHTML,/Condition: reduced/);
+});
+
+test('editing rounds after a named condition remains exportable and smoke repairs empty rounds', async t => {
+  const app=await workbench(t);
+  await app.tab('scenario');
+  for(const condition of ['disabled','reduced']){
+    app.input({dataset:{match:'condition'},value:condition});
+    const panel=app.node('panel').innerHTML;
+    app.input({dataset:{match:'communication_rounds'},value:'2',valueAsNumber:2});
+    assert.match(await app.exportConfig(),/communication_rounds = 2/);
+    assert.doesNotMatch(await app.exportConfig(),/condition =/);
+    app.input({dataset:{match:'condition'},value:condition});
+    assert.equal(app.node('panel').innerHTML,panel,'condition changes must not rebuild the focused selector');
+    app.input({dataset:{match:'communication_rounds'},value:'',valueAsNumber:NaN});
+    await app.click('smoke');
+    const expected=condition==='disabled'?0:1;
+    const output=await app.exportConfig();
+    assert.match(output,new RegExp('communication_rounds = '+expected));
+    assert.match(output,new RegExp('condition = "'+condition+'"'));
+    assert.match(output,new RegExp('max_calls = '+(3*(expected+1)*contract.defaults.match.max_attempts)));
+  }
+});
+
+test('actual replay script labels policies and historical v1 conditions truthfully',async()=>{
+  const template=await readFile(join(root,'parallax_relay/replay_template.html'),'utf8');
+  for(const policy of ['wait','uniform','scripted']){
+    const nodes=new Map();const node=id=>{if(!nodes.has(id))nodes.set(id,{value:'0',textContent:'',replaceChildren(){},closest(){return this;},addEventListener(){}});return nodes.get(id);};
+    const manifest={mode:'mock',provenance:{execution:{value:{policy:{name:policy},conditions:{communication:'reduced'}}}}};
+    const data={manifest,records:[],calls:[],result:{stop_reason:'turn_limit',turns:0,budget:{calls_started:0},energy:6}};
+    const script=template.match(/<script>([\s\S]*?)<\/script>/)[1].replace('__REPLAY_DATA__',JSON.stringify(data));
+    runInNewContext(script,{document:{getElementById:node,createElement:()=>({}),createTextNode:()=>({})}});
+    assert.match(node('mode').textContent,new RegExp(policy==='scripted'?'SCRIPTED FIXTURE':policy.toUpperCase()+' POLICY'));
+    assert.match(node('condition').textContent,/Condition: reduced/);
+  }
+});
 
 test('additive settlement split is validated and retained on export', async t => {
   const app = await workbench(t);

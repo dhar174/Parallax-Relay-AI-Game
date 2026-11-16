@@ -42,6 +42,8 @@ class MatchSettings(Settings):
     @model_validator(mode='before')
     @classmethod
     def normalize_condition(cls, value):
+        if isinstance(value, dict) and 'communication_rounds' in value and type(value['communication_rounds']) is not int:
+            raise ValueError('communication_rounds must be an integer, not a boolean')
         if isinstance(value, dict) and isinstance(value.get('condition'), str) and value['condition'] in CONDITIONS:
             value = dict(value)
             rounds = CONDITIONS[value['condition']].communication_rounds

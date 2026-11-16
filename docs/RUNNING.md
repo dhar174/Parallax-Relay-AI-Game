@@ -195,7 +195,8 @@ model ID and key. Assignments can be rotated; exactly these three roles are requ
 
 | Match setting | Default | Accepted bounds |
 |---|---:|---|
-| `communication_rounds` | 2 | 1 or 2 |
+| `communication_rounds` | 2 | Integer 0, 1 or 2; booleans rejected |
+| `condition` | Unset | full, reduced, disabled, withheld, no_images |
 | `max_turns` | 12 | 1–12 |
 | `max_calls` | 216 | 1–10,000 |
 | `max_attempts` | 2 | 1–3, including the initial attempt |
@@ -207,9 +208,11 @@ model ID and key. Assignments can be rotated; exactly these three roles are requ
 | `image_token_reserve` | 8,192 | 1–1,000,000 |
 | `max_estimated_cost_usd` | Unset | Positive, with pricing for every role |
 
-The TOML is validated first. `--max-turns`, `--max-calls`, and `--fast` then override
-its corresponding match settings; `--fast` sets one communication round. Other
-settings require TOML edits. Unknown configuration fields are rejected.
+The TOML is validated first. `--max-turns`, `--max-calls` and `--condition` then
+override the corresponding match settings. `--fast` selects reduced communication
+and rejects a conflicting named/disabled condition. `--policy` chooses a mock-only
+scripted, WAIT or uniform policy; uniform requires `--trial-id`. Other settings
+require TOML edits. Unknown configuration fields are rejected.
 `--quiet` suppresses the banner and phase progress, but still prints the result and
 replay path. Select exactly one of `--mock`, `--check`, or `--live`.
 
@@ -298,8 +301,9 @@ and dirty or unavailable source still limit reconstruction. Historical fixtures
 remain readable without provenance; missing identity is unknown.
 
 For comparative work, follow the prospective [evaluation protocol](EVALUATION.md).
-Current UUID flags label single runs; they do not implement its future campaign
-ledger, budget scheduler, baseline policies or missing ablation controls.
+UUID flags label individual runs. All five controls and the WAIT/uniform-v1
+baselines are implemented. Campaign registration, scheduling and aggregation
+remain the separate #19 workstream.
 
 Open `index.html` locally. The round slider and arrow buttons select resolved turns.
 Images show the state **before** that round; events describe its result. Calls and

@@ -42,6 +42,7 @@ No npm packages are needed. The Node tests execute the production modules and im
 | [recording.py](../parallax_relay/recording.py) and [example_run/](../example_run/) | Run import, observations, evaluation and fixture playback | Schema versions, names, record fields, terminal versus partial runs and old replay compatibility |
 | [provenance.py](../parallax_relay/provenance.py) | Native manifest identity and programmatic recordings | Preserve optional provenance, programmatic/unknown modes and absent room labels; never infer live execution from missing identity |
 | [runtime_contract.py](../site/runtime_contract.py) and [run_records.py](../site/run_records.py) | Build/runtime identity and native record packaging | Project-root Git checks, archive fallback, normalized fingerprint, object records and allowlisted PNGs |
+| [conditions.py](../parallax_relay/conditions.py) and [policies.py](../parallax_relay/policies.py) | Condition selector, phase/call estimates and offline policy labels | Keep the condition mapping in contracts.mjs synchronized; preserve policy identity and keyboard focus |
 | [site/web/](../site/web/) | Static UI, form checks, native run import | Copy, layout, accessibility and controls |
 | [site/build_workbench.py](../site/build_workbench.py) and [site/relay_workbench.py](../site/relay_workbench.py) | Build artifacts and loopback adapter | Packaging and integration against the actual CLI |
 

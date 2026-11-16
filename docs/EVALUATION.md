@@ -52,19 +52,15 @@ added. For `no_images`, remove image attachments for every role, preserving the 
 own-HUD projection and schemas; do not substitute descriptions/OCR or expose a
 hidden-state text representation. Other arms retain their role-specific images.
 
-#18 must introduce an explicit `AgentRequest.include_image` flag (default true).
-Set it false for every `no_images` request and retry; each provider must then omit
-the image content part, and budget quotes must omit `image_token_reserve`. Keep
-valid role PNGs in observations and spectator recording. Emptying `image_png` is
-not an implementation: current adapters attach it unconditionally, the recorder
-saves it, and the current budget always reserves image tokens.
+`AgentRequest.include_image` defaults to true. The no-images arm sets it false
+on every request/retry; all three adapters omit image parts and budget quotes omit
+`image_token_reserve`. Valid role PNGs remain in observations and spectator records.
+Empty image bytes are never used as a substitute for explicit attachment control.
 
-The current driver stores public messages in each role's history, so withholding
-only the current request's message list is insufficient. #18 must filter that
-history at construction and test later turns. Its explicit condition configuration
-and provenance reader/writer must support all five arms; today's settings and
-provenance support only full/reduced communication and `role_png_and_hud` inputs.
-Apply the documented provenance versioning rules when extending those contracts.
+The driver filters withheld public messages and metadata at request and history
+construction, including later turns. Effective settings and provenance v2 support
+all five arms; the frozen provenance-v1 reader retains historical full/reduced
+records. Inputs never substitute spectator state or a replacement scratchpad.
 
 Use a minimal, versioned public condition notice so prompts do not falsely promise
 messages or images that are absent. Freeze/hash each prompt variant; disclose this
@@ -85,7 +81,7 @@ Keep the existing scripted solution as a solvability/infrastructure oracle. It
 knows `PLAN` and does not interpret images; its victory is not model evidence. A
 future room needs a verified oracle or comparable solvability certificate.
 
-Implement two simple policies under #18 before comparative campaigns:
+Two simple policies are implemented under #18 for use before comparative campaigns:
 
 - **WAIT:** empty broadcast/negotiation messages; `WAIT` on every commitment and
   empty private notes. This is a deterministic floor, not a competent agent.
@@ -109,8 +105,8 @@ over the fixed ordered list exactly once for that key; record the derivation,
 per-turn seeds, policy version and Python version. Reconstructing or retrying a
 commitment must return the same action for its key; it must not advance a mutable
 cross-turn stream. Communication phases consume no draws. This is a local policy
-seed, not a provider seed. Record fixture-specific context explicitly when #18
-adds these policies; current provenance does not infer them from arbitrary agents.
+seed, not a provider seed. Explicit offline context records policy identity;
+provenance never infers a policy from arbitrary agents.
 
 Run deterministic controls once per distinct room/condition/policy configuration,
 deduplicating meaningless provider-role labels. Repeated identical executions are
@@ -359,9 +355,9 @@ exploratory contrasts, baselines, role assignments and room splits. Synthetic
 examples and scripted verification stay labeled separately from model evidence.
 
 Current [provenance](PROVENANCE.md) supplies individual-run identity and lifecycle.
-#18 must supply/test policies and request controls; #19 must supply the pre-launch
+#18 supplies tested policies and request controls; #19 must supply the pre-launch
 ledger, scheduling, campaign budgeting and aggregation/analysis; #20 must supply
-held-out families and solvability/privacy checks. Those issues remain open. None
+held-out families and solvability/privacy checks. #19 and #20 remain future work in this controls slice. None
 of this protocol establishes live compatibility or requires a paid run in this PR.
 
 ## Slice 8 controls delivery
