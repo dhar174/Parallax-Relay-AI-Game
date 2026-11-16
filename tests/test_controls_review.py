@@ -1,5 +1,4 @@
 """Antigravity #39 reproductions and durable behavioral regressions."""
-import copy
 import contextlib
 import io
 from dataclasses import replace
@@ -20,6 +19,31 @@ from parallax_relay.state import initial_world
 
 
 class ControlsReviewTests(unittest.TestCase):
+    def test_rehashed_notice_requires_exact_json_types(self):
+        run=RunProvenance();run.begin(MatchSettings(),{},initial_world().snapshot())
+        for key,value in (('version',True),('public_messages_available',1),('role_image_available',1.0)):
+            data=run.snapshot();block=data['inputs']['schemas']
+            block['value']['request_structure']['condition_notice'][key]=value
+            block['sha256']=canonical_hash(block['value'])
+            with self.subTest(key=key),self.assertRaises(ValueError):read_provenance({'provenance':data})
+
+    def test_context_revalidates_nested_copies_and_all_numeric_settings_reject_booleans(self):
+        bad=MatchSettings().model_copy(update={'condition':'disabled'})
+        with self.assertRaises(ValidationError):ProvenanceContext(requested_settings=bad)
+        context=ProvenanceContext().model_copy(update={'requested_settings':bad})
+        with self.assertRaises(ValueError):RunProvenance(context)
+        for name in ('max_turns','max_calls','max_attempts','timeout_seconds','max_output_tokens','history_turns',
+                     'retry_delay_seconds','max_consecutive_failures','max_estimated_cost_usd','image_token_reserve'):
+            for value in (True,False):
+                with self.subTest(name=name,value=value),self.assertRaises(ValidationError):MatchSettings(**{name:value})
+
+    def test_uniform_python_version_rejects_unicode_digits(self):
+        run=RunProvenance(ProvenanceContext(mode='mock',policy='uniform',trial_id=UUID(int=1)))
+        run.begin(MatchSettings(),{},initial_world().snapshot());data=run.snapshot();block=data['execution']
+        block['value']['policy']['python_version']='３.１２.３'
+        block['sha256']=canonical_hash(block['value'])
+        with self.assertRaises(ValueError):read_provenance({'provenance':data})
+
     def test_boolean_rounds_are_rejected_before_condition_normalization(self):
         for arm, value in [('disabled', False), ('reduced', True), ('full', True), (None, True)]:
             with self.subTest(arm=arm), self.assertRaises(ValidationError):

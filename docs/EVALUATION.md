@@ -69,11 +69,11 @@ stating only the phase schedule, message availability and image availability.
 Do not add effort instructions, replacement scratchpads or additional thinking
 prompts for withheld inputs. The full/withheld contrast includes removal of the
 role's public scratchpad and any effort change induced by that factual notice.
-No provider tools or cross-trial memory are
-allowed. Before campaigning, #18 must test the actual serialized requests for every
-arm, including later turns, retries, histories, notes and fallbacks. Future controls
-must record actual conditions rather than reuse current full/reduced provenance
-labels. Running `--fast` alone is never a no-communication experiment.
+No provider tools or cross-trial memory are allowed. The intercepted HTTP tests
+verify actual serialized requests for every arm, including later turns, retries,
+histories, notes and exhausted fallbacks. Provenance v2 records each actual arm;
+future controls must retain that distinction. Running `--fast` alone is never a
+no-communication experiment.
 
 ## Baselines
 

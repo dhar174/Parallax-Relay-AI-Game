@@ -26,6 +26,7 @@ class Rates(Settings):
 
 
 class MatchSettings(Settings):
+    model_config = ConfigDict(strict=True)
     communication_rounds: Literal[0, 1, 2] = 2
     condition: ConditionName | None = None
     max_turns: int = Field(default=12, ge=1, le=12)
@@ -43,7 +44,7 @@ class MatchSettings(Settings):
     @classmethod
     def normalize_condition(cls, value):
         if isinstance(value, dict) and 'communication_rounds' in value and type(value['communication_rounds']) is not int:
-            raise ValueError('communication_rounds must be an integer, not a boolean')
+            raise ValueError('communication_rounds must be an integer')
         if isinstance(value, dict) and isinstance(value.get('condition'), str) and value['condition'] in CONDITIONS:
             value = dict(value)
             rounds = CONDITIONS[value['condition']].communication_rounds

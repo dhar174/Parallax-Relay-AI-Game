@@ -135,7 +135,7 @@ document.addEventListener('input',({target:t})=>{
    config.match.condition=t.value||null;
    if(t.value)config.match.communication_rounds=conditionRounds(t.value);
    const rounds=document.querySelector('[data-match="communication_rounds"]');
-   if(rounds)rounds.value=String(config.match.communication_rounds);
+   if(rounds)rounds.value=Number.isFinite(config.match.communication_rounds)?String(config.match.communication_rounds):'';
   }else{
    config.match[t.dataset.match]=t.value===''&&!t.validity?.badInput&&t.dataset.match==='max_estimated_cost_usd'?null:t.valueAsNumber;
    if(t.dataset.match==='communication_rounds'&&Number.isFinite(t.valueAsNumber)&&config.match.condition!=null&&conditionRounds(config.match.condition)!==t.valueAsNumber){

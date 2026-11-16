@@ -27,8 +27,10 @@ test('editing rounds after a named condition remains exportable and smoke repair
   await app.tab('scenario');
   for(const condition of ['disabled','reduced']){
     app.input({dataset:{match:'condition'},value:condition});
+    assert.equal(app.node('match-communication_rounds').value,condition==='disabled'?'0':'1');
     const panel=app.node('panel').innerHTML;
     app.input({dataset:{match:'communication_rounds'},value:'2',valueAsNumber:2});
+    assert.equal(app.node('match-condition').value,'');
     assert.match(await app.exportConfig(),/communication_rounds = 2/);
     assert.doesNotMatch(await app.exportConfig(),/condition =/);
     app.input({dataset:{match:'condition'},value:condition});
@@ -41,6 +43,15 @@ test('editing rounds after a named condition remains exportable and smoke repair
     assert.match(output,new RegExp('condition = "'+condition+'"'));
     assert.match(output,new RegExp('max_calls = '+(3*(expected+1)*contract.defaults.match.max_attempts)));
   }
+});
+
+test('unselecting a named arm preserves empty rounds without writing NaN',async t=>{
+ const app=await workbench(t);await app.tab('scenario');
+ app.input({dataset:{match:'condition'},value:'disabled'});
+ app.input({dataset:{match:'communication_rounds'},value:'',valueAsNumber:NaN});
+ app.input({dataset:{match:'condition'},value:''});
+ assert.equal(app.node('match-communication_rounds').value,'');
+ assert.doesNotMatch(app.node('match-communication_rounds').value,/NaN/);
 });
 
 test('actual replay script labels policies and historical v1 conditions truthfully',async()=>{
@@ -175,7 +186,8 @@ async function workbench(t, overrides = {}) {
   const globals = {
     document: {
       getElementById: node,
-      querySelector: () => node('footer'),
+      querySelector: selector => selector==='.sidefoot'?node('footer'):
+        node('match-'+selector.match(/^\[data-match="([a-z_]+)"\]$/)[1]),
       querySelectorAll: () => ['scenario', 'offline', 'live', 'evaluation'].map(tab => {
         const button = node('nav-' + tab);
         button.dataset = { tab };

@@ -1,5 +1,19 @@
 # Verification record
 
+## Controls review follow-up — November 16, 2026 UTC
+
+Revision `76fb564` passed all six jobs in
+[workflow 43804721583](https://github.com/dhar174/Parallax-Relay-AI-Game/actions/runs/43804721583),
+with 280 Python tests per job and 56 Node tests on locked Ubuntu/Python 3.12.
+Antigravity independently reverified 280 Python / 56 Node tests and cleared the
+original findings. Subsequent non-blocking concerns have focused regressions for
+exact notice JSON types, copied context settings, numeric booleans, ASCII Python
+version labels and independent condition/round DOM controls. Final revision
+receipts are recorded in the PR response. Local follow-up verification passed
+283 Python tests in 29.549 seconds and 57 Node tests, with zero failures/skips.
+Original delivery counts below remain
+historical evidence for `f9d035e`.
+
 ## Antigravity review corrections — November 16, 2026 UTC
 
 The [controls follow-up](verification/2026-11-15-pr39-antigravity.md) and
@@ -52,7 +66,7 @@ remains separately tracked; none of #20/#23/#24/#26/#34/#35 closes here.
 
 ## Slice 8 controls — November 16, 2026 UTC
 
-Baseline merged source `0b21a0b` passed 260 Python tests. The delivered controls
+Baseline merged source `0b21a0b` passed 260 Python tests. Original controls revision `f9d035e`
 passed 268 Python tests (26.303 seconds), dependency consistency, compilation,
 workbench build, 53 Node tests with zero skips/failures, and normal/fast mock
 victories (seven turns, 63/42 calls, five energy, all scores 100).

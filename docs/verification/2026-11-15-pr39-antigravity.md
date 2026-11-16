@@ -21,3 +21,13 @@ Chromium interaction, dependency/build/mock checks and hosted matrix are verifie
 for the submitted revision; exact counts/links are recorded in the PR response.
 Historical fixture files are preserved. Broader browser/security/room work remains
 separately tracked.
+
+The re-review of `76fb564` cleared the original findings and identified additional
+non-blocking cases. New probes first reproduced Python bool/int/float equality in
+condition notices, direct copied-context settings bypass, Unicode version digits
+and the empty-round selector writing `NaN`. Corrections compare canonical JSON
+identities, revalidate requested settings/context, enforce strict numeric match
+settings, use ASCII version digits and preserve empty numeric DOM fields. DOM
+stubs now resolve condition/round inputs independently. The unused import, overly
+specific integer error and remaining documentation attribution/status issues are
+corrected; old delivery counts explicitly identify their historical revision.
