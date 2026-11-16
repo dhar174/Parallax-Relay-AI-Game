@@ -218,3 +218,12 @@ inputs before output/provider construction, and `run_match` checks it again.
 Single-match runs, diagnostics, pilots and operational reruns cannot select
 held-out rooms. Pure engine/certificate APIs are trusted host utilities; the
 permit is a workflow guard, not a sandbox for arbitrary Python.
+
+
+Each trial launch collects one fresh frozen-input snapshot. The trusted runner
+passes that checked snapshot into permit creation; the permit detaches it and
+rechecks immutable registration/trial/catalog bindings at `run_match` entry.
+Direct `execute_trial`/permit-factory callers collect the fresh snapshot there.
+These are per-launch host receipts, not a cache to reuse across launches. Permit
+creation failures return sanitized `setup_failure` receipts before trial output or
+provider setup, so the campaign settles the attempted trial and releases its block.

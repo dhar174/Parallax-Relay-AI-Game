@@ -10,7 +10,7 @@ header{display:flex;justify-content:space-between;align-items:center;gap:20px;fl
 .sensors,.logs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.panel img{width:100%;height:auto;display:block;border-radius:6px;background:#101925}.panel h2 span{font-weight:400;color:#93b2cd;font-size:12px}.logs{margin-top:14px}.entry{padding:9px 0;border-bottom:1px solid #293b4c;font-size:13px;line-height:1.55;white-space:pre-wrap;overflow-wrap:anywhere}.entry:last-child{border-bottom:0}.entry b{color:#9cdbde}.subhead{font-size:11px;color:#d6c18c;letter-spacing:.08em;text-transform:uppercase;margin-top:14px}.note{color:#aebecb;font-size:12px;line-height:1.5}.warning{color:#e6c987;font-size:12px}details{margin-top:14px}summary{cursor:pointer;color:#bbcfdf;font-size:13px}.empty{padding:24px;border:1px dashed #486078;border-radius:12px;margin:20px 0}footer{font-size:12px;color:#8fa7bc;margin-top:24px;line-height:1.6}#failure{color:#f3bc95}
 @media(max-width:850px){body{padding:16px}.summary{grid-template-columns:repeat(2,1fr)}.sensors,.logs{grid-template-columns:1fr}h1{font-size:24px}.panel,.log{padding:12px}}
 </style></head><body>
-<header><div><div class="eyebrow">Multimodal multi-agent test chamber</div><h1>PARALLAX RELAY</h1><p>The Split Span · Milestone 2 · recorded match</p></div><div class="badge" id="mode"></div></header>
+<header><div><div class="eyebrow">Multimodal multi-agent test chamber</div><h1>PARALLAX RELAY</h1><p id="room">Recorded match</p></div><div class="badge" id="mode"></div></header>
 <p id="roster"></p><p id="condition"></p><p class="warning">Spectator access: every sensor feed and private objective is visible here. This page is never sent to a player.</p>
 <section class="summary" aria-label="Match summary"><div class="metric"><span>Outcome</span><strong id="outcome"></strong></div><div class="metric"><span>Resolved turns</span><strong id="turnCount"></strong></div><div class="metric"><span>Model call attempts</span><strong id="calls"></strong></div><div class="metric"><span>Team energy remaining</span><strong id="energy"></strong></div></section>
 <div id="empty" class="empty" hidden>No turn was fully resolved. The final image shows the unchanged state. Inspect <code>calls.jsonl</code> and <code>phases.jsonl</code> for the partial turn.</div>
@@ -25,6 +25,8 @@ header{display:flex;justify-content:space-between;align-items:center;gap:20px;fl
 const DATA=__REPLAY_DATA__;
 const $=id=>document.getElementById(id),records=DATA.records,result=DATA.result;
 const provenance=DATA.manifest.provenance,mode=DATA.manifest.mode??provenance?.execution?.value?.mode;
+const room=DATA.manifest.room??provenance?.inputs?.room?.value?.id??(DATA.manifest.schema_version===2?'The Split Span':'Room unspecified');
+$('room').textContent=room+' · recorded match';
 const policy=provenance?.execution?.value?.policy?.name;
 $('mode').textContent=mode==='mock'?(policy==='scripted'?'MOCK · SCRIPTED FIXTURE':policy?'MOCK · '+policy.toUpperCase()+' POLICY':'MOCK · OFFLINE POLICY'):mode==='live'?'LIVE API RUN':mode==='programmatic'?'PROGRAMMATIC RUN':'RUN MODE UNKNOWN';
 $('outcome').textContent=result.stop_reason.replaceAll('_',' ');

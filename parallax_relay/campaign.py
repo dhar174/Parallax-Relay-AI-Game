@@ -106,7 +106,6 @@ def register(value: dict, out: Path, *, pilot: Path | None = None) -> dict:
         if pilot_data['spec']['stage'] != 'pilot' or not pilot_report['cohort_eligible']:
             raise CampaignError('Confirmation requires a completed pilot registration')
         if spec.protocol_version==2:
-            if pilot_data['schema_version']!=2:raise CampaignError('Confirmation requires a current development pilot')
             validate_pilot_transition(CampaignSpec.model_validate(pilot_data['spec']),spec,pilot_data['frozen'],frozen)
         elif (pilot_data['spec']['mode'] != spec.mode or pilot_data['spec']['rooms'] != spec.rooms or
                 sorted(pilot_data['spec']['roster'],key=lambda p:(p['provider'],p['model'])) !=
@@ -210,17 +209,18 @@ class Ledger:
 
 
 async def execute_trial(root: Path, registration: dict, spec: CampaignSpec, trial: dict,
-                        environ: dict) -> dict:
+                        environ: dict,*,_checked_inputs: dict|None=None) -> dict:
     settings = trial_settings(spec, trial)
     from .room_execution import RoomExecutionPermit
-    # Gate before output, credentials, client construction and provider calls.
-    permit=RoomExecutionPermit.from_registration(registration,trial) if get_room(settings.room_id).split=='held_out' else None
     agents, recorder, result = {}, None, None
     started = monotonic()
     stage, stop, cleanup = 'setup', 'setup_failure', 'ok'
     execution_stop = None
     cancelled = None
     try:
+        # Gate before output, credentials, client construction and provider calls.
+        permit=(RoomExecutionPermit.from_registration(registration,trial,_checked_inputs=_checked_inputs)
+                if get_room(settings.room_id).split=='held_out' else None)
         model_team = trial['team'] == 'models'
         identities = {r: PlayerIdentity(provider=trial['players'][r]['provider'], model=trial['players'][r]['model'])
                       if model_team else PlayerIdentity(provider='mock', model=(
@@ -333,14 +333,18 @@ async def run_campaign(root: Path, *, offline: bool = False, live: bool = False,
             for trial, (max_calls, max_dollars) in zip(trials, exposure):
                 if last_launch is not None:
                     await asyncio.sleep(max(0, spec.min_trial_interval_seconds - (monotonic() - last_launch)))
-                if (spec.stage != 'diagnostic' or spec.protocol_version==2) and frozen_inputs(spec) != registration['frozen']:
+                checked=frozen_inputs(spec) if spec.stage!='diagnostic' or spec.protocol_version==2 else None
+                if checked is not None and checked != registration['frozen']:
                     stop = 'frozen_input_drift'
                     break
                 ledger.emit('trial_launched', trial_id=trial['trial_id'], block_id=block_id)
                 last_launch = monotonic()
                 interrupted = None
                 try:
-                    receipt = await execute_trial(root, registration, spec, trial,selected_env)
+                    if get_room(trial['room']).split=='held_out':
+                        receipt=await execute_trial(root,registration,spec,trial,selected_env,_checked_inputs=checked)
+                    else:
+                        receipt = await execute_trial(root, registration, spec, trial,selected_env)
                 except asyncio.CancelledError as error:
                     interrupted = error
                     receipt = getattr(error, 'campaign_trial', {

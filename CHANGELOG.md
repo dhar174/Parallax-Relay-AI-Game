@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+### Slice 9 rooms
+
+- Add catalog v1 with three development crossing rooms and six held-out retrieval/
+  return or two-bridge rooms, one shared resolver and sensor-specific projections.
+- Prove every room with host-only certificates; retain the unchanged Split Span
+  script as a memorization control that fails all six held-out missions.
+- Add native/request/provenance format 3 and embedded room definitions while
+  preserving historical readers and committed examples.
+- Enforce protocol-2 development/pilot and held-out confirmation splits, frozen
+  transition identity and descriptive cross-room accounting; add CLI/workbench
+  development-room selection and recorded-room replay headers.
+- Preserve campaign accounting on permit setup failure and reuse each launch's
+  fresh identity check for permit binding and entry validation. No paid campaign,
+  ECHO activation, physics, dashboard or deployment is included.
+
 ### Slice 8 campaigns
 
 - Add frozen campaign registration, serial trial execution, durable lifecycle

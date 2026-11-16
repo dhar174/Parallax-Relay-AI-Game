@@ -10,19 +10,26 @@ from .provenance import canonical_hash
 class RoomExecutionPermit:
     registration_json: str
     trial_json: str
+    checked_inputs_json: str
 
     @classmethod
-    def from_registration(cls,registration: dict,trial: dict):
-        from .campaign import validate_registration
+    def from_registration(cls,registration: dict,trial: dict,*,_checked_inputs: dict|None=None):
+        """Bind this launch's fresh host check; direct callers collect it here."""
+        from .campaign import validate_registration,frozen_inputs
+        from .campaign_models import CampaignSpec
         validate_registration(registration)
-        permit=cls(json.dumps(registration,sort_keys=True),json.dumps(trial,sort_keys=True))
+        checked=(_checked_inputs if _checked_inputs is not None else
+                 frozen_inputs(CampaignSpec.model_validate(registration['spec'])))
+        permit=cls(json.dumps(registration,sort_keys=True),json.dumps(trial,sort_keys=True),json.dumps(checked,sort_keys=True))
         permit.validate(trial['room'])
         return permit
 
     def validate(self,room_id: str) -> None:
         from .campaign_models import CampaignSpec
-        from .campaign import frozen_inputs
         registration=json.loads(self.registration_json);trial=json.loads(self.trial_json)
+        # Recheck immutable registration/trial/catalog bindings at run_match's
+        # entry without repeating the launch's Git/package/input scan.
+        checked=json.loads(self.checked_inputs_json)
         spec=CampaignSpec.model_validate(registration['spec'])
         if (registration.get('schema_version')!=2 or spec.protocol_version!=2 or spec.stage!='confirmatory' or
             not isinstance(registration.get('pilot'),dict) or not registration['pilot'].get('registration_sha256') or
@@ -33,5 +40,5 @@ class RoomExecutionPermit:
             registration['frozen'].get('catalog')!=catalog_identity() or
             registration['frozen']['source']['status']!='clean' or
             registration['frozen']['environment']['value']['status']!='complete' or
-            registration['frozen']!=frozen_inputs(spec)):
+            registration['frozen']!=checked):
             raise ValueError('A held-out room requires a matching registered confirmatory campaign')

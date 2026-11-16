@@ -72,6 +72,17 @@ test('unselecting a named arm preserves empty rounds without writing NaN',async 
  assert.doesNotMatch(app.node('match-communication_rounds').value,/NaN/);
 });
 
+test('replay header names the recorded room safely and keeps the historical fallback',async()=>{
+ const template=await readFile(join(root,'parallax_relay/replay_template.html'),'utf8');
+ for(const [manifest,label] of [[{schema_version:3,room:'dev_02'},'dev_02'],[{schema_version:2},'The Split Span'],[{schema_version:3},'Room unspecified'],[{schema_version:3,room:'<img src=x onerror=alert(1)>'},'<img src=x onerror=alert(1)>']]){
+  const nodes=new Map();const node=id=>{if(!nodes.has(id))nodes.set(id,{value:'0',textContent:'',replaceChildren(){},closest(){return this;},addEventListener(){}});return nodes.get(id);};
+  const data={manifest,records:[],calls:[],result:{stop_reason:'turn_limit',turns:0,budget:{calls_started:0},energy:6}};
+  const script=template.match(/<script>([\s\S]*?)<\/script>/)[1].replace('__REPLAY_DATA__',JSON.stringify(data));
+  runInNewContext(script,{document:{getElementById:node,createElement:()=>({}),createTextNode:()=>({})}});
+  assert.equal(node('room').textContent,label+' · recorded match');
+ }
+});
+
 test('actual replay script labels policies and historical v1 conditions truthfully',async()=>{
   const template=await readFile(join(root,'parallax_relay/replay_template.html'),'utf8');
   for(const policy of ['wait','uniform','scripted']){

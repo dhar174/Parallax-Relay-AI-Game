@@ -117,7 +117,7 @@ def validate_frozen(value,spec,*,version=2):
     if spec.stage!='diagnostic' and (source.status!='clean' or env.value['status']!='complete'):
         raise ValueError('Ineligible frozen identity')
     if version==2:
-        from .rooms import RoomDefinition,room_hash
+        from .rooms import RoomDefinition
         catalog=_Fingerprint.model_validate(value['catalog']);definitions=catalog.value['rooms']
         if catalog.value.get('id')!='catalog_v1' or type(catalog.value.get('version')) is not int or catalog.value['version']!=1:
             raise ValueError('Invalid frozen catalog')

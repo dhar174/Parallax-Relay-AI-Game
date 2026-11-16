@@ -206,3 +206,9 @@ A recorder finalized from an externally supplied result keeps execution/times
 unknown. Native v3 writes `manifest.room_definition` from that supplied world so
 the workbench can validate its geometry without inventing execution input identity.
 Bound runs retain their definition inside fingerprinted provenance inputs.
+
+
+The initial CLI manifest names the selected room even if setup fails before driver
+binding. Replay headers use the recorded room with text-only DOM insertion; old
+version-2 records without a room retain the Split Span fallback. This changes
+current output only; committed historical viewers remain unchanged.

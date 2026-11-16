@@ -109,8 +109,8 @@ async def _run(args, cfg, settings, runtime) -> int:
     policy_model = 'scripted-fixture' if policy == 'scripted' else policy + '-v1'
     players = ({r: {'provider':'mock','model':policy_model} for r in ROLES} if args.mock else
                {r: {'provider':p.provider,'model':p.model} for r,p in runtime.items()})
-    manifest = {'schema_version':2, 'mode':mode, 'players':players,
-                'settings':settings.model_dump(), 'room':'The Split Span'}
+    manifest = {'schema_version':3, 'mode':mode, 'players':players,
+                'settings':settings.model_dump(), 'room':settings.room_id}
     if args.mock:
         manifest['requested_settings'] = requested_settings
     context = ProvenanceContext(mode=mode, experiment_id=args.experiment_id, trial_id=args.trial_id,
