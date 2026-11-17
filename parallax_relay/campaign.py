@@ -131,7 +131,9 @@ def register(value: dict, out: Path, *, pilot: Path | None = None) -> dict:
                 pilot_report.get('anomalies')!=[] or len(rows)!=len(pilot_data['schedule']) or
                 canonical_hash(pilot_report.get('analysis_source'))!=canonical_hash(pilot_data['frozen']['source']) or
                 any(row.get('cleanup_status')!='ok' or
-                    row.get('stop_reason') not in ('victory','defeat','turn_limit') for row in rows)):
+                    row.get('stop_reason') not in ('victory','defeat','turn_limit') or
+                    row.get('recording_stop_reason')!=row.get('stop_reason') or
+                    row.get('execution_stop_reason')!=row.get('stop_reason') for row in rows)):
                 raise CampaignError('Validation requires a complete nonbinding exploratory pilot')
         if spec.protocol_version in (2,3):
             validate_pilot_transition(CampaignSpec.model_validate(pilot_data['spec']),spec,pilot_data['frozen'],frozen)

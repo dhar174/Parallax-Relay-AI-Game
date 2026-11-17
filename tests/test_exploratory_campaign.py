@@ -23,7 +23,8 @@ def eligible_pilot_report():
     # Gate-focused analyzer fixture; separate real-driver tests cover artifacts.
     return {'cohort_eligible': True, 'completion_status': 'complete',
             'analysis_source': CLEAN, 'anomalies': [],
-            'trials': [{'stop_reason': 'turn_limit', 'cleanup_status': 'ok'} for _ in range(60)]}
+            'trials': [{'stop_reason': 'turn_limit', 'cleanup_status': 'ok',
+                        'recording_stop_reason':'turn_limit','execution_stop_reason':'turn_limit'} for _ in range(60)]}
 
 
 class ExploratoryCampaignTests(unittest.IsolatedAsyncioTestCase):
@@ -84,11 +85,13 @@ class ExploratoryCampaignTests(unittest.IsolatedAsyncioTestCase):
             base=Path(temp);pilot=base/'pilot';registration=register(profile_spec('pilot'),pilot)
             with self.assertRaises(CampaignError):register(profile_spec('validation'),base/'missing')
             with self.assertRaises(CampaignError):register(profile_spec('validation'),base/'unrun',pilot=pilot)
-            for key,bad in [('stop_reason','spend_budget'),('stop_reason','call_budget'),('cleanup_status','failed')]:
+            for key,bad in [('stop_reason','spend_budget'),('stop_reason','call_budget'),('cleanup_status','failed'),
+                            ('recording_stop_reason','spend_budget'),('execution_stop_reason','call_budget'),
+                            ('recording_stop_reason','defeat'),('execution_stop_reason',None)]:
                 report=eligible_pilot_report();report['trials'][0][key]=bad
                 with patch('parallax_relay.campaign_analysis.analyze',return_value=report):
                     with self.subTest(key=key,value=bad),self.assertRaises(CampaignError):
-                        register(profile_spec('validation'),base/('rejected-'+bad),pilot=pilot)
+                        register(profile_spec('validation'),base/('rejected-'+key+'-'+str(bad)),pilot=pilot)
             with patch('parallax_relay.campaign_analysis.analyze',return_value=eligible_pilot_report()):
                 value=register(profile_spec('validation'),base/'validation',pilot=pilot)
             self.assertEqual(value['pilot']['registration_sha256'],registration['sha256'])
