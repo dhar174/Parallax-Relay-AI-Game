@@ -14,6 +14,19 @@ from .provenance import canonical_hash
 from .rooms import get_room,rooms as catalog_rooms,catalog_identity,room_hash
 
 
+def _same_profile_types(value, expected):
+    """Reject Python-only coercions such as tuples serialized as JSON arrays."""
+    if type(value) is not type(expected):
+        return False
+    if type(value) is dict:
+        return (value.keys() == expected.keys() and
+                all(_same_profile_types(value[key], expected[key]) for key in expected))
+    if type(value) is list:
+        return (len(value) == len(expected) and
+                all(_same_profile_types(a, b) for a, b in zip(value, expected)))
+    return True
+
+
 class CampaignModel(Settings):
     provider: Literal['openai', 'anthropic', 'gemini']
     model: str = Field(pattern=r'^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$')
@@ -55,7 +68,9 @@ class CampaignSpec(Settings):
             # Compare unnormalized canonical JSON so coercions such as strings,
             # booleans, or omitted settings cannot alter the approved profile.
             try:
-                matches = canonical_hash(value) == canonical_hash(profile_spec(value.get('stage')))
+                expected = profile_spec(value.get('stage'))
+                matches = (_same_profile_types(value, expected) and
+                           canonical_hash(value) == canonical_hash(expected))
             except (TypeError, ValueError):
                 matches = False
             if not matches:raise ValueError('Exploratory profile must match the approved specification')

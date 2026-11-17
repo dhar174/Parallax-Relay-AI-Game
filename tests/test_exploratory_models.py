@@ -78,6 +78,15 @@ class ExploratoryModelsTests(unittest.TestCase):
             with self.subTest(stage=stage), self.assertRaises((ValueError, TypeError)):
                 profile.profile_spec(stage)
 
+    def test_profile_rejects_non_json_collection_types_before_coercion(self):
+        profile = exploratory(self)
+        for stage in ('pilot', 'validation'):
+            for field in ('rooms', 'policies', 'roster', 'conditions'):
+                value = profile.profile_spec(stage)
+                value[field] = tuple(value[field])
+                with self.subTest(stage=stage, field=field), self.assertRaises(ValueError):
+                    CampaignSpec.model_validate(value)
+
     def test_schedule_uses_one_fixed_assignment_per_room_for_all_arms(self):
         profile = exploratory(self)
         self.assertEqual(dict(profile.GEMINI_ROLE_BY_ROOM), ROOM_ROLE)
