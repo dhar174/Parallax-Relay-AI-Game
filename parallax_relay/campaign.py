@@ -32,6 +32,7 @@ from .money import total as money_total, difference, json_fields, amount
 from .campaign_validation import validate_frozen, utc, equal_money
 from .state import initial_world
 from .rooms import get_room, rooms, catalog_identity
+from .exploratory import is_exploratory, profile_analysis
 
 
 class CampaignError(ValueError):
@@ -68,10 +69,10 @@ def frozen_inputs(spec: CampaignSpec) -> dict:
             'catalog': catalog_identity(),
             'inputs': {room.id: {name: input_identities(initial_world(room.id).snapshot(),
                        trial_settings(spec, {'room':room.id,'condition': name, 'team': 'models' if spec.mode == 'live' else 'wait'}))
-                       for name in spec.conditions} for room in rooms() if spec.protocol_version==2 or room.id=='split_span'},
+                       for name in spec.conditions} for room in rooms() if spec.protocol_version in (2,3) or room.id=='split_span'},
             'provider_contracts': {p.provider: provider_contract(p.provider) for p in spec.roster},
             'sampling': 'provider_default', 'known_model_revisions': None,
-            'analysis': {'version': 2, 'bootstrap_resamples': 10000, 'seed': 0,
+            'analysis': profile_analysis() if is_exploratory(spec) else {'version': 2, 'bootstrap_resamples': 10000, 'seed': 0,
                          'percentile': 'Hyndman-Fan-7', 'prng': 'random.Random',
                          'concurrency': 1, 'primary_contrast': ['full', 'disabled']}}
 
@@ -84,8 +85,10 @@ def validate_pilot_transition(pilot: CampaignSpec, confirmation: CampaignSpec, b
         value['roster']=sorted(value['roster'],key=lambda p:(p['provider'],p['model']))
         value['policies']=sorted(value['policies']);value['conditions']=sorted(value['conditions'])
         return value
-    if (pilot.stage!='pilot' or confirmation.stage!='confirmatory' or pilot.protocol_version!=2 or
-        confirmation.protocol_version!=2 or common(pilot)!=common(confirmation) or before!=after):
+    transition=(pilot.protocol_version,confirmation.protocol_version,confirmation.stage)
+    if (pilot.stage!='pilot' or transition not in ((2,2,'confirmatory'),(3,3,'validation')) or
+        canonical_hash(common(pilot))!=canonical_hash(common(confirmation)) or
+        canonical_hash(before)!=canonical_hash(after)):
         raise CampaignError('Changed frozen inputs, settings or design require a new development pilot')
 
 
@@ -96,16 +99,25 @@ def register(value: dict, out: Path, *, pilot: Path | None = None) -> dict:
                                       frozen['environment']['value']['status'] != 'complete'):
         raise CampaignError('Protocol cohorts require clean source and complete environment identity')
     pilot_record = None
-    if spec.stage == 'confirmatory':
+    if spec.stage in ('confirmatory','validation'):
+        label='Validation' if spec.stage=='validation' else 'Confirmation'
         if pilot is None:
-            raise CampaignError('Confirmation requires a completed pilot registration')
+            raise CampaignError(label+' requires a completed pilot registration')
         from .campaign_analysis import analyze
         pilot_data = read_registration(pilot)
         if pilot_data['schema_version']!=2:raise CampaignError('Confirmation requires a fresh registration and current pilot')
         pilot_report = analyze(pilot)
         if pilot_data['spec']['stage'] != 'pilot' or not pilot_report['cohort_eligible']:
             raise CampaignError('Confirmation requires a completed pilot registration')
-        if spec.protocol_version==2:
+        if is_exploratory(spec):
+            rows=pilot_report.get('trials',[])
+            if (pilot_report.get('completion_status')!='complete' or
+                pilot_report.get('anomalies')!=[] or len(rows)!=len(pilot_data['schedule']) or
+                canonical_hash(pilot_report.get('analysis_source'))!=canonical_hash(pilot_data['frozen']['source']) or
+                any(row.get('cleanup_status')!='ok' or
+                    row.get('stop_reason') not in ('victory','defeat','turn_limit') for row in rows)):
+                raise CampaignError('Validation requires a complete nonbinding exploratory pilot')
+        if spec.protocol_version in (2,3):
             validate_pilot_transition(CampaignSpec.model_validate(pilot_data['spec']),spec,pilot_data['frozen'],frozen)
         elif (pilot_data['spec']['mode'] != spec.mode or pilot_data['spec']['rooms'] != spec.rooms or
                 sorted(pilot_data['spec']['roster'],key=lambda p:(p['provider'],p['model'])) !=
@@ -116,7 +128,7 @@ def register(value: dict, out: Path, *, pilot: Path | None = None) -> dict:
                         'changed_frozen_sections': [k for k in frozen if frozen[k] != pilot_data['frozen'][k]],
                         'match_settings_changed': spec.match.model_dump() != pilot_data['spec']['match']}
     elif pilot is not None:
-        raise CampaignError('Only confirmation can reference a pilot')
+        raise CampaignError('Only confirmation or validation can reference a pilot')
     data = {'schema_version': 2, 'experiment_id': str(uuid4()), 'created_at': now(),
             'spec': spec.model_dump(mode='json'), 'frozen': frozen, 'pilot': pilot_record,
             'schedule': schedule(spec)}
@@ -151,14 +163,14 @@ def validate_registration(data: dict) -> dict:
         if data['schema_version']==2 and data['spec'].get('schema_version')!=2:raise ValueError()
         validate_frozen(data['frozen'],spec,version=data['schema_version'])
         pilot=data['pilot']
-        if spec.stage=='confirmatory':
+        if spec.stage in ('confirmatory','validation'):
             if (not isinstance(pilot,dict) or not isinstance(pilot.get('registration_sha256'),str) or
                 not re.fullmatch(r'[0-9a-f]{64}',pilot['registration_sha256']) or
                 type(pilot.get('match_settings_changed')) is not bool or
                 not isinstance(pilot.get('changed_frozen_sections'),list) or
                 any(key not in data['frozen'] for key in pilot['changed_frozen_sections'])):
                 raise ValueError()
-            if spec.protocol_version==2 and (pilot['match_settings_changed'] or pilot['changed_frozen_sections']):raise ValueError()
+            if spec.protocol_version in (2,3) and (pilot['match_settings_changed'] or pilot['changed_frozen_sections']):raise ValueError()
         elif pilot is not None:raise ValueError()
         actual, expected = data['schedule'], schedule(spec,legacy=data['schema_version']==1)
         if not isinstance(actual, list) or len(actual) != len(expected):
@@ -177,8 +189,9 @@ def validate_registration(data: dict) -> dict:
             if trial['block_id'] in blocks and blocks[trial['block_id']] != group:
                 raise ValueError()
             blocks[trial['block_id']] = group
-            if {k: v for k, v in trial.items() if k not in ('trial_id', 'block_id')} != {
-                    k: v for k, v in template.items() if k not in ('trial_id', 'block_id')}:
+            payload={k:v for k,v in trial.items() if k not in ('trial_id','block_id')}
+            wanted={k:v for k,v in template.items() if k not in ('trial_id','block_id')}
+            if (canonical_hash(payload)!=canonical_hash(wanted) if is_exploratory(spec) else payload!=wanted):
                 raise ValueError()
         if len(blocks) != len(set(blocks.values())):
             raise ValueError()
