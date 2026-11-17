@@ -191,6 +191,33 @@ class ExploratoryCampaignTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(report['campaign_accounting']['reservation_balance_estimated_usd'],0)
             self.assertTrue(all(t['unlaunched_reason']=='low_disk_space' for t in report['trials']))
 
+    async def test_preflight_checks_existing_trial_destination_storage_before_clients(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp)/'pilot';register(profile_spec('pilot'),root)
+            (root/'trials').mkdir()
+            def disk(path):return type('Disk',(),{'free':(5*1024**3-1 if path==root/'trials' else 10*1024**3)})()
+            with patch('parallax_relay.campaign.shutil.disk_usage',side_effect=disk),patch('parallax_relay.campaign.HTTPAgent',side_effect=AssertionError('client constructed')):
+                with self.assertRaisesRegex(CampaignError,'5 GiB'):
+                    await run_campaign(root,live=True,environ={'OPENAI_API_KEY':'FAKE','GEMINI_API_KEY':'FAKE'})
+            self.assertFalse((root/'started.json').exists())
+            self.assertFalse((root/'ledger.jsonl').exists())
+            self.assertEqual(list((root/'trials').iterdir()),[])
+
+    async def test_between_trial_guard_checks_trial_destination_separately_from_root(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp)/'pilot';register(profile_spec('pilot'),root)
+            (root/'trials').mkdir()
+            readings=iter([5*1024**3,2*1024**3-1])
+            def disk(path):return type('Disk',(),{'free':next(readings) if path==root/'trials' else 10*1024**3})()
+            with patch('parallax_relay.campaign.shutil.disk_usage',side_effect=disk),patch('parallax_relay.campaign.HTTPAgent',side_effect=AssertionError('client constructed')):
+                await run_campaign(root,live=True,environ={'OPENAI_API_KEY':'FAKE','GEMINI_API_KEY':'FAKE'})
+            report=analyze(root)
+            self.assertEqual(report['campaign_stop']['reason'],'low_disk_space')
+            self.assertEqual(report['counts']['launched'],0)
+            self.assertEqual(report['anomalies'],[])
+            self.assertEqual(report['campaign_accounting']['reservation_balance_calls'],0)
+            self.assertEqual(report['campaign_accounting']['reservation_balance_estimated_usd'],0)
+
     async def test_real_recording_and_priced_fake_driver_support_both_stages_without_network(self):
         from parallax_relay.policies import WaitAgent
         from parallax_relay.protocol import ModelReply, Usage

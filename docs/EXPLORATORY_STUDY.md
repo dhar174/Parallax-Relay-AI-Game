@@ -147,7 +147,9 @@ alone does not make the paid stage ready.
 The runner requires at least **5 GiB free disk before live credential/client setup
 or one-shot markers**, then checks before each next trial and stops new launches
 below **2 GiB**. Record current free bytes, units, filesystem and measurement time
-for the actual output location. Resource stops leave an incomplete ledger and are
+for the actual output location. Both campaign-root storage and an existing
+`trials` destination are checked, including a separate mount or symlink target.
+Resource stops leave an incomplete ledger and are
 infrastructure outcomes; they are not automatically game defeats. Storage checks
 cannot guarantee host continuity or durable recovery from a killed process.
 

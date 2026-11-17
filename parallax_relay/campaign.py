@@ -306,6 +306,15 @@ async def execute_trial(root: Path, registration: dict, spec: CampaignSpec, tria
     return evidence
 
 
+def _available_disk_bytes(root: Path) -> int:
+    """Check ledger storage and an existing recording destination/mount."""
+    free = shutil.disk_usage(root).free
+    trials = root/'trials'
+    if trials.exists() or trials.is_symlink():
+        free = min(free,shutil.disk_usage(trials).free)
+    return free
+
+
 def _execution_preflight(root: Path, registration: dict, *, offline: bool, live: bool):
     """Check execution identity and capacity before any credential handling."""
     if registration['schema_version']!=2:
@@ -317,7 +326,7 @@ def _execution_preflight(root: Path, registration: dict, *, offline: bool, live:
     matches = current == registration['frozen']
     if (spec.stage != 'diagnostic' or spec.protocol_version==2) and not matches:
         raise CampaignError('Frozen source/environment/inputs changed; register a new cohort')
-    if is_exploratory(spec) and shutil.disk_usage(root).free < 5*1024**3:
+    if is_exploratory(spec) and _available_disk_bytes(root) < 5*1024**3:
         raise CampaignError('Exploratory execution requires at least 5 GiB free disk before launch')
     return spec, matches
 
@@ -370,7 +379,7 @@ async def run_campaign(root: Path, *, offline: bool = False, live: bool = False,
             for trial, (max_calls, max_dollars) in zip(trials, exposure):
                 if last_launch is not None:
                     await asyncio.sleep(max(0, spec.min_trial_interval_seconds - (monotonic() - last_launch)))
-                if is_exploratory(spec) and shutil.disk_usage(root).free < 2*1024**3:
+                if is_exploratory(spec) and _available_disk_bytes(root) < 2*1024**3:
                     stop = 'low_disk_space'
                     break
                 checked=frozen_inputs(spec) if spec.stage!='diagnostic' or spec.protocol_version==2 else None
