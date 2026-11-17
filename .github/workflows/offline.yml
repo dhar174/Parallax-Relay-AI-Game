@@ -108,3 +108,46 @@ jobs:
         run: python scripts/check_committed_diff.py
       - name: Check working-tree whitespace
         run: git diff --check
+
+  browser:
+    name: Chromium / Ubuntu 24 / Python 3.12 / Node 24
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PIP_DISABLE_PIP_VERSION_CHECK: '1'
+      PLAYWRIGHT_BROWSERS_PATH: '0'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: tools/browser/package-lock.json
+      - name: Install locked Python environment
+        run: |
+          python -m venv .venv
+          python -m pip --python .venv/bin/python install --require-hashes --only-binary=:all: -r requirements-bootstrap.lock
+          .venv/bin/python -m pip install --require-hashes --only-binary=:all: -r requirements-dev.lock -r requirements.txt
+          .venv/bin/python -m pip check
+      - name: Install locked browser development dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund --prefix tools/browser
+      - name: Provision the matching managed Chromium and OS libraries
+        working-directory: tools/browser
+        run: npx --no-install playwright install --with-deps chromium
+      - name: Run reproducible offline browser coverage
+        env:
+          PYTHON: ${{ github.workspace }}/.venv/bin/python
+        run: npm test --prefix tools/browser
+      - name: Upload browser evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: chromium-browser-evidence
+          path: tools/browser/test-results/
+          if-no-files-found: ignore

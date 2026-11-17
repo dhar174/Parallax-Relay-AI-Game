@@ -1,0 +1,480 @@
+import assert from 'node:assert/strict';
+import { selectedDiagnostics, assertFrameDiagnostics, rotateDiagnosticRounds, assertFinalImage } from './diagnostics.mjs';
+import { before, after, test } from 'node:test';
+import { writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { provision, companion, pageFor, native, viewerURL, openWorkbench, importJSON, finalFrame, layout, results, root, settleImages, textContrast } from './helpers.mjs';
+
+let environment;
+before(async () => {environment = await provision();});
+after(async () => {if (environment) await environment.close();});
+
+const cases = [
+  ['win', 'victory', 7, 63, 21], ['turn-limit', 'turn_limit', 1, 9, 3],
+  ['later-partial', 'call_budget', 1, 15, 5], ['zero-turn-partial', 'call_budget', 0, 6, 2],
+  ['zero-call', 'call_budget', 0, 0, 0], ['local-error', 'local_error', 0, 3, 1],
+  ['cancelled', 'cancelled', 0, 3, 0], ['retry-shape', 'turn_limit', 2, 19, 6],
+  ['commit-unresolved', 'internal_error', 0, 9, 3], ['later-commit-unresolved', 'internal_error', 1, 18, 6],
+  ['broadcast-only', 'call_budget', 0, 3, 1],
+];
+
+function workbenchRound(page, round) {
+  return page.locator('#partial-rounds > details').filter({
+    has: page.locator('summary').filter({hasText: new RegExp('^Round ' + round + ' ')}),
+  });
+}
+
+for (const [name, stop, turns, calls, phases] of cases) {
+  test('file viewer retains native final checkpoint and all diagnostics: ' + name, async t => {
+    const data = await native(environment, name);
+    assert.deepEqual(environment.inventory[name], {stop_reason: stop, turns, calls, phases});
+    assert.equal(data.result.budget.calls_started, calls);
+    const page = await pageFor(t, environment);
+    await page.goto(viewerURL(environment, name));
+    assert.match(await page.title(), /Parallax Relay/);
+    assert.equal(await page.locator('#calls').textContent(), String(calls));
+    assert.equal(await page.locator('#turnCount').textContent(), String(turns));
+    const resolved = new Set(data.replay.map(record => record.turn - 1));
+    const partial = new Set([...data.calls, ...data.phases].map(record => record.turn).filter(turn => !resolved.has(turn)));
+    assert.equal(Number(await page.locator('#round').getAttribute('max')), turns + partial.size, 'Only resolved, evidenced partial and final frames exist');
+    await finalFrame(page);
+    assert.match(await page.locator('#roundLabel').textContent(), /final/i);
+    assert.deepEqual(JSON.parse(await page.locator('#finalState').textContent()), data.final_state);
+    await assertFinalImage(page, new URL('final_spectator.png', viewerURL(environment, name)).href);
+    // Every recorded call/phase is available when its actual frame is selected.
+    let shownCalls = 0, shownPhases = 0;
+    const callText = [], phaseText = [];
+    for (let index = 0; index < Number(await page.locator('#round').getAttribute('max')); index++) {
+      await page.locator('#round').fill(String(index));
+      await page.locator('#round').dispatchEvent('input');
+      await settleImages(page);
+      const frame = await selectedDiagnostics(page);
+      assertFrameDiagnostics(data, frame);
+      callText.push(...await page.locator('#diagnostics .entry').allTextContents());
+      phaseText.push(...await page.locator('#phases .entry').allTextContents());
+      shownCalls += await page.locator('#diagnostics .entry').count();
+      shownPhases += await page.locator('#phases .entry').count();
+      if (!resolved.has(frame.turn)) {
+        const commitments = data.phases.filter(row => row.turn === frame.turn && row.phase === 'commit')
+          .flatMap(row => Object.entries(row.sealed_actions ?? {}));
+        const actionRows = await page.locator('#actions .entry').allTextContents();
+        assert.equal(actionRows.length, commitments.length, 'Partial phase shows only actual completed commitments');
+        for (const [role, action] of commitments) assert.ok(actionRows.some(text => text.startsWith(role + ':') && text.includes(JSON.stringify(action))));
+        if (commitments.length) assert.match(await page.locator('#actions').textContent(), /not applied \(round unresolved\)/);
+        assert.equal(await page.locator('#events .entry').count(), 0, 'Partial phase has no invented engine events');
+        assert.equal(await page.locator('#private .entry').count(), 0, 'Partial phase has no invented HUD or private-note rows');
+      }
+    }
+    assert.equal(shownCalls, calls, 'Each native attempt must remain visible exactly once');
+    assert.equal(shownPhases, phases, 'Each completed native phase must remain visible exactly once');
+    for (const call of data.calls) assert.ok(callText.some(text => text.includes(JSON.stringify(call))), 'Complete native call diagnostic');
+    for (const phase of data.phases) assert.ok(phaseText.some(text => text.includes(JSON.stringify(phase))), 'Complete native phase diagnostic');
+    if (turns === 0 && calls === 0) {
+      assert.equal(await page.locator('#actions .entry').count(), 0);
+      assert.equal(await page.locator('#events .entry').count(), 0);
+    }
+  });
+}
+
+test('file viewer keyboard controls have names, boundaries, focus and live updates', async t => {
+  const page = await pageFor(t, environment);
+  await page.goto(viewerURL(environment, 'win'));
+  assert.equal(await page.getByRole('button', {name: 'Previous round'}).isDisabled(), true);
+  await page.keyboard.press('Tab');
+  assert.equal(await page.getByRole('slider', {name: 'Recorded round'}).evaluate(el => el === document.activeElement), true);
+  const before = await page.locator('#roundLabel').textContent();
+  await page.keyboard.press('ArrowRight');
+  await settleImages(page);
+  assert.notEqual(await page.locator('#roundLabel').textContent(), before);
+  await page.keyboard.press('Tab');
+  assert.equal(await page.getByRole('button', {name: 'Next round'}).evaluate(el => el === document.activeElement), true);
+  await page.keyboard.press('Enter');
+  await settleImages(page);
+  assert.equal(await page.locator('#round').inputValue(), '2');
+  await page.getByRole('button', {name: 'Previous round'}).click();
+  await settleImages(page);
+  assert.equal(await page.locator('#round').inputValue(), '1');
+  await page.keyboard.press('Tab');
+  assert.equal(await page.locator('#round').evaluate(el => el === document.activeElement), true);
+  assert.notEqual(await page.locator('#round').evaluate(el => getComputedStyle(el).outlineStyle), 'none');
+  assert.ok(['polite', 'assertive'].includes(await page.locator('#roundLabel').getAttribute('aria-live')));
+  await page.keyboard.press('End');
+  await settleImages(page);
+  assert.equal(await page.getByRole('button', {name: 'Next round'}).isDisabled(), true);
+  await page.keyboard.press('Home');
+  await settleImages(page);
+  assert.equal(await page.getByRole('button', {name: 'Previous round'}).isDisabled(), true);
+  assert.equal(await page.locator('#round').inputValue(), '0');
+});
+
+for (const viewport of [{width: 1280, height: 800}, {width: 390, height: 844}]) {
+  test('file viewer fits viewport and exposes readable text: ' + viewport.width, async t => {
+    const page = await pageFor(t, environment, {viewport});
+    await page.goto(viewerURL(environment, 'later-partial'));
+    await finalFrame(page);
+    await page.getByText('Final world snapshot (spectator only)', {exact: true}).click();
+    await layout(page, 'standalone-' + viewport.width);
+    const label = page.locator('#roundLabel');
+    assert.ok(await label.isVisible());
+    const contrast = await textContrast(page, '#roundLabel');
+    assert.ok(contrast >= 4.5, 'Round-label contrast ' + contrast);
+    await writeFile(join(results, 'contrast-' + viewport.width + '.json'), JSON.stringify({viewport, roundLabelContrast: contrast}, null, 2));
+  });
+}
+
+test('model strings remain inert in standalone and workbench partial data', async t => {
+  const server = await companion();
+  t.after(() => server.close());
+  const page = await pageFor(t, environment, {origin: server.origin});
+  await page.goto(viewerURL(environment, 'malicious'));
+  assert.match(await page.locator('#room').textContent(), /onerror=/);
+  await page.locator('#round').fill('1');
+  await page.locator('#round').dispatchEvent('input');
+  await settleImages(page);
+  assert.match(await page.locator('#chat').textContent(), /window.modelExecuted/);
+  assert.equal(await page.evaluate(() => window.modelExecuted), undefined);
+  assert.equal(await page.locator('img[src^="https:"]').count(), 0);
+  await openWorkbench(page, server.origin);
+  await importJSON(page, environment, 'malicious-import');
+  assert.match(await page.locator('#partial-rounds').textContent(), /window.modelExecuted/);
+  assert.equal(await page.evaluate(() => window.modelExecuted), undefined);
+  assert.equal(await page.locator('img[src^="https:"]').count(), 0);
+});
+
+test('missing images are explicit without losing final state or diagnostics', async t => {
+  const base = pathToFileURL(join(environment.fixtures, 'missing-images') + '/').href;
+  const missing = ['turn_00_spectra.png', 'turn_00_pyra.png', 'turn_00_flux.png', 'turn_00_spectator.png', 'final_spectator.png'].map(name => base + name);
+  const page = await pageFor(t, environment, {missing});
+  await page.goto(viewerURL(environment, 'missing-images'));
+  for (const role of ['SPECTRA', 'PYRA', 'FLUX', 'SPECTATOR']) {
+    await page.locator('#' + role + 'Unavailable').waitFor({state: 'visible'});
+    assert.equal(await page.locator('#' + role).isVisible(), false);
+    assert.match(await page.locator('#' + role + 'Unavailable').textContent(), /unavailable|missing/i);
+  }
+  await finalFrame(page);
+  assert.deepEqual(JSON.parse(await page.locator('#finalState').textContent()), (await native(environment, 'missing-images')).final_state);
+  await page.locator('#SPECTATORUnavailable').waitFor({state: 'visible'});
+  assert.equal(await page.locator('#SPECTATOR').isVisible(), false);
+  assert.match(await page.locator('#SPECTATORUnavailable').textContent(), /unavailable|missing/i);
+});
+
+test('built workbench imports actual legacy v2 and new v3 directories and JSON', async t => {
+  const server = await companion();
+  t.after(() => server.close());
+  const page = await pageFor(t, environment, {origin: server.origin});
+  await openWorkbench(page, server.origin);
+  assert.match(await page.title(), /Parallax Relay/);
+  await page.locator('[data-tab="evaluation"]').click();
+  await page.getByRole('button', {name: 'Import run folder', exact: true}).focus();
+  const chooser = page.waitForEvent('filechooser');
+  await page.keyboard.press('Enter');
+  await (await chooser).setFiles(join(root, 'example_run'));
+  await page.locator('#final-state').waitFor();
+  assert.deepEqual(JSON.parse(await page.locator('#final-state pre').textContent()), (await native(environment, 'legacy-v2')).final_state);
+  assert.ok(await page.locator('#final-spectator').evaluate(async image => {await image.decode(); return image.naturalWidth > 0;}));
+  await page.locator('#directory').setInputFiles(join(environment.fixtures, 'later-partial'));
+  await page.waitForFunction(() => document.getElementById('directory').value === '');
+  assert.deepEqual(JSON.parse(await page.locator('#final-state pre').textContent()), (await native(environment, 'later-partial')).final_state);
+  for (const [name] of cases) {
+    await importJSON(page, environment, name);
+    const data = await native(environment, name);
+    assert.deepEqual(JSON.parse(await page.locator('#final-state pre').textContent()), data.final_state);
+    assert.equal(await page.locator('#final-spectator').getAttribute('src') === data.images['final_spectator.png'], true, 'Final PNG equals the native final artifact');
+    const allPhases = page.locator('details').filter({has: page.getByText('All phase records', {exact: true})}).locator('pre');
+    assert.deepEqual(JSON.parse(await allPhases.textContent()), data.phases);
+    if (name === 'later-partial' || name === 'zero-turn-partial') {
+      assert.match(await page.locator('#partial-rounds').textContent(), /broadcast|negotiate/);
+    }
+    if (name === 'retry-shape') {
+      const failures = page.locator('section.card').filter({has: page.getByRole('heading', {name: 'Failure evidence and phase records', exact: true})}).locator(':scope > pre');
+      assert.deepEqual(JSON.parse(await failures.textContent()), data.calls.filter(call => call.status !== 'ok'));
+      const failed = JSON.parse(await failures.textContent());
+      assert.deepEqual(failed.map(call => [call.role, call.turn, call.phase, call.attempt, call.status]),
+        [['SPECTRA', 0, 'broadcast', 1, 'invalid_json_schema']]);
+      assert.equal(data.phases.find(phase => phase.turn === 0 && phase.phase === 'broadcast').statuses.SPECTRA, 'ok');
+    }
+    if (name === 'commit-unresolved' || name === 'later-commit-unresolved') {
+      const turn = name === 'commit-unresolved' ? 0 : 1;
+      const round = workbenchRound(page, turn + 1);
+      assert.match(await round.locator('summary').textContent(), /unfinished/);
+      assert.match(await round.locator(':scope > p').textContent(), /Completed commitments.*not applied.*without resolution/i);
+      assert.deepEqual(JSON.parse(await round.locator('pre').nth(0).textContent()), data.phases.filter(phase => phase.turn === turn));
+      assert.deepEqual(JSON.parse(await round.locator('pre').nth(1).textContent()), data.calls.filter(call => call.turn === turn));
+    }
+  }
+  await importJSON(page, environment, 'missing-images');
+  assert.match(await page.locator('#final-spectator').textContent(), /unavailable/i);
+  assert.deepEqual(JSON.parse(await page.locator('#final-state pre').textContent()), (await native(environment, 'missing-images')).final_state);
+  await importJSON(page, environment, 'later-partial');
+  await page.getByText('Final world snapshot', {exact: true}).click();
+  for (const viewport of [{width: 1280, height: 800}, {width: 390, height: 844}]) {
+    await page.setViewportSize(viewport);
+    await layout(page, 'workbench-' + viewport.width);
+    const contrast = await textContrast(page, '#final-state h2');
+    assert.ok(contrast >= 4.5, 'Final checkpoint heading contrast ' + contrast);
+    await writeFile(join(results, 'workbench-contrast-' + viewport.width + '.json'), JSON.stringify({viewport, finalHeadingContrast: contrast}, null, 2));
+  }
+});
+
+test('workbench readiness waits for delayed initial status before keyboard import', async t => {
+  const server = await companion();
+  t.after(() => server.close());
+  const page = await pageFor(t, environment, {origin: server.origin});
+  let releaseStatus;
+  const released = new Promise(resolve => {releaseStatus = resolve;});
+  const requested = page.waitForRequest(server.origin + '/api/status');
+  await page.route(server.origin + '/api/status', async route => {
+    await released;
+    await route.continue();
+  });
+  let ready = false;
+  const opening = openWorkbench(page, server.origin).then(() => {ready = true;});
+  try {
+    await requested;
+    await page.waitForLoadState('load');
+    // Reproduce the lost-focus window without fabricating a companion response.
+    await page.locator('[data-tab="evaluation"]').click();
+    await page.getByRole('button', {name: 'Import run folder', exact: true}).focus();
+    assert.equal(await page.locator('#import-directory').evaluate(el => el === document.activeElement), true);
+    assert.equal(ready, false, 'Navigation must remain pending until the initial status render completes');
+  } finally {
+    releaseStatus();
+    await opening;
+  }
+  assert.equal(await page.locator('#import-directory').evaluate(el => el === document.activeElement), false,
+    'The real status continuation replaced the formerly focused button');
+  await page.getByRole('button', {name: 'Import run folder', exact: true}).focus();
+  const chooser = page.waitForEvent('filechooser');
+  await page.keyboard.press('Enter');
+  await (await chooser).setFiles(join(root, 'example_run'));
+  await page.locator('#final-state').waitFor();
+  assert.deepEqual(JSON.parse(await page.locator('#final-state pre').textContent()), (await native(environment, 'legacy-v2')).final_state);
+});
+
+test('actual loopback companion executes one-turn mock through built workbench', async t => {
+  const server = await companion();
+  t.after(() => server.close());
+  const page = await pageFor(t, environment, {origin: server.origin});
+  await openWorkbench(page, server.origin);
+  await page.locator('[data-match="max_turns"]').fill('1');
+  await page.locator('[data-tab="offline"]').click();
+  const response = page.waitForResponse(response => response.url() === server.origin + '/api/mock', {timeout: 60_000});
+  await page.getByRole('button', {name: 'Run offline through Python', exact: true}).click();
+  const data = await (await response).json();
+  assert.equal(data.result.stop_reason, 'turn_limit');
+  assert.equal(data.result.turns, 1);
+  assert.equal(data.calls.length, 9);
+  await page.locator('#final-state').waitFor();
+  assert.deepEqual(JSON.parse(await page.locator('#final-state pre').textContent()), data.final_state);
+  assert.equal(await page.locator('#final-spectator').getAttribute('src') === data.images['final_spectator.png'], true, 'Companion final PNG equals native final artifact');
+  assert.ok(await page.locator('#final-spectator').evaluate(async image => {await image.decode(); return image.naturalWidth > 0;}));
+});
+
+
+test('current file viewer reads actual legacy v2 final artifacts', async t => {
+  const data = await native(environment, 'legacy-v2');
+  assert.equal(data.manifest.schema_version, 2);
+  const page = await pageFor(t, environment);
+  await page.goto(viewerURL(environment, 'legacy-v2'));
+  await finalFrame(page);
+  assert.deepEqual(JSON.parse(await page.locator('#finalState').textContent()), data.final_state);
+  await assertFinalImage(page, new URL('final_spectator.png', viewerURL(environment, 'legacy-v2')).href);
+});
+
+
+for (const name of ['missing-replay', 'missing-middle-replay']) {
+  test('omitted legacy replay rows retain known resolution and native evidence: ' + name, async t => {
+    const data = await native(environment, name);
+    assert.equal(data.result.turns, 7);
+    assert.equal(data.final_state.turn, 7);
+    const resolved = new Set(data.replay.map(record => record.turn - 1));
+    const orphan = [...new Set(data.calls.map(call => call.turn).filter(turn => !resolved.has(turn)))];
+    const page = await pageFor(t, environment);
+    await page.goto(viewerURL(environment, name));
+    const maximum = Number(await page.locator('#round').getAttribute('max'));
+    assert.equal(maximum, 7);
+    let shownCalls = 0, shownPhases = 0;
+    for (let index = 0; index < maximum; index++) {
+      await page.locator('#round').fill(String(index));
+      await page.locator('#round').dispatchEvent('input');
+      await settleImages(page);
+      const label = await page.locator('#roundLabel').textContent();
+      const frame = await selectedDiagnostics(page);
+      assertFrameDiagnostics(data, frame);
+      const selectedTurn = frame.turn;
+      if (orphan.includes(selectedTurn)) {
+        assert.match(label, /resolved round record unavailable/);
+        assert.doesNotMatch(label, /unfinished|unresolved|unknown/i);
+        assert.doesNotMatch(await page.locator('#actions').textContent(), /not applied|unresolved|unapplied/i);
+        assert.equal(await page.locator('#events .entry').count(), 0);
+      }
+      shownCalls += await page.locator('#diagnostics .entry').count();
+      shownPhases += await page.locator('#phases .entry').count();
+    }
+    assert.equal(shownCalls, 63);
+    assert.equal(shownPhases, 21);
+    await finalFrame(page);
+    assert.deepEqual(JSON.parse(await page.locator('#finalState').textContent()), data.final_state);
+    await assertFinalImage(page, new URL('final_spectator.png', viewerURL(environment, name)).href);
+    const server = await companion();
+    t.after(() => server.close());
+    const workbench = await pageFor(t, environment, {origin: server.origin});
+    await openWorkbench(workbench, server.origin);
+    await importJSON(workbench, environment, name);
+    const summaries = await workbench.locator('#partial-rounds > details > summary').allTextContents();
+    for (const turn of orphan) {
+      const summary = summaries.find(text => text.startsWith('Round ' + (turn + 1) + ' '));
+      assert.ok(summary, 'Missing archive evidence for round ' + (turn + 1));
+      assert.match(summary, /resolved round record unavailable/);
+      assert.doesNotMatch(summary, /unfinished|unresolved|unknown/i);
+      const evidence = workbench.locator('#partial-rounds > details').filter({has: workbench.locator('summary').filter({hasText: new RegExp('^Round ' + (turn + 1) + ' ')})}).locator('pre');
+      assert.deepEqual(JSON.parse(await evidence.nth(0).textContent()), data.phases.filter(phase => phase.turn === turn));
+      assert.deepEqual(JSON.parse(await evidence.nth(1).textContent()), data.calls.filter(call => call.turn === turn));
+    }
+    assert.deepEqual(JSON.parse(await workbench.locator('#final-state pre').textContent()), data.final_state);
+  });
+}
+
+for (const name of ['checkpoint-turn-conflict', 'checkpoint-terminal-conflict', 'checkpoint-later-phase-conflict']) {
+  test('contradictory checkpoint keeps native commitments resolution unknown in both viewers: ' + name, async t => {
+    const data = await native(environment, name);
+    assert.equal(data.result.turns, 1);
+    assert.equal(data.final_state.turn, 1);
+    assert.equal(data.replay[0].turn, 1);
+    const commitments = data.phases.find(phase => phase.turn === 1 && phase.phase === 'commit').sealed_actions;
+    assert.deepEqual(Object.keys(commitments).sort(), ['FLUX', 'PYRA', 'SPECTRA']);
+    if (name === 'checkpoint-turn-conflict') assert.equal(data.replay[0].state_after.turn, 2);
+    else if (name === 'checkpoint-terminal-conflict') {
+      assert.equal(data.replay[0].state_after.win, true);
+      assert.equal(data.final_state.win, false);
+    } else assert.equal(data.phases.at(-1).turn, 2);
+
+    await t.test('standalone', async t => {
+      const page = await pageFor(t, environment);
+      await page.goto(viewerURL(environment, name));
+      await page.locator('#round').fill('1');
+      await page.locator('#round').dispatchEvent('input');
+      await settleImages(page);
+      assert.match(await page.locator('#roundLabel').textContent(), /^Round 2 .*resolution unknown/);
+      assert.doesNotMatch(await page.locator('#roundLabel').textContent(), /unfinished|resolved round record unavailable/);
+      const frame = await selectedDiagnostics(page);
+      assert.equal(frame.turn, 1);
+      assertFrameDiagnostics(data, frame);
+      const actions = await page.locator('#actions .entry').allTextContents();
+      assert.equal(actions.length, 3);
+      for (const [role, action] of Object.entries(commitments)) {
+        assert.ok(actions.some(text => text.startsWith(role + ':') && text.includes(JSON.stringify(action))));
+      }
+      assert.doesNotMatch(await page.locator('#actions').textContent(), /not applied|unresolved|unapplied/i);
+      await finalFrame(page);
+      assert.deepEqual(JSON.parse(await page.locator('#finalState').textContent()), data.final_state);
+      await assertFinalImage(page, new URL('final_spectator.png', viewerURL(environment, name)).href);
+    });
+    await t.test('workbench', async t => {
+      const server = await companion();
+      t.after(() => server.close());
+      const workbench = await pageFor(t, environment, {origin: server.origin});
+      await openWorkbench(workbench, server.origin);
+      await importJSON(workbench, environment, name);
+      const round = workbenchRound(workbench, 2);
+      assert.match(await round.locator('summary').textContent(), /^Round 2 .*resolution unknown/);
+      assert.doesNotMatch(await round.textContent(), /unfinished|not applied|unapplied/i);
+      assert.deepEqual(JSON.parse(await round.locator('pre').nth(0).textContent()), data.phases.filter(phase => phase.turn === 1));
+      assert.deepEqual(JSON.parse(await round.locator('pre').nth(1).textContent()), data.calls.filter(call => call.turn === 1));
+      assert.deepEqual(JSON.parse(await workbench.locator('#final-state pre').textContent()), data.final_state);
+    });
+  });
+}
+
+test('broadcast-only native stop shows no completed commitments in either viewer', async t => {
+  const data = await native(environment, 'broadcast-only');
+  assert.equal(data.result.turns, 0);
+  assert.deepEqual(data.phases.map(phase => phase.phase), ['broadcast']);
+  assert.equal(data.calls.length, 3);
+  await t.test('standalone', async t => {
+    const page = await pageFor(t, environment);
+    await page.goto(viewerURL(environment, 'broadcast-only'));
+    assert.match(await page.locator('#roundLabel').textContent(), /^Round 1 .*unfinished/);
+    assertFrameDiagnostics(data, await selectedDiagnostics(page));
+    assert.equal(await page.locator('#actions .entry').count(), 0);
+    assert.doesNotMatch(await page.locator('#actions').textContent(), /commitments recorded|not applied/i);
+  });
+  await t.test('workbench', async t => {
+    const server = await companion();
+    t.after(() => server.close());
+    const workbench = await pageFor(t, environment, {origin: server.origin});
+    await openWorkbench(workbench, server.origin);
+    await importJSON(workbench, environment, 'broadcast-only');
+    const round = workbenchRound(workbench, 1);
+    assert.match(await round.locator('summary').textContent(), /^Round 1 .*unfinished/);
+    assert.match(await round.locator(':scope > p').textContent(), /No completed commitments recorded/i);
+    assert.doesNotMatch(await round.textContent(), /Completed commitments are recorded|not applied/i);
+    assert.deepEqual(JSON.parse(await round.locator('pre').nth(0).textContent()), data.phases);
+    assert.deepEqual(JSON.parse(await round.locator('pre').nth(1).textContent()), data.calls);
+  });
+});
+
+
+test('per-frame checks reject a rotating call and phase mutant accepted by aggregate checks', async t => {
+  const data = await native(environment, 'win');
+  const page = await pageFor(t, environment);
+  await page.goto(viewerURL(environment, 'win'));
+  await rotateDiagnosticRounds(page, data.result.turns);
+  const frames = [];
+  for (let index = 0; index < data.result.turns; index++) {
+    await page.locator('#round').fill(String(index));
+    await page.locator('#round').dispatchEvent('input');
+    await settleImages(page);
+    frames.push(await selectedDiagnostics(page));
+  }
+  // These are the former aggregate assertions: every original row still appears once.
+  const calls = frames.flatMap(frame => frame.calls), phases = frames.flatMap(frame => frame.phases);
+  assert.equal(calls.length, 63);
+  assert.equal(phases.length, 21);
+  for (const call of data.calls) assert.ok(calls.some(row => JSON.stringify(row) === JSON.stringify(call)));
+  for (const phase of data.phases) assert.ok(phases.some(row => JSON.stringify(row) === JSON.stringify(phase)));
+  t.diagnostic('OLD aggregate assertions ACCEPT the rotated mutant: 63 calls and 21 phases retained');
+  for (const frame of frames) {
+    assert.throws(() => assertFrameDiagnostics(data, frame), /Native calls for displayed turn/);
+    const callsCorrected = {...frame, calls: data.calls.filter(row => row.turn === frame.turn)};
+    assert.throws(() => assertFrameDiagnostics(data, callsCorrected), /Native phases for displayed turn/);
+  }
+  t.diagnostic('NEW per-frame assertions REJECT all seven rotated call groups and all seven rotated phase groups');
+});
+
+
+test('native shape-error retry retains attempts one and two in their actual round and phase', async t => {
+  const data = await native(environment, 'retry-shape');
+  const attempts = data.calls.filter(row => row.role === 'SPECTRA' && row.turn === 0 && row.phase === 'broadcast');
+  assert.deepEqual(attempts.map(row => [row.attempt, row.status]), [[1, 'invalid_json_schema'], [2, 'ok']]);
+  assert.equal(data.calls.length, 19);
+  assert.equal(data.phases.length, 6);
+  assert.equal(data.phases.find(row => row.turn === 0 && row.phase === 'broadcast').statuses.SPECTRA, 'ok');
+  const page = await pageFor(t, environment);
+  await page.goto(viewerURL(environment, 'retry-shape'));
+  const first = await selectedDiagnostics(page);
+  assert.equal(first.turn, 0);
+  assertFrameDiagnostics(data, first);
+  assert.deepEqual(first.calls.filter(row => row.role === 'SPECTRA' && row.phase === 'broadcast'), attempts);
+  await page.locator('#next').click();
+  await settleImages(page);
+  const second = await selectedDiagnostics(page);
+  assert.equal(second.turn, 1);
+  assertFrameDiagnostics(data, second);
+  assert.equal(second.calls.some(row => row.attempt === 2), false);
+});
+
+
+test('exact final PNG URL rejects a pre-action image disguised with a final-image query', async t => {
+  const page = await pageFor(t, environment);
+  await page.goto(viewerURL(environment, 'win'));
+  await finalFrame(page);
+  await page.locator('#SPECTATOR').evaluate(image => {image.src = 'turn_00_spectator.png?final_spectator.png';});
+  // Both former checks pass even though the rendered bytes are from turn zero.
+  assert.match(await page.locator('#SPECTATOR').getAttribute('src'), /final_spectator\.png$/);
+  assert.ok(await page.locator('#SPECTATOR').evaluate(async image => {await image.decode(); return image.naturalWidth > 0;}));
+  t.diagnostic('OLD suffix plus PNG-decode assertions ACCEPT the wrong pre-action PNG');
+  await assert.rejects(() => assertFinalImage(page, new URL('final_spectator.png', viewerURL(environment, 'win')).href), /Final spectator URL must equal/);
+  t.diagnostic('NEW exact final-artifact URL assertion REJECTS the wrong pre-action PNG');
+});
