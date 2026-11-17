@@ -60,6 +60,20 @@ class ExploratoryCampaignTests(unittest.IsolatedAsyncioTestCase):
                 with self.subTest(key=key),self.assertRaises(CampaignError):
                     validate_registration(changed)
 
+    def test_duplicate_profile_spec_and_registration_keys_are_rejected_at_json_boundary(self):
+        from parallax_relay.campaign import main, read_json
+        with tempfile.TemporaryDirectory() as temp:
+            base=Path(temp);spec=base/'pilot.json'
+            spec.write_text(json.dumps(profile_spec('pilot')).replace('"campaign_max_calls": 10368','"campaign_max_calls": 999999, "campaign_max_calls": 10368'))
+            with self.assertRaises(CampaignError):read_json(spec)
+            with patch('sys.stderr'):
+                self.assertEqual(main(['register','--spec',str(spec),'--out',str(base/'bad')]),2)
+            self.assertFalse((base/'bad').exists())
+            root=base/'registered';register(profile_spec('pilot'),root)
+            path=root/'registration.json'
+            path.write_text(path.read_text().replace('"campaign_max_calls": 10368','"campaign_max_calls": 999999, "campaign_max_calls": 10368'))
+            with self.assertRaises(CampaignError):read_registration(root)
+
     def test_validation_requires_eligible_nonbinding_same_profile_pilot_and_freezes_inputs(self):
         with tempfile.TemporaryDirectory() as temp:
             base=Path(temp);pilot=base/'pilot';registration=register(profile_spec('pilot'),pilot)
@@ -114,6 +128,19 @@ class ExploratoryCampaignTests(unittest.IsolatedAsyncioTestCase):
             with patch('parallax_relay.campaign.shutil.disk_usage',return_value=type('Disk',(),{'free':5*1024**3-1})()),patch('parallax_relay.campaign.HTTPAgent',side_effect=AssertionError('client constructed')):
                 with self.assertRaisesRegex(CampaignError,'5 GiB'):
                     await run_campaign(root,live=True,environ=ForbiddenEnvironment(OPENAI_API_KEY='FAKE',GEMINI_API_KEY='FAKE'))
+            self.assertEqual({p.name for p in root.iterdir()},before)
+
+    def test_cli_low_disk_preflight_precedes_environment_copy_and_env_file(self):
+        from parallax_relay.campaign import main
+        class ForbiddenEnvironment(dict):
+            def keys(self):raise AssertionError('environment copied before disk preflight')
+            def __iter__(self):raise AssertionError('environment copied before disk preflight')
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp)/'pilot';register(profile_spec('pilot'),root)
+            before={p.name for p in root.iterdir()}
+            with patch('parallax_relay.campaign.shutil.disk_usage',return_value=type('Disk',(),{'free':5*1024**3-1})()),patch('parallax_relay.campaign.load_env_file',side_effect=AssertionError('credential file read')),patch('parallax_relay.campaign.os.environ',ForbiddenEnvironment(OPENAI_API_KEY='FAKE',GEMINI_API_KEY='FAKE')),patch('sys.stderr') as errors:
+                self.assertEqual(main(['run','--campaign',str(root),'--live','--env-file',str(Path(temp)/'credentials')]),2)
+            self.assertIn('5 GiB',''.join(call.args[0] for call in errors.write.call_args_list))
             self.assertEqual({p.name for p in root.iterdir()},before)
 
     async def test_low_disk_between_trials_stops_launches_and_releases_the_entire_block(self):

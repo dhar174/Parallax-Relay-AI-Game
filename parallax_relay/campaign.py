@@ -59,8 +59,19 @@ def atomic_json(path: Path, value) -> None:
 
 def read_json(path: Path):
     try:
-        return json.loads(path.read_text(encoding='utf-8'),
-                          parse_constant=lambda _: (_ for _ in ()).throw(ValueError()))
+        duplicates = []
+        def object_pairs(pairs):
+            value = {}
+            for key,item in pairs:
+                if key in value:duplicates.append(key)
+                value[key] = item
+            return value
+        value = json.loads(path.read_text(encoding='utf-8'), object_pairs_hook=object_pairs,
+                           parse_constant=lambda _: (_ for _ in ()).throw(ValueError()))
+        if duplicates and (is_exploratory(value) or
+                isinstance(value,dict) and is_exploratory(value.get('spec'))):
+            raise ValueError()
+        return value
     except (OSError, ValueError, RecursionError):
         raise CampaignError('Missing or invalid campaign JSON') from None
 
@@ -291,9 +302,8 @@ async def execute_trial(root: Path, registration: dict, spec: CampaignSpec, tria
     return evidence
 
 
-async def run_campaign(root: Path, *, offline: bool = False, live: bool = False,
-                       environ: dict | None = None) -> None:
-    registration = read_registration(root)
+def _execution_preflight(root: Path, registration: dict, *, offline: bool, live: bool):
+    """Check execution identity and capacity before any credential handling."""
     if registration['schema_version']!=2:
         raise CampaignError('Historical campaigns require a fresh registration for current execution')
     spec = CampaignSpec.model_validate(registration['spec'])
@@ -305,6 +315,13 @@ async def run_campaign(root: Path, *, offline: bool = False, live: bool = False,
         raise CampaignError('Frozen source/environment/inputs changed; register a new cohort')
     if is_exploratory(spec) and shutil.disk_usage(root).free < 5*1024**3:
         raise CampaignError('Exploratory execution requires at least 5 GiB free disk before launch')
+    return spec, matches
+
+
+async def run_campaign(root: Path, *, offline: bool = False, live: bool = False,
+                       environ: dict | None = None) -> None:
+    registration = read_registration(root)
+    spec, matches = _execution_preflight(root,registration,offline=offline,live=live)
     selected_env=dict(os.environ if environ is None else environ)
     if live:
         for player in spec.roster:
@@ -441,6 +458,8 @@ def main(argv: list[str] | None = None) -> int:
         elif args.command == 'run':
             registered=read_registration(args.campaign)
             if registered['schema_version']!=2:raise CampaignError('Historical campaigns require a fresh registration for current execution')
+            if is_exploratory(registered['spec']):
+                _execution_preflight(args.campaign,registered,offline=args.offline,live=args.live)
             env = dict(os.environ)
             if args.env_file is not None:
                 if not args.live:
