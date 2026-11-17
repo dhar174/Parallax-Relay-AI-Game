@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "verified_date": "2026-11-16",
+  "verification_method": "Read-only official documentation retrieval; model account access and remote revisions remain unverified.",
+  "models": {
+    "openai/gpt-6-luna": {
+      "model_url": "https://developers.openai.com/api/docs/models/gpt-6-luna.md",
+      "pricing_url": "https://developers.openai.com/api/docs/pricing.md",
+      "prompt_caching_url": "https://developers.openai.com/api/docs/guides/prompt-caching.md",
+      "pricing": {"input_per_million": 0.1, "output_per_million": 0.5},
+      "cache_write_input_per_million": 0.125,
+      "notes": "Standard short-context direct API nominal rates, under 272K input tokens. Official caching/model docs rechecked 2026-11-16: implicit caching is enabled by default; default 30-minute writes cost 1.25x ordinary input, not an additive fee. The adapter does not disable caching or distinguish write charges; configured Budget input .10 can understate billed write input .125. Receipt separately quotes all OpenAI input at .125, with cache activity unknown. No cache-read discount, batch/flex reduction, fast or regional processing assumed. Model page confirms text/image input, Responses API and structured outputs; backend revision unknown and provider-default reasoning retained."
+    },
+    "gemini/gemini-3.5-flash-lite": {
+      "model_url": "https://aistudio.google.com/docs/models/gemini-3.5-flash-lite",
+      "pricing_url": "https://aistudio.google.com/docs/pricing#gemini-3.5-flash-lite",
+      "pricing": {"input_per_million": 0.3, "output_per_million": 2.5},
+      "notes": "Official ai.google.dev model/pricing URLs redirected to these Google AI Studio docs. Stable model code, text/image input and structured outputs confirmed; standard paid text/image rates include output thinking. No free-tier, caching, batch or flex reduction assumed; account quota and backend revision unknown."
+    }
+  }
+}

@@ -96,7 +96,10 @@ the evaluation protocol (#17) now specifies protocol 2. Merged PR #39 closes
 controls/baselines #18 with five arms and WAIT/uniform-v1 policies; merged PR #40
 closes #19 with campaign registration, a bounded serial trial runner and JSON/CSV
 aggregation. Merged PR #41 closes room infrastructure #20. Parent #9 remains open:
-controlled model campaigns and their research reporting gates remain unrun.
+eligible model pilot/confirmation campaigns and research reporting remain unrun.
+The [November 17 qualification](docs/verification/2026-11-17-reviewed-stack-and-q.md)
+completed the bounded compatibility gate for the selected roster; it supplies
+neither pilot/confirmation results nor their spending authorization.
 
 Run provenance (R08) now records source/configuration,
 prompt/schema/room versions, dependency environment, model identifiers, trial IDs,
@@ -136,13 +139,14 @@ set and evidence; incompatible objectives require an explicit scoring design.
 
 ## 5. Later exploration
 
-**Status:** replay inspection and browser verification (R10, #25/#26) are approved
-and pending implementation/evidence under Phase 1 of the
+**Status:** replay inspection and browser verification (R10, #25/#26) are delivered
+in merged PRs #43/#44, with [current verification and limits](docs/verification/2026-11-17-reviewed-stack-and-q.md).
+This completes Phase 1 of the
 [completion plan](docs/superpowers/plans/2026-11-16-four-phase-completion.md).
-Parent #12 remains open. Optional expansion below remains deferred.
+Parent #12's acceptance criteria are satisfied. Optional expansion below remains deferred.
 
-Complete replay accessibility and unfinished-run inspection against their issue
-acceptance criteria, including actual browser evidence. Consider a live
+Preserve replay accessibility and unfinished-run inspection with reproducible
+browser regressions. Consider a live
 spectator interface, additional roles including ECHO, richer mechanics, or deployment
 only through separate proposals that state their effect on reproducibility and
 information boundaries.

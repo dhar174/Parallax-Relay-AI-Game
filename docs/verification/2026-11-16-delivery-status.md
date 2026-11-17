@@ -6,6 +6,10 @@ and PR inspection on November 16, 2026 UTC. This is a reconciliation of existing
 evidence and current issue state, not a new runtime verification, audit or model
 campaign. Test counts below belong only to the dated receipts they link.
 
+**Historical snapshot:** the [November 17 accepted-stack and Q receipt](2026-11-17-reviewed-stack-and-q.md)
+supersedes this preparation status. The rows below retain the November 16 issue,
+unmerged-PR and unrun-Q observations; they are not current claims after that handoff.
+
 ## Original review findings R01–R10
 
 | Finding / issue | Accepted delivery | Evidence and tested source/environment | Current limitation / closure gate |

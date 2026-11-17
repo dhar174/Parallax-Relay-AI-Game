@@ -2,10 +2,22 @@
 
 ## Unreleased
 
+### Slice 10 and reviewed qualification
+
+- Deliver final/unfinished replay inspection and reproducible real-browser checks
+  in merged #43/#44, including conservative conflict labels and startup readiness.
+- Require patched Pillow 13.x (#45), deliver strict offline campaign preparation
+  (#46), and retain bounded dependency/license evidence and collector fixes (#47).
+- Complete authorized Q on frozen `eff18ce3`: 15 two-turn matches, 220 requests
+  including four recovered Gemini 503s, no accounting anomalies, and a reconciled
+  $0.1599778 local estimate. No gameplay success, provider invoice or P/C execution
+  is implied. See the [dated receipt](docs/verification/2026-11-17-reviewed-stack-and-q.md).
+
 ### Delivery-status reconciliation
 
 - Record merged controls (#39), campaigns (#40) and rooms (#41), with #18/#19/#20
-  closed; retain open research, audit and replay gates in the dated delivery matrix.
+  closed; preserve the historical open research/audit/replay preparation gates in
+  the November 16 matrix and link the November 17 replay/qualification follow-up.
 - Correct stale fixed-room and provider merge-pending summaries; preserve original
   dated evidence and keep Anthropic live-unverified under the #15 not-planned decision.
 

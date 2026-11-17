@@ -11,6 +11,12 @@ research gate #9 stays open for eligible model campaigns and reporting; live cla
 also require dated compatibility evidence for the exact provider/model roster.
 The [delivery matrix](verification/2026-11-16-delivery-status.md) separates these gates.
 
+[Qualification Q on November 17](verification/2026-11-17-reviewed-stack-and-q.md)
+completed 15 two-turn model matches across all three selected assignments and five
+arms. It verifies bounded protocol/role-phase compatibility and accounting, not
+gameplay success or a pilot/confirmation result. Separate P/C spending approvals
+and eligible research reporting remain required.
+
 ## Question and comparison scope
 
 The primary question is whether full communication improves operational success

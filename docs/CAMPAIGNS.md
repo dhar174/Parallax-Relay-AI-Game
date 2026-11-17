@@ -5,6 +5,10 @@ extension in [evaluation](EVALUATION.md). Registration, execution and analysis
 are separate CLI actions. The [nine curated rooms](ROOMS.md) add development/held-out
 cohorts; no dashboard, provider fallback or paid experiment is implied.
 
+For the approved roster's preparation-only candidate generator, conservative
+numeric reservation worksheet and separate Q/P/C spending gates, see
+[Phase-2 campaign preparation](CAMPAIGN_PREPARATION.md).
+
 ## Offline diagnostic quickstart
 
 Activate the locked development environment. From the repository root:

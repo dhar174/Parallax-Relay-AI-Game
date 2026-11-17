@@ -102,7 +102,9 @@ class Recorder:
     def _viewer(self, result) -> bytes:
         template = Path(__file__).with_name('replay_template.html').read_text(encoding='utf-8')
         data = json.dumps({'manifest': self.manifest, 'result': result.summary(),
-                           'records': result.records, 'calls': result.calls}, ensure_ascii=True)
+                           'records': result.records, 'calls': result.calls,
+                           'phases': result.phases, 'final_state': result.world.snapshot()},
+                          ensure_ascii=True)
         data = data.replace('<', '\\u003c').replace('>', '\\u003e').replace('&', '\\u0026')
         return template.replace('__REPLAY_DATA__', data).encode('utf-8')
 

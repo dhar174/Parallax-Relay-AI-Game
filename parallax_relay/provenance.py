@@ -25,6 +25,14 @@ from .providers import provider_contract
 from .rooms import RoomDefinition,get_room,room_hash,catalog_identity,validate_snapshot
 
 ROOT = Path(__file__).resolve().parent.parent
+# Public process settings needed for cross-platform Git discovery/configuration.
+# This is a privacy allowlist, not a subprocess sandbox or config-content audit.
+GIT_PROCESS_ENV_KEYS = (
+    'PATH', 'HOME', 'USERPROFILE', 'HOMEDRIVE', 'HOMEPATH',
+    'SYSTEMROOT', 'WINDIR', 'COMSPEC', 'PATHEXT',
+    'LANG', 'LC_ALL', 'LC_CTYPE', 'TMP', 'TEMP', 'TMPDIR',
+    'APPDATA', 'LOCALAPPDATA', 'XDG_CONFIG_HOME',
+)
 
 
 class ProvenanceError(ValueError):
@@ -85,8 +93,19 @@ def _utc_now() -> str:
 
 def collect_source(root: Path) -> dict:
     unavailable = {'status': 'unavailable', 'revision': None, 'reason': 'git_unavailable'}
-    # Honor the package root, not caller overrides pointing Git at another tree.
-    env = {k: v for k, v in os.environ.items() if not k.upper().startswith('GIT_')}
+    # Look up only public settings; do not enumerate/read credential, token,
+    # proxy or inherited Git override values even to filter them out later.
+    env = {}
+    for name in GIT_PROCESS_ENV_KEYS:
+        value = os.environ.get(name)
+        if value is not None:
+            env[name] = value
+    # Windows environments are case-insensitive; also accept a mixed-case
+    # SystemRoot in case-sensitive mappings without emitting duplicate keys.
+    if 'SYSTEMROOT' not in env:
+        system_root = os.environ.get('SystemRoot')
+        if system_root is not None:
+            env['SYSTEMROOT'] = system_root
     env['GIT_OPTIONAL_LOCKS'] = '0'
     def git(*args):
         return subprocess.run(['git', '-c', 'core.fsmonitor=', '-C', str(root), *args], env=env,

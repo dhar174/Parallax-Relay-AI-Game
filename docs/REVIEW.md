@@ -4,11 +4,14 @@ Reviewed **2026-11-13**, against runtime baseline
 [`719c7696c4bfe50934fc936bbccfb62812633164`](https://github.com/dhar174/Parallax-Relay-AI-Game/commit/719c7696c4bfe50934fc936bbccfb62812633164).
 This is a documentation and source review with offline reproductions. Runtime code,
 tests, dependencies, and committed fixtures were not changed during that review.
-Subsequent slice 1–9 resolutions are annotated below; in those sections the original
+Subsequent slice 1–10 resolutions are annotated below; in those sections the original
 evidence, suggested remedies, and reproductions are historical baseline records.
 
 The [November 16 delivery matrix](verification/2026-11-16-delivery-status.md) pins
-current implementation and issue status to merged source `4e0851b`. The original
+the November 16 implementation and issue snapshot to merged source `4e0851b`.
+The [November 17 follow-up](verification/2026-11-17-reviewed-stack-and-q.md)
+records accepted replay/audit-preparation changes and bounded live qualification.
+The original
 review coverage and test counts below describe November 13, not a fresh audit.
 
 ## Method and coverage
@@ -54,7 +57,7 @@ review; that is not a security assurance.
 | R07 | P1 | Future enhancement | Fixed room cannot establish general cooperative ability | Controls/runner/rooms delivered (#18/#19/#20); #9 research gate open |
 | R08 | P2 | Future enhancement | Run artifacts lack full experiment provenance | Provenance #10 and runner #19 delivered; research claims unverified |
 | R09 | P2 | Test gap | CI, reproducibility, and missing audit coverage | Partially addressed; audits open |
-| R10 | P3 | Test gap / future enhancement | Replay browser coverage and partial-run inspection | Open |
+| R10 | P3 | Test gap / future enhancement | Replay browser coverage and partial-run inspection | Delivered in merged PRs #43/#44 |
 
 ## R01: Non-UTF-8 TOML escapes CLI error handling
 
@@ -400,6 +403,15 @@ stays open for the separate source/privacy audit #23 and dependency/license audi
 #24; CI success does not complete those audits or establish live compatibility.
 
 ## R10: Replay coverage and partial-run inspection need work
+
+**Slice 10 resolution — November 17:** merged PRs #43/#44 provide actual final
+checkpoints and unfinished diagnostics in both viewers, including zero-turn
+records, historical imports, conflicting evidence and truthful commitment labels.
+The corrected assembled source passed 77 Node and 37 real Chromium checks, plus
+the complete 391-test Python suite and seven hosted jobs. The
+[dated receipt](verification/2026-11-17-reviewed-stack-and-q.md) distinguishes
+Linux Chromium/keyboard/layout/contrast checks from unclaimed audible screen-reader
+or cross-browser coverage. The original evidence below remains historical.
 
 **Evidence:** `replay_template.html:32–47` selects only resolved records and filters
 call diagnostics to those turns. If a later turn aborts, its calls/messages remain

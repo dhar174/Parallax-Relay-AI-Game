@@ -308,11 +308,20 @@ UUID flags label individual runs. All five controls and the WAIT/uniform-v1
 baselines are implemented. The [campaign CLI](CAMPAIGNS.md) implements registration,
 serial scheduling, whole-block admission and all-trial aggregation.
 
-Open `index.html` locally. The round slider and arrow buttons select resolved turns.
-Images show the state **before** that round; events describe its result. Calls and
-phases from an unfinished round may only be visible in JSONL, not in the viewer.
-For a zero-turn run, the viewer uses the final spectator image and hides round
-controls. There is no live dashboard or built-in resume command. Finalization automatically
+Open a newly generated `index.html` locally. The slider and arrow buttons select
+resolved rounds, rounds with calls or phases but no replay record, and a final
+checkpoint. Matching result and final-state turn counts identify a missing resolved
+record or an unfinished round; inconsistent or unavailable counts, a replay row
+beyond that checkpoint, or later evidence after a terminal checkpoint leave
+resolution unknown. Round images show the state **before** actions; events describe
+a resolved outcome. Confirmed unfinished commitments are recorded but not applied.
+Completed phases and all call attempts remain available, including on a zero-turn
+run. The final view uses `final_spectator.png`, and the final world JSON is always
+available in the page; missing images are marked unavailable. Game outcome and
+scores are distinct from the operational stop reason. The page embeds calls,
+phases and final state independently of their separately written artifacts. Native
+schema versions and historical fixtures remain unchanged. There is no live
+dashboard or built-in resume command. Finalization automatically
 attempts recovery for the active run only; it does not resume gameplay.
 
 ## Exit codes and troubleshooting

@@ -44,8 +44,15 @@ Git is probed at the package checkout root before creating output. An unrelated
 parent repository is not used as source identity. Read-only probes have a one-second
 timeout each. Missing Git, failed probes, and archives are represented as unavailable;
 known revision information is retained when only status collection fails, including
-a timeout. Probe environments discard inherited `GIT_*` overrides, restore only
-`GIT_OPTIONAL_LOCKS=0`, and disable filesystem-monitor commands. A dirty
+a timeout. Probe environments look up only explicit public process settings:
+`PATH`, `HOME`, `USERPROFILE`, `HOMEDRIVE`, `HOMEPATH`, `SYSTEMROOT` (with a
+`SystemRoot` fallback), `WINDIR`, `COMSPEC`, `PATHEXT`, `LANG`, `LC_ALL`,
+`LC_CTYPE`, `TMP`, `TEMP`, `TMPDIR`, `APPDATA`, `LOCALAPPDATA`, and
+`XDG_CONFIG_HOME`. They never enumerate environment values or look up provider
+keys, tokens, proxy secrets or inherited `GIT_*` values. The child receives only
+these public settings plus `GIT_OPTIONAL_LOCKS=0`; filesystem-monitor commands
+remain disabled. This privacy allowlist is not a subprocess sandbox or an audit
+of local Git configuration contents. A dirty
 run records its base revision and dirty status, not its patch or an exact dirty-code
 snapshot. No remote URL, branch name, author, hostname, or absolute local path is
 recorded. Installed package metadata contributes only names and versions, never

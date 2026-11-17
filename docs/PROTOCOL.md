@@ -101,6 +101,14 @@ The failure streak counts failed **phases**, not rounds. Three consecutive faile
 phases for one role abort by default. Any successful phase resets that role's streak.
 Fatal setup/provider errors abort the unfinished round without resolving its actions.
 Already completed public messages and attempt metadata remain in the partial logs.
+The spectator viewer associates zero-based call and phase turns with one-based
+resolved round numbers. For evidence without a resolved record, matching result
+and final-state turn counts distinguish missing resolved records from an unfinished
+round. Conflicting or unavailable counts, a replay row beyond that checkpoint,
+or later evidence after a terminal checkpoint leave resolution unknown. The viewer
+labels completed commitments unapplied only for a confirmed unfinished round.
+The separately accessible final snapshot is the last resolved checkpoint, including
+the initial world when no turn resolved; it does not imply a fabricated round.
 Recording/progress failures stop the match and trigger bounded best-effort
 finalization. The checkpoint is the last successfully resolved engine turn, including
 its original submitted actions, even if its incremental write failed. Completed

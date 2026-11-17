@@ -17,7 +17,18 @@ The build regenerates the ignored `build/workbench/dist/` directory. It contains
 
 Generated runs use temporary storage. Download **Export complete JSON** from Evaluation to keep the record, including images. To keep the native files separately, export the workbench TOML and invoke the CLI as described in the running guide. Import its output folder with **Evaluation → Import run folder**.
 
-Imports accept well-formed native schema-version-2 and version-3 records. Version 3 validates recorded room geometry and snapshot references before replacing the current run. Invalid fields are reported before replacing the selected run, so its evaluation and exported data remain available after a rejected import. Empty logs, incomplete runs, missing optional images and additional metadata such as provenance remain supported. Folder imports preserve `final_spectator.png` along with turn images and reject duplicate accepted image filenames. PNG bytes are signature-checked and encoded independently of browser MIME metadata. File selections reset after each attempt so a corrected file can be selected again. The latest load intent wins, and background completions do not replace an active configuration form. Programmatic and unknown-mode records can omit the room label; exports retain their original metadata. The final image is retained in exports; the current workbench does not display a separate final-state view.
+Imports accept well-formed native schema-version-2 and version-3 records. Version 3 validates recorded room geometry and snapshot references before replacing the current run. Invalid fields are reported before replacing the selected run, so its evaluation and exported data remain available after a rejected import. Empty logs, incomplete runs, missing optional images and additional metadata such as provenance remain supported. Folder imports preserve `final_spectator.png` along with turn images and reject duplicate accepted image filenames. PNG bytes are signature-checked and encoded independently of browser MIME metadata. File selections reset after each attempt so a corrected file can be selected again. The latest load intent wins, and background completions do not replace an active configuration form. Programmatic and unknown-mode records can omit the room label; exports retain their original metadata.
+
+Evaluation shows the final spectator image when available and the final world JSON.
+Rounds without replay records expose their calls and completed phases. Matching
+result and final-state turn counts distinguish missing resolved records from an
+unfinished round; inconsistent or unavailable counts, a replay row beyond that
+checkpoint, or later evidence after a terminal checkpoint leave resolution unknown.
+A commitment in a confirmed unfinished round is not applied. Call/phase turn
+numbers are zero-based and resolved rounds are one-based. Phase objects without a
+usable turn remain visible separately. Engine
+outcome and scores remain separate from the operational stop reason. The import
+validation and complete JSON export retain their existing data and schema versions.
 
 ## Focused frontend verification
 
