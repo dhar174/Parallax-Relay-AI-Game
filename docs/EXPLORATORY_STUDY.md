@@ -202,6 +202,8 @@ analysis seed 0, null percentile/PRNG, concurrency 1 and primary contrast
 Retain per-room/per-arm model and baseline rows, planned/launched/unlaunched
 counts, every failed trial, unknown outcomes and usage/cost coverage. Keep engine
 outcomes separate from operational success and infrastructure stops. Describe the
+observed rate and arm difference only when their launched outcomes are known;
+otherwise report null with missingness bounds and explicit denominators. Describe the
 observed full-minus-disabled difference per room without repeated-trial bootstrap,
 significance, equivalence, within-room role-rotation or room-population inference.
 One repetition per arm cannot support those claims. Report binding guards and

@@ -60,15 +60,19 @@ def atomic_json(path: Path, value) -> None:
 def read_json(path: Path):
     try:
         duplicates = []
+        exploratory_seen = False
         def object_pairs(pairs):
+            nonlocal exploratory_seen
             value = {}
             for key,item in pairs:
+                if key == 'protocol_version' and type(item) is int and item == 3:
+                    exploratory_seen = True
                 if key in value:duplicates.append(key)
                 value[key] = item
             return value
         value = json.loads(path.read_text(encoding='utf-8'), object_pairs_hook=object_pairs,
                            parse_constant=lambda _: (_ for _ in ()).throw(ValueError()))
-        if duplicates and (is_exploratory(value) or
+        if duplicates and (exploratory_seen or is_exploratory(value) or
                 isinstance(value,dict) and is_exploratory(value.get('spec'))):
             raise ValueError()
         return value

@@ -73,6 +73,11 @@ class ExploratoryCampaignTests(unittest.IsolatedAsyncioTestCase):
             path=root/'registration.json'
             path.write_text(path.read_text().replace('"campaign_max_calls": 10368','"campaign_max_calls": 999999, "campaign_max_calls": 10368'))
             with self.assertRaises(CampaignError):read_registration(root)
+            legacy=profile_spec('pilot');legacy.update(protocol_version=2,repetitions=5,campaign_max_estimated_cost_usd=500.0)
+            spec.write_text(json.dumps(legacy))
+            self.assertEqual(CampaignSpec.model_validate(read_json(spec)).protocol_version,2)
+            spec.write_text(json.dumps(legacy).replace('"protocol_version": 2','"protocol_version": 3, "protocol_version": 2'))
+            with self.assertRaises(CampaignError):read_json(spec)
 
     def test_validation_requires_eligible_nonbinding_same_profile_pilot_and_freezes_inputs(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -117,6 +122,33 @@ class ExploratoryCampaignTests(unittest.IsolatedAsyncioTestCase):
             with patch('parallax_relay.campaign_analysis.paired_bootstrap',side_effect=AssertionError('no inference')):
                 write_report(analyze(root),Path(temp)/'report')
             self.assertEqual(json.loads((Path(temp)/'report'/'report.json').read_text())['profile_id'],report['profile_id'])
+
+    def test_interrupted_arm_has_null_observed_rate_and_difference_with_missingness_bounds(self):
+        from parallax_relay.campaign import Ledger
+        from parallax_relay.campaign_models import trial_exposure
+        from parallax_relay.campaign_analysis import success_summary
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp)/'pilot';reg=register(profile_spec('pilot'),root)
+            spec=CampaignSpec.model_validate(reg['spec'])
+            model=next(t for t in reg['schedule'] if t['team']=='models')
+            block=[t for t in reg['schedule'] if t['block_id']==model['block_id']]
+            first,last=[t for t in block if t['condition'] in ('full','disabled')]
+            ledger=Ledger(root)
+            ledger.emit('campaign_started',registration_sha256=reg['sha256'],registration_matches=True)
+            ledger.emit('block_reserved',block_id=model['block_id'],reserved_calls=sum(trial_exposure(spec,t)[0] for t in block),reserved_estimated_usd=1.25)
+            ledger.emit('trial_launched',trial_id=first['trial_id'],block_id=first['block_id'])
+            calls,dollars=trial_exposure(spec,first)
+            ledger.emit('trial_finished',trial_id=first['trial_id'],stage='setup',stop_reason='setup_failure',result=None,cleanup_status='ok',elapsed_seconds=0,run_id=None,execution_stop_reason=None,recording_stop_reason=None,cancelled=False,accounted_calls=0,accounted_estimated_usd=0,released_calls=calls,released_estimated_usd=dollars)
+            ledger.emit('trial_launched',trial_id=last['trial_id'],block_id=last['block_id'])
+            report=analyze(root)
+            contrast=next(c for c in report['descriptive_contrasts'] if c['team']=='models' and c['room']==model['room'])
+            self.assertEqual(contrast[last['condition']]['operational_success']['unknown'],1)
+            self.assertIsNone(contrast[last['condition']]['operational_success']['rate'])
+            self.assertIsNone(contrast['observed_difference'])
+            self.assertNotEqual(contrast['all_planned_bounds'][0],contrast['all_planned_bounds'][1])
+            self.assertIsNone(report['overall']['operational_success']['rate'])
+            # Preserve the historical protocol-1/2 lower-bound rate convention.
+            self.assertEqual(success_summary(0,1,1,1)['rate'],0)
 
     async def test_low_disk_preflight_precedes_credentials_clients_and_attempt_markers(self):
         class ForbiddenEnvironment(dict):

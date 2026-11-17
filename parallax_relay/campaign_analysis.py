@@ -285,9 +285,11 @@ def _summary(rows: list[dict]) -> dict:
                      'cost_is_estimate_not_billing_guarantee': True})}
 
 
-def _descriptive_summary(rows: list[dict]) -> dict:
+def _descriptive_summary(rows: list[dict], *, unknown_as_null: bool = False) -> dict:
     summary = _summary(rows)
     summary['operational_success'].pop('wilson_95')
+    if unknown_as_null and summary['operational_success']['unknown']:
+        summary['operational_success']['rate'] = None
     return summary
 
 
@@ -482,7 +484,7 @@ def analyze(root: Path) -> dict:
         cells[(row['room'], row['team'], row['assignment_id'], row['condition'])].append(row)
     cell_reports = [{'room': key[0], 'team': key[1], 'assignment_id': key[2], 'condition': key[3],
                      'deterministic_control': key[1] in ('scripted', 'wait'),
-                     **(_descriptive_summary(group) if is_exploratory(spec) else _summary(group))}
+                     **(_descriptive_summary(group,unknown_as_null=True) if is_exploratory(spec) else _summary(group))}
                     for key, group in sorted(cells.items())]
     arm_groups = defaultdict(list)
     for cell in cell_reports:
@@ -528,7 +530,7 @@ def analyze(root: Path) -> dict:
             if 'room' in row:row.update(labels(row['room']))
     descriptive={}
     def descriptive_summary(group):
-        return _descriptive_summary(group)
+        return _descriptive_summary(group,unknown_as_null=is_exploratory(spec))
     for dimension in ('family','split'):
         groups=defaultdict(list)
         for row in rows:groups[row[dimension]].append(row)
