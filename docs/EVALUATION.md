@@ -1,8 +1,12 @@
 # Cooperative-game evaluation protocol
 
-Current protocol **2**, November 16, 2026; protocol-1 historical semantics are
-retained. This is the prospective evaluation specification under #17, not benchmark
-results or authorization to spend money. Controls/baselines #18, runner/analysis
+Formal protocol **2**, November 16, 2026, retains protocol-1 historical
+semantics. Explicit protocol **3**, `exploratory-under20-v1`, is implemented for
+review as a separate descriptive pilot/held-out validation profile; see the
+[exploratory study contract](EXPLORATORY_STUDY.md). The formal protocol-2
+5/30-repetition design and its statistical methods below are unchanged. This is
+the prospective evaluation specification under #17, not benchmark results or
+authorization to spend money. Controls/baselines #18, runner/analysis
 #19 and room infrastructure #20 are delivered in merged PRs #39/#40/#41 and closed.
 All five arms, WAIT and uniform-v1 are implemented alongside the scripted oracle.
 [Catalog v1](ROOMS.md) has nine curated rooms: three development and six held-out.
@@ -14,8 +18,9 @@ The [delivery matrix](verification/2026-11-16-delivery-status.md) separates thes
 [Qualification Q on November 17](verification/2026-11-17-reviewed-stack-and-q.md)
 completed 15 two-turn model matches across all three selected assignments and five
 arms. It verifies bounded protocol/role-phase compatibility and accounting, not
-gameplay success or a pilot/confirmation result. Separate P/C spending approvals
-and eligible research reporting remain required.
+gameplay success or a pilot/confirmation result. That historical Q cohort is never
+pooled with the exploratory study. Separate pilot/validation spending approvals
+are required for the current task; formal P/C spending approvals and eligible research reporting remain separate unmet gates.
 
 ## Question and comparison scope
 
@@ -426,3 +431,33 @@ model-performance, difficulty, visual-ability or communication-benefit claim.
 Historical protocol-1 inputs remain Split Span-only with original counts; old
 registration version 1 can be analyzed but requires fresh registration to execute
 current code. See [campaign contracts](CAMPAIGNS.md).
+
+## Protocol-3 exploratory study
+
+The explicit [`exploratory-under20-v1`](EXPLORATORY_STUDY.md) profile uses the same
+five treatments, authoritative engine, observation boundaries and native/request
+format 3. It keeps specification schema 2 and registration envelope 2; it changes
+neither historical registration interpretation nor protocol-2 defaults.
+
+It has exactly one repetition per arm and one prespecified model assignment per
+room. Gemini takes each role once across the three development rooms and twice
+across the six held-out rooms, with the two remaining roles filled by independent
+OpenAI agents. All five arms in a room use that same assignment. This is balance
+across the fixed room set, not a within-room rotation. Scripted, WAIT and uniform
+baselines each run once per room/arm, without provider-label multiplication.
+
+Only `pilot` and `validation` stages are allowed. The 60-trial development pilot
+contains 15 model and 45 baseline trials; the 120-trial held-out validation contains
+30 model and 90 baseline trials. Validation must link a completed eligible pilot
+with unchanged frozen identities/settings and no binding money/call guards or
+cleanup faults. Tight limits may bind: retain the resulting incomplete evidence,
+report feasibility, and stop without validation or increasing the budget.
+
+Analysis version 3 is `descriptive_per_room`, explicitly exploratory and always
+nonconfirmatory. Preserve planned/launched/unlaunched denominators, operational
+and engine outcomes, failures, unknowns, usage and local estimate coverage. Show
+per-room full-minus-disabled observations as descriptions only. Do not use the
+formal repeated-trial bootstrap, significance claims, repeat-based uncertainty,
+within-room role-rotation effects or room-population inference. Existing diagnostic
+and qualification results stay separate. Even complete validation cannot close the
+original #9 confirmation acceptance gate.

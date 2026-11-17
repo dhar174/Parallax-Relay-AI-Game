@@ -1,5 +1,19 @@
 # Phase-2 campaign preparation
 
+For the current under-$20 task, use the explicit
+[`exploratory-under20-v1` profile](EXPLORATORY_STUDY.md), implemented for review with
+`prepare/check --profile exploratory-under20-v1`. It creates pilot and validation
+candidates with $3.75/$7.50 local campaign guards and a common $0.25 match guard.
+The combined new guard exposure is $11.25; the separate prior-Q allowance is $0.25.
+These local limits are not invoice guarantees or spending approval.
+
+The original protocol-2 preparation design below is retained as a dated formal
+proposal. Its larger Q/P/C proposals are superseded **for this task only**; its
+5/30-repetition protocol, historical receipts and default generator behavior are
+unchanged. Do not use its worksheet or Q/P/C gates as the current study's approval
+request. See the new guide for safety pricing, frozen identities, resource checks
+and separate pilot/validation approvals.
+
 This is **preparation only**, not standing authorization to spend, evidence of model
 compatibility, a registration, or campaign results. The approved requested roster
 is two independent OpenAI `gpt-6-luna` agents and one Gemini

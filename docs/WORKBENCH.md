@@ -111,7 +111,10 @@ an arm updates its communication-round count and invalidates live preparation.
 No-images retains spectator PNGs but sends no image parts to providers. Withheld
 communications are spectator-only; imported runs display their recorded arm.
 Historical imports without a condition label remain explicitly unspecified.
-Campaign registration/execution/analysis are CLI operations, not browser actions.
+Campaign registration/execution/analysis are CLI operations. The explicit
+[protocol-3 exploratory profile](EXPLORATORY_STUDY.md) is also CLI-only; campaign
+UI is outside this change. Native/request format 3, import/export and single-match
+workbench behavior remain unchanged.
 New native records display known-usage-priced and retained unknown-usage estimates
 separately when present. Unpriced amounts remain unavailable. Imported historical
 records without the optional split remain readable and round-trip unchanged.
@@ -122,9 +125,10 @@ The configuration contract includes metadata-only room IDs, versions, families
 and splits. The room selector/export/companion allow development rooms; smoke
 limits preserve the selected room and invalidate prior live approval. The named
 live-smoke preset resets to Split Span and retains its historical profile hash.
-Held-out execution is available only through registered protocol-2 confirmation,
-not the browser. New native imports preserve the embedded spectator definition;
-legacy imports retain their original shape. See [rooms](ROOMS.md).
+Held-out execution is available only through registered protocol-2 confirmation
+or matching protocol-3 validation, through the campaign CLI. New native imports
+preserve the embedded spectator definition; legacy imports retain their original
+shape. See [rooms](ROOMS.md).
 
 Malformed v3 definitions, inconsistent loss flags and contradictory single-bridge
 aliases are rejected before replacing the selected run. External-result records

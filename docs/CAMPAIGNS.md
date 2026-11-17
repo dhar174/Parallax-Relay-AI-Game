@@ -1,13 +1,18 @@
 # Registered evaluation campaigns
 
-The scheduler supports historical protocol 1 and the split-aware protocol-2
-extension in [evaluation](EVALUATION.md). Registration, execution and analysis
-are separate CLI actions. The [nine curated rooms](ROOMS.md) add development/held-out
-cohorts; no dashboard, provider fallback or paid experiment is implied.
+The scheduler preserves historical protocol 1 and the formal split-aware
+protocol 2 in [evaluation](EVALUATION.md). The explicit protocol-3 profile
+[`exploratory-under20-v1`](EXPLORATORY_STUDY.md) is implemented for review as a
+separate descriptive pilot/validation design; it does not replace the formal
+5/30-repetition design. Registration, execution and analysis are separate CLI
+actions. The [nine curated rooms](ROOMS.md) add development/held-out cohorts; no
+dashboard, provider fallback or paid experiment is implied.
 
-For the approved roster's preparation-only candidate generator, conservative
-numeric reservation worksheet and separate Q/P/C spending gates, see
-[Phase-2 campaign preparation](CAMPAIGN_PREPARATION.md).
+For this task, use the [under-$20 exploratory study](EXPLORATORY_STUDY.md) and its
+separate pilot/validation spending gates. The original preparation-only generator
+and formal Q/P/C worksheet remain documented in
+[Phase-2 campaign preparation](CAMPAIGN_PREPARATION.md). Neither guide authorizes
+provider calls or establishes runtime readiness.
 
 ## Offline diagnostic quickstart
 
@@ -38,18 +43,20 @@ It is also a bounded diagnostic, not a pilot or confirmation.
 
 New JSON specifications use version 2; unknown keys are rejected. Version-1
 inputs adapt into new registration version 2 with protocol-1 Split Span semantics
-and unchanged trial counts. Omitting a version selects version/protocol 2. Its fields are:
+and unchanged trial counts. Omitting a version selects version/protocol 2.
+Protocol 3 must be explicit and uses the exact named profile below. The common
+fields are:
 
 | Field | Contract/default |
 |---|---|
 | `schema_version`, `protocol_version` | New defaults `2`; schema 1 requires protocol 1 |
-| `stage` | `diagnostic` (default), `pilot`, or `confirmatory` |
+| `stage` | Protocols 1/2: `diagnostic` (default), `pilot`, or `confirmatory`; protocol 3: `pilot` or `validation` only |
 | `mode` | `offline` (default) or `live` |
 | `policies` | Unique selection of `scripted`, `wait`, `uniform`; all three by default |
 | `roster` | Live-only, exactly three entries; each has `provider`, bare `model`, `api_key_env`, complete `pricing` |
-| `rooms` | Protocol 2: diagnostics use development subset (default all three), pilots all three development rooms, confirmation all six held-out rooms; protocol 1 only `["split_span"]` |
+| `rooms` | Protocol 3: prescribed development pilot or held-out validation split; protocol 2: diagnostics use development subset (default all three), pilots all three development rooms, confirmation all six held-out rooms; protocol 1 only `["split_span"]` |
 | `conditions` | Unique subset of the five arms; all five by default |
-| `repetitions` | Diagnostic default 1; pilot exactly 5; confirmation exactly 30 |
+| `repetitions` | Protocol 3: exactly 1; protocols 1/2: diagnostic default 1, pilot exactly 5, confirmation exactly 30 |
 | `match` | Existing match settings shared across arms; omit `condition` and leave `communication_rounds` at default 2; the schedule supplies both and `room_id` |
 | `campaign_max_calls` | Required positive integer; conservative block admission counts every possible attempt |
 | `campaign_max_estimated_cost_usd` | Required positive live estimate guard; omitted for unpriced offline policies |
@@ -57,7 +64,8 @@ and unchanged trial counts. Omitting a version selects version/protocol 2. Its f
 | `min_trial_interval_seconds` | Minimum between trial launches, default 0; trials always run serially |
 | `rerun_of`, `rerun_reason` | Optional original trial UUID and `infrastructure_recheck`/`manual_recheck`; one offline diagnostic trial only |
 
-Pilot/confirmation require all five arms and all three prescribed baseline teams.
+Protocol-1/2 pilot/confirmation require all five arms and all three prescribed
+baseline teams.
 For model teams, enumerate unique provider/model permutations across the three
 roles. Repeated `(provider, model)` pairs deduplicate; repeated identities must use
 the same pricing/account-variable configuration. Deterministic scripted/WAIT teams
@@ -77,12 +85,13 @@ static prompt/schema/per-room identity and the full catalog/certificate hashes a
 
 Protocol cohorts require clean Git source and complete environment identity.
 Diagnostics may use dirty/unavailable source, with explicit inference limitations.
-Registered inputs must still match before every protocol-2 campaign (including
-diagnostics) and each subsequent trial launch. Protocol-1 diagnostics retain
-their explicit drift/ineligibility reporting. New cohorts, not edited registrations, represent changed inputs.
+Registered inputs must still match before every protocol-2/3 campaign (including
+protocol-2 diagnostics) and each subsequent trial launch. Protocol-1 diagnostics
+retain their explicit drift/ineligibility reporting. Changed inputs require a
+new cohort and registration.
 
-After a complete, eligible pilot, register confirmation using a new specification
-with `stage="confirmatory"` and `--pilot runs/the-pilot`. Its registration links
+For protocols 1/2, after a complete eligible pilot, register confirmation using a
+new specification with `stage="confirmatory"` and `--pilot runs/the-pilot`. Its registration links
 the pilot hash. Protocol 2 freezes source, environment, catalog/membership, prompts,
 roster/prices, policies and match settings across the transition. Only stage,
 room split, repetition count, campaign ceilings and scheduler seed may change.
@@ -90,9 +99,27 @@ Changed treatment/input settings require a new development pilot. Protocol 1
 retains its same-room transition and reports changed frozen sections/settings. Pilot results are never pooled
 into confirmation; missing/failed trials cannot be replaced for favorable results.
 
+## Explicit exploratory profile
+
+Protocol 3 retains specification schema 2 and registration envelope 2. It supports
+only `exploratory-under20-v1`: one fixed assignment per room, one repetition per
+arm, all five arms and all three baseline policies. It schedules 15 model plus 45
+baseline pilot trials and 30 model plus 90 baseline validation trials. The room
+assignment map, exact settings, safety prices and limits are in the
+[profile contract](EXPLORATORY_STUDY.md). Legacy assignment enumeration and
+protocol-1/2 schedules/serialized defaults stay unchanged.
+
+Validation registration uses `stage="validation"` with `--pilot` and requires a
+completed eligible protocol-3 pilot with identical frozen source, environment,
+all-nine-room input identities and common settings. Binding money/call guards or
+cleanup faults block the transition. Changed treatment/settings require a new
+pilot. Only a matching registered validation grants held-out execution; protocol
+3 cannot be used for diagnostics or formal confirmation. Neither stage supplies
+confirmatory inference or closes #9.
+
 ## Execution, budgets and interruption
 
-`run --offline` only accepts offline registrations. Future live execution requires
+`run --offline` only accepts offline registrations. Live execution requires
 `run --live`, exact roster/condition eligibility evidence, local credentials and
 separate explicit approval of the registered spending exposure. No live campaign
 was conducted to deliver Slice 8. `--env-file` is live-only, uses literal loading,
@@ -105,9 +132,10 @@ The runner reserves a complete next block before starting any of its trials.
 Call exposure is the sum of each arm's theoretical maximum, bounded by per-match
 call caps. Dollar admission reserves the entire configured common per-match
 estimate cap for each model trial. This deliberately avoids pretending future
-request byte sizes are known. Choose a pilot-supported nonbinding match cap and
-freeze it for confirmation. Match phase reservations still cover the whole team's
-retry allowance. Unknown usage retains its quote; partial counts remain separate.
+request byte sizes are known. Formal protocol-1/2 confirmation requires a
+pilot-supported nonbinding match cap, frozen for confirmation. Protocol 3 keeps
+its exact $0.25 guard and rejects the validation transition if guards bind. Match
+phase reservations still cover the whole team's retry allowance. Unknown usage retains its quote; partial counts remain separate.
 
 After each trial, settle actual started calls/local estimates and release unused
 capacity. Missing execution receipts retain conservative exposure. Recorded
@@ -144,7 +172,8 @@ schedule can contain engine defeats or intentional turn-limit stops.
 
 `analyze` performs no provider calls or trial execution. It writes fresh
 `report.json`, `trials.csv`, `cells.csv` and `attempts.csv`, verifying readback.
-New reports and analysis use version 2; ledger envelopes remain version 1.
+Protocol-1/2 reports and analysis use version 2; protocol-3 analysis uses version
+3 with explicit exploratory metadata. Ledger envelopes remain version 1.
 Historical registration version 1 remains analyzable; current execution requires
 fresh registration, without reinterpreting old trial IDs or adding trials.
 Each file is written through a temporary file and atomic replacement; the four
@@ -162,7 +191,8 @@ Review all spectator metadata before sharing. Reports keep:
 - Known operational failures, genuinely unknown outcomes and explicit bounds.
   Setup failure is known zero success, even without a manifest. A saved engine win
   without a completed runner receipt leaves operational success unknown.
-- Per-cell Wilson intervals, equal-assignment arm summaries, cross-tabs, attempts,
+- Protocol-1/2 per-cell Wilson intervals and equal-assignment arm summaries;
+  all protocols retain cross-tabs, attempts,
   retries/fallbacks, structured engine-illegal actions, latency, conditional scores,
   usage coverage and local known-price versus retained-estimate costs.
 
@@ -171,9 +201,14 @@ cleanup. All launched trials stay in the denominator. Unpriced/unknown costs sta
 null for full-denominator per-trial/per-success rates; known partial totals include
 coverage counts. Missing artifacts do not erase a durable setup-failure receipt.
 
-Confirmatory contrasts require the full eligible cohort, complete artifacts,
-known outcomes and the registered analysis source. Analysis uses 10,000 paired
-block bootstrap samples, seed 0, equal assignment weights and Type-7 percentiles.
+Protocol-3 reporting is descriptive per room, retains all trial denominators,
+failures and unknowns, and always sets `confirmatory_eligible=false`. It has no
+bootstrap, significance test, within-room role-rotation inference or room-population
+inference. See the [analysis contract](EXPLORATORY_STUDY.md#analysis-and-claim-limits).
+
+Protocol-1/2 confirmatory contrasts require the full eligible cohort, complete
+artifacts, known outcomes and the registered analysis source. Analysis uses 10,000
+paired block bootstrap samples, seed 0, equal assignment weights and Type-7 percentiles.
 Incomplete/ineligible cohorts receive descriptive rates/bounds without a
 complete-pair substitute. Secondary contrasts are exploratory. Degenerate intervals
 are labeled and do not establish equivalence. Deterministic controls are not
@@ -212,13 +247,15 @@ partial total; explicit priced zero remains zero.
 Turn records add spectator-only `action_outcomes` from engine resolution. These
 diagnostics never enter requests/history or provide policies with a legality oracle.
 Existing engine outcomes, reply schemas and historical recording readers remain
-unchanged; new fields are additive within recording schema version 2.
+unchanged. These fields were additive within recording schema version 2; current
+native format 3 is unchanged by the exploratory profile.
 
 ## Held-out execution permits
 
-Only the registered protocol-2 confirmation runner grants a room execution
-permit. It binds the validated registration, trial, catalog and current frozen
-inputs before output/provider construction, and `run_match` checks it again.
+Only a registered protocol-2 confirmation or matching protocol-3 validation
+runner grants a room execution permit. It binds the validated registration, trial,
+catalog and current frozen inputs before output/provider construction, and
+`run_match` checks it again.
 Single-match runs, diagnostics, pilots and operational reruns cannot select
 held-out rooms. Pure engine/certificate APIs are trusted host utilities; the
 permit is a workflow guard, not a sandbox for arbitrary Python.
