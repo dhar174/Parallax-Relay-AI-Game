@@ -159,6 +159,17 @@ test('standalone preserves victory and scores when the operational stop is local
  app.next();assert.match(n('private').textContent,/100/);
 });
 
+test('contradictory result and final outcome flags are visible as a conflict in both viewers',async t=>{
+ const data=structuredClone(fixture);
+ data.final_state.win=false;
+ assert.doesNotThrow(()=>checkRun(data));
+ const replay=await standaloneReplay({...data,records:data.replay});
+ assert.match(replay.node('outcome').textContent,/outcome conflict/i);
+ const app=await workbench(t);await app.importJSON(data);
+ assert.match(app.node('panel').innerHTML,/Team outcome[\s\S]*?<strong>Outcome conflict<\/strong>/);
+ assert.deepEqual(await app.exportJSON(),data);
+});
+
 test('standalone zero-turn replay shows only evidence actually present and keeps final state available',async()=>{
  const result={...fixture.result,win:false,loss:false,completed:false,scores:null,turns:0,stop_reason:'call_budget'};
  const app=await standaloneReplay({manifest:fixture.manifest,result,records:[],calls:[],phases:[],final_state:{turn:0,energy:6}}),n=app.node;

@@ -35,7 +35,8 @@ const room=label(manifest.room??provenance?.inputs?.room?.value?.id,manifest.sch
 $('room').textContent=room+' · recorded match';
 const policy=provenance?.execution?.value?.policy?.name;
 $('mode').textContent=mode==='mock'?(policy==='scripted'?'MOCK · SCRIPTED FIXTURE':typeof policy==='string'&&policy?'MOCK · '+policy.toUpperCase()+' POLICY':'MOCK · OFFLINE POLICY'):mode==='live'?'LIVE API RUN':mode==='programmatic'?'PROGRAMMATIC RUN':'RUN MODE UNKNOWN';
-$('outcome').textContent=result.win===true?'Victory':result.loss===true?'Defeat':result.completed===false?'Incomplete':result.completed===true?'Completed':'Unavailable';
+const outcomeConflict=['win','loss'].some(key=>typeof DATA.final_state?.[key]==='boolean'&&typeof result[key]==='boolean'&&DATA.final_state[key]!==result[key]);
+$('outcome').textContent=outcomeConflict?'Outcome conflict':result.win===true?'Victory':result.loss===true?'Defeat':result.completed===false?'Incomplete':result.completed===true?'Completed':'Unavailable';
 $('stopReason').textContent='Stop reason: '+(typeof result.stop_reason==='string'?result.stop_reason.replaceAll('_',' '):'unavailable');
 $('turnCount').textContent=validTurn(result.turns)?result.turns:'Unavailable';$('calls').textContent=validTurn(result.budget?.calls_started)?result.budget.calls_started:'Unavailable';$('energy').textContent=Number.isFinite(result.energy)?result.energy:'Unavailable';
 $('roster').textContent=roles.map(role=>{const p=manifest.players?.[role]??provenance?.players?.[role]??{};return role+': '+label(p.provider,'unknown')+' / '+label(p.model,'unknown')}).join('  ·  ');
