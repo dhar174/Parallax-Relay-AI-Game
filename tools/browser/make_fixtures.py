@@ -1,5 +1,6 @@
 """Generate disposable, explicit offline browser fixtures with the real driver."""
 import asyncio
+from copy import deepcopy
 import json
 from pathlib import Path
 import shutil
@@ -11,6 +12,7 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / 'site'))
 from parallax_relay.agents import ScriptedAgent
 from parallax_relay.config import MatchSettings
+from parallax_relay.engine import resolve_turn
 from parallax_relay.orchestrator import MatchExecutionError, run_match
 from parallax_relay.protocol import ModelReply, ROLES, Usage
 from parallax_relay.recording import Recorder
@@ -34,10 +36,12 @@ async def main(destination):
     for name, settings in [('win', {}), ('turn-limit', {'max_turns': 1}),
                            ('later-partial', {'max_calls': 19}),
                            ('zero-turn-partial', {'max_calls': 10}),
+                           ('broadcast-only', {'max_calls': 7}),
                            ('zero-call', {'max_calls': 1}),
                            ('local-error', {}), ('cancelled', {}),
                            ('retry-shape', {'max_turns': 2, 'retry_delay_seconds': 0}),
-                           ('commit-unresolved', {'max_turns': 1})]:
+                           ('commit-unresolved', {'max_turns': 1}),
+                           ('later-commit-unresolved', {'max_turns': 2})]:
         out = destination / name
         recorder = Recorder(out, {'mode': 'mock'})
         agents = {role: ScriptedAgent(role) for role in ROLES}
@@ -67,8 +71,13 @@ async def main(destination):
                 pass
         else:
             try:
-                if name == 'commit-unresolved':
-                    with patch('parallax_relay.orchestrator.resolve_turn', side_effect=RuntimeError('synthetic browser fixture resolution failure')):
+                if name in ('commit-unresolved', 'later-commit-unresolved'):
+                    def fail_resolution(world, actions, *, diagnostics=None):
+                        if name == 'later-commit-unresolved' and world.turn == 0:
+                            return resolve_turn(world, actions, diagnostics=diagnostics)
+                        raise RuntimeError('synthetic browser fixture resolution failure')
+
+                    with patch('parallax_relay.orchestrator.resolve_turn', side_effect=fail_resolution):
                         await run_match(agents, MatchSettings(**settings), recorder=recorder)
                 elif name == 'local-error':
                     with patch.object(recorder, 'phase', side_effect=OSError('synthetic browser fixture write failure')):
@@ -76,12 +85,17 @@ async def main(destination):
                 else:
                     await run_match(agents, MatchSettings(**settings), recorder=recorder)
             except MatchExecutionError:
-                if name not in ('local-error', 'commit-unresolved'):
+                if name not in ('local-error', 'commit-unresolved', 'later-commit-unresolved'):
                     raise
         data = read_run(out)
         if name == 'commit-unresolved':
             assert data['replay'] == [] and data['final_state']['turn'] == 0
             assert len(data['calls']) == 9 and len(data['phases']) == 3
+            assert set(data['phases'][-1]['sealed_actions']) == set(ROLES)
+        if name == 'later-commit-unresolved':
+            assert len(data['replay']) == 1 and data['final_state']['turn'] == 1
+            assert len(data['calls']) == 18 and len(data['phases']) == 6
+            assert data['phases'][-1]['turn'] == 1
             assert set(data['phases'][-1]['sealed_actions']) == set(ROLES)
         if name == 'retry-shape':
             retry = [row for row in data['calls'] if row['role'] == 'SPECTRA' and row['turn'] == 0 and row['phase'] == 'broadcast']
@@ -90,6 +104,27 @@ async def main(destination):
         (out / 'native.json').write_text(json.dumps(data), encoding='utf-8')
         inventory[name] = {'turns': data['result']['turns'], 'calls': len(data['calls']),
                            'phases': len(data['phases']), 'stop_reason': data['result']['stop_reason']}
+    # Explicit contradictory derivatives of a native one-resolved/one-COMMIT stop.
+    # These derivatives are not driver output. Keep schema-valid snapshot geometry
+    # while making the named evidence disagree with the outer checkpoint.
+    for name in ('checkpoint-turn-conflict', 'checkpoint-terminal-conflict', 'checkpoint-later-phase-conflict'):
+        out = destination / name
+        shutil.copytree(destination / 'later-commit-unresolved', out)
+        data = read_run(out)
+        if name == 'checkpoint-turn-conflict':
+            data['replay'][0]['state_after']['turn'] = 2
+        elif name == 'checkpoint-terminal-conflict':
+            terminal = read_run(destination / 'win')['final_state']
+            terminal['turn'] = 1
+            data['replay'][0]['state_after'] = terminal
+        else:
+            later_phase = deepcopy(data['phases'][0])
+            later_phase['turn'] = 2
+            data['phases'].append(later_phase)
+        for log in ('replay', 'phases'):
+            (out / f'{log}.jsonl').write_text(''.join(json.dumps(row) + '\n' for row in data[log]), encoding='utf-8')
+        viewer(out, data)
+        (out / 'native.json').write_text(json.dumps(data), encoding='utf-8')
     # Retain the committed historical schema, rather than fabricating v2 by relabeling v3.
     out = destination / 'legacy-v2'
     shutil.copytree(ROOT / 'example_run', out)
