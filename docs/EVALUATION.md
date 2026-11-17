@@ -1,11 +1,21 @@
 # Cooperative-game evaluation protocol
 
-Current protocol **2**, November 16, 2026; protocol-1 historical semantics are retained. This is a prospective specification for
-#17, not benchmark results or authorization to spend money. It defines requirements
-for controls (#18), the campaign runner/analysis (#19), and held-out rooms (#20).
-Slice 8 controls implement all five arms, WAIT and uniform-v1 alongside the scripted
-oracle; see the running guide for their CLI and provenance contracts. This protocol itself supplies no campaign results or new rooms. Parent research gate #9 stays open;
-live claims also require bounded provider/model compatibility evidence under #8.
+Current protocol **2**, November 16, 2026; protocol-1 historical semantics are
+retained. This is the prospective evaluation specification under #17, not benchmark
+results or authorization to spend money. Controls/baselines #18, runner/analysis
+#19 and room infrastructure #20 are delivered in merged PRs #39/#40/#41 and closed.
+All five arms, WAIT and uniform-v1 are implemented alongside the scripted oracle.
+[Catalog v1](ROOMS.md) has nine curated rooms: three development and six held-out.
+See the running and campaign guides for current CLI/provenance contracts. Parent
+research gate #9 stays open for eligible model campaigns and reporting; live claims
+also require dated compatibility evidence for the exact provider/model roster.
+The [delivery matrix](verification/2026-11-16-delivery-status.md) separates these gates.
+
+[Qualification Q on November 17](verification/2026-11-17-reviewed-stack-and-q.md)
+completed 15 two-turn model matches across all three selected assignments and five
+arms. It verifies bounded protocol/role-phase compatibility and accounting, not
+gameplay success or a pilot/confirmation result. Separate P/C spending approvals
+and eligible research reporting remain required.
 
 ## Question and comparison scope
 
@@ -165,15 +175,18 @@ Thirty repeats is the selected fixed design, not a demonstrated power guarantee.
 
 ## Rooms and claim gates
 
-The Split Span is a public development room with a known solution. Current results
-would support only this fixed-room comparison. Under #20, split by room **family**,
+Catalog v1 has three public development crossing rooms, including Split Span,
+and six held-out retrieval/return or two-bridge rooms. Split by room **family**,
 not merely random seed: variants sharing layouts/solution templates belong in the
-same split. Freeze and publish held-out family/instance membership and generation
-seeds before tuning; keep them out of prompts, examples, policy construction and
-development feedback. Verify solvability and observation privacy independently.
-No held-out generalization claim is allowed until such rooms actually exist and are
-evaluated without tuning on their outcomes. Multiple seeds of the same template
-are not independent evidence of generalization to a new family.
+same split. Membership is frozen in the curated catalog; generation seeds are null.
+Keep held-out observations and solutions out of development tuning, examples and
+policy construction. Confirmation requests receive only their permitted role-local
+observations. Host-only certificates and privacy tests
+verify solvability and projections; they supply no model-performance evidence.
+Held-out claims require eligible evaluation without tuning on those outcomes.
+Multiple seeds of one template are not independent evidence of a new family.
+Historical protocol-1 campaigns retain their Split Span-only semantics; the
+protocol-2 extension below defines the current development/confirmation transition.
 
 Campaign eligibility requires declared model/condition/room identity and pinned
 clean source plus a complete, recorded environment. Freeze configuration and prompt/
@@ -270,8 +283,10 @@ Report degenerate bootstrap intervals explicitly; identical outcomes and zero
 observed differences do not establish equivalence or absence of an effect. This
 fixed sample design has no prespecified minimum detectable effect. Treat secondary
 contrasts and score/efficiency comparisons as exploratory, without a significance
-claim selected from multiple comparisons. Do not extend fixed-room intervals to a
-room population; a future held-out-family design needs its own clustered analysis.
+claim selected from multiple comparisons. Protocol 2 retains per-room inference
+and descriptive family/split totals for the finite curated catalog. Do not extend
+these intervals to a room population. Any later design sampling a task population
+requires its own prespecified sampling and inference method.
 
 ## Reliability, efficiency, usage, and cost
 
@@ -356,9 +371,11 @@ examples and scripted verification stay labeled separately from model evidence.
 
 Current [provenance](PROVENANCE.md) supplies individual-run identity and lifecycle.
 #18 supplies tested policies and request controls; #19 supplies the pre-launch
-ledger, scheduling, campaign budgeting and aggregation/analysis. #20 remains future
-work for held-out families and solvability/privacy checks. None
-of this protocol establishes live compatibility or requires a paid run in this PR.
+ledger, scheduling, campaign budgeting and aggregation/analysis. #20 supplies the
+curated development/held-out catalog, solvability certificates and privacy checks.
+Those issues are closed as infrastructure delivery; #9 remains open for eligible
+model evaluation and reporting. None of this establishes model performance,
+provider-wide live compatibility or authorization for paid execution.
 
 ## Slice 8 controls delivery
 
@@ -377,7 +394,8 @@ all-outcome JSON/CSV reporting and protocol-defined statistics. The normative
 requirements above continue to apply where their original wording anticipated
 future implementation. Delivery is verified offline using scripted/intercepted
 agents; no model campaign, held-out evaluation or benchmark claim is established.
-Parent #9 remains open for #20 and its reporting gates.
+Parent #9 remains open for eligible model campaigns and reporting gates; room
+infrastructure #20 is delivered in merged PR #41, as specified below.
 
 ## Protocol-2 curated room extension
 

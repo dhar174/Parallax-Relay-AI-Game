@@ -3,9 +3,11 @@
 The goal is a reliable research game in which distinct observations and public
 communication matter to successful cooperation. This is a proposed sequence with
 completion gates, not a dated release commitment. The current implementation is
-Milestone 2: one fixed room, three roles, offline-tested infrastructure, and one
-verified bounded live turn. A full real-model victory and benchmark results remain
-unverified.
+nine curated rooms (three development, six held-out), three active roles, explicit
+evaluation controls, a bounded campaign runner, and one verified bounded live turn.
+A full real-model victory, controlled model campaigns, and benchmark results remain
+unverified. The [dated delivery matrix](docs/verification/2026-11-16-delivery-status.md)
+separates accepted infrastructure from the remaining research, audit, and replay gates.
 
 Findings referenced below are in [Review](docs/REVIEW.md). Priorities describe impact
 and dependencies; optional mechanics are not automatically defects.
@@ -82,16 +84,22 @@ verification, unverified combinations and inputs unsupported by the current
 contract. Evidence identifies the exact API/version, model/known revision, role
 assignment, input/output contract, limits and date. Neither a provider-wide claim
 nor exhaustive Cartesian-product coverage follows from one successful roster.
-Coordinate observation ablations with #18, campaigns with #19 and rooms with #20.
+Build on the controls (#18, merged PR #39), campaigns (#19, merged PR #40) and
+rooms (#20, merged PR #41).
 New modalities/adapters require separately reviewed slices and spending approval;
 this roadmap introduces no runtime feature, automatic fallback or paid execution.
 
 ## 3. Reproducible evaluation
 
-**Status:** partly implemented. Slice 5 adds versioned run provenance (#10);
-the prospective evaluation protocol (#17) is specified. Slice 8 controls/baselines (#18) implement the five protocol arms and WAIT/uniform-v1
-policies. Slice 8 also adds campaign registration, a bounded serial trial runner
-and JSON/CSV aggregation (#19). Controlled model campaigns remain unrun.
+**Status:** infrastructure delivered. Slice 5 adds versioned run provenance (#10);
+the evaluation protocol (#17) now specifies protocol 2. Merged PR #39 closes
+controls/baselines #18 with five arms and WAIT/uniform-v1 policies; merged PR #40
+closes #19 with campaign registration, a bounded serial trial runner and JSON/CSV
+aggregation. Merged PR #41 closes room infrastructure #20. Parent #9 remains open:
+eligible model pilot/confirmation campaigns and research reporting remain unrun.
+The [November 17 qualification](docs/verification/2026-11-17-reviewed-stack-and-q.md)
+completed the bounded compatibility gate for the selected roster; it supplies
+neither pilot/confirmation results nor their spending authorization.
 
 Run provenance (R08) now records source/configuration,
 prompt/schema/room versions, dependency environment, model identifiers, trial IDs,
@@ -100,7 +108,7 @@ room generation or a supported provider option; it cannot promise deterministic
 model output. See [Run provenance](docs/PROVENANCE.md). The [campaign runner](docs/CAMPAIGNS.md) schedules/aggregates trials and preserves
 setup failures and missing artifacts.
 
-[Evaluation protocol v1](docs/EVALUATION.md) specifies repeated trials, balanced
+[Evaluation protocol 2](docs/EVALUATION.md) specifies repeated trials, balanced
 role assignments, policy baselines and five comparison arms. Its selected design
 is 5 pilot plus 30 confirmatory trials per unique assignment/condition/room, with
 all-trial denominators, uncertainty and campaign budgets. The current `--fast`
@@ -114,12 +122,12 @@ Publish no claim of causal communication benefit without a controlled comparison
 
 ## 4. Meaningful cooperative challenges
 
-**Status:** issue #20 implementation adds nine curated rooms and enforced
-development/held-out workflow; empirical comparison remains gated by eligible
-campaigns. See [catalog](docs/ROOMS.md).
+**Status:** delivered in merged PR #41; #20 is closed. Catalog v1 adds nine
+curated rooms and enforced development/held-out workflow; empirical comparison
+remains gated by eligible campaigns. See [catalog](docs/ROOMS.md).
 
-Implemented explicit room definitions and variants whose hidden facts, resource
-choices, or compatible/competing objectives require different plans (R07). Preserve
+Implemented explicit room definitions and variants whose hidden facts and resource
+choices require different plans (R07); current objectives remain compatible. Preserve
 engine authority and role-specific observations. Separate development rooms from
 held-out evaluation rooms and retain a solvability oracle or scripted baseline for
 each supported variant.
@@ -131,13 +139,18 @@ set and evidence; incompatible objectives require an explicit scoring design.
 
 ## 5. Later exploration
 
-**Status:** deferred until earlier gates justify expansion.
+**Status:** replay inspection and browser verification (R10, #25/#26) are delivered
+in merged PRs #43/#44, with [current verification and limits](docs/verification/2026-11-17-reviewed-stack-and-q.md).
+This completes Phase 1 of the
+[completion plan](docs/superpowers/plans/2026-11-16-four-phase-completion.md).
+Parent #12's acceptance criteria are satisfied. Optional expansion below remains deferred.
 
-Improve replay accessibility and unfinished-run inspection (R10). Consider a live
+Preserve replay accessibility and unfinished-run inspection with reproducible
+browser regressions. Consider a live
 spectator interface, additional roles including ECHO, richer mechanics, or deployment
 only through separate proposals that state their effect on reproducibility and
 information boundaries.
 
 **Completion gate for starting a proposal:** describe the intended user, concrete
 problem, maintenance cost, security boundary changes, and success criteria. These
-items are not scheduled deliverables of the current documentation work.
+optional expansion items are not scheduled deliverables of the completion plan.

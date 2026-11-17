@@ -1,0 +1,151 @@
+{
+  "source": "eff18ce3fca46f400db430159bae0f8981f8a28a",
+  "qualification_checks": "passed",
+  "trials": 15,
+  "two_turns_each": true,
+  "statuses": {
+    "ok": 216,
+    "http_error": 4
+  },
+  "http_failure_statuses": {
+    "503": 4
+  },
+  "provider_statuses": {
+    "openai/gpt-6-luna/ok": 144,
+    "gemini/gemini-3.5-flash-lite/ok": 72,
+    "gemini/gemini-3.5-flash-lite/http_error": 4
+  },
+  "cleanup": {
+    "ok": 15
+  },
+  "known_usage_estimate_usd": "0.1022145",
+  "retained_unknown_estimate_usd": "0.0577633",
+  "local_estimate_usd": "0.1599778",
+  "anomalies": [],
+  "reservation_balances": {
+    "calls": 0,
+    "usd": 0
+  },
+  "native_files": 240,
+  "coverage": [
+    {
+      "assignment": "225041c05f84b7cdfc952e2ac950556406aeb175355df516339a28a321c6a2ce",
+      "condition": "no_images",
+      "successful_calls": 18,
+      "attempts": 18,
+      "illegal_actions": 1
+    },
+    {
+      "assignment": "225041c05f84b7cdfc952e2ac950556406aeb175355df516339a28a321c6a2ce",
+      "condition": "reduced",
+      "successful_calls": 12,
+      "attempts": 12,
+      "illegal_actions": 0
+    },
+    {
+      "assignment": "225041c05f84b7cdfc952e2ac950556406aeb175355df516339a28a321c6a2ce",
+      "condition": "withheld",
+      "successful_calls": 18,
+      "attempts": 19,
+      "illegal_actions": 0
+    },
+    {
+      "assignment": "225041c05f84b7cdfc952e2ac950556406aeb175355df516339a28a321c6a2ce",
+      "condition": "disabled",
+      "successful_calls": 6,
+      "attempts": 6,
+      "illegal_actions": 0
+    },
+    {
+      "assignment": "225041c05f84b7cdfc952e2ac950556406aeb175355df516339a28a321c6a2ce",
+      "condition": "full",
+      "successful_calls": 18,
+      "attempts": 18,
+      "illegal_actions": 0
+    },
+    {
+      "assignment": "aef4844075d1e342502986aa1041f84d60dd3cb056a4649574af9957f53b1e0a",
+      "condition": "full",
+      "successful_calls": 18,
+      "attempts": 18,
+      "illegal_actions": 0
+    },
+    {
+      "assignment": "aef4844075d1e342502986aa1041f84d60dd3cb056a4649574af9957f53b1e0a",
+      "condition": "no_images",
+      "successful_calls": 18,
+      "attempts": 18,
+      "illegal_actions": 2
+    },
+    {
+      "assignment": "aef4844075d1e342502986aa1041f84d60dd3cb056a4649574af9957f53b1e0a",
+      "condition": "reduced",
+      "successful_calls": 12,
+      "attempts": 12,
+      "illegal_actions": 0
+    },
+    {
+      "assignment": "aef4844075d1e342502986aa1041f84d60dd3cb056a4649574af9957f53b1e0a",
+      "condition": "disabled",
+      "successful_calls": 6,
+      "attempts": 6,
+      "illegal_actions": 0
+    },
+    {
+      "assignment": "aef4844075d1e342502986aa1041f84d60dd3cb056a4649574af9957f53b1e0a",
+      "condition": "withheld",
+      "successful_calls": 18,
+      "attempts": 18,
+      "illegal_actions": 0
+    },
+    {
+      "assignment": "a734d2a6a42679f525f117345b9f26cd8c6fd610a977298a23ba508875109903",
+      "condition": "withheld",
+      "successful_calls": 18,
+      "attempts": 19,
+      "illegal_actions": 3
+    },
+    {
+      "assignment": "a734d2a6a42679f525f117345b9f26cd8c6fd610a977298a23ba508875109903",
+      "condition": "full",
+      "successful_calls": 18,
+      "attempts": 18,
+      "illegal_actions": 0
+    },
+    {
+      "assignment": "a734d2a6a42679f525f117345b9f26cd8c6fd610a977298a23ba508875109903",
+      "condition": "disabled",
+      "successful_calls": 6,
+      "attempts": 6,
+      "illegal_actions": 1
+    },
+    {
+      "assignment": "a734d2a6a42679f525f117345b9f26cd8c6fd610a977298a23ba508875109903",
+      "condition": "reduced",
+      "successful_calls": 12,
+      "attempts": 13,
+      "illegal_actions": 1
+    },
+    {
+      "assignment": "a734d2a6a42679f525f117345b9f26cd8c6fd610a977298a23ba508875109903",
+      "condition": "no_images",
+      "successful_calls": 18,
+      "attempts": 19,
+      "illegal_actions": 1
+    }
+  ],
+  "registration_sha256": "c92705b7bdd59e0d7da853455fd3f92c150fc5f6e9e67dd4660f5168a9162ab7",
+  "qualification_spec_sha256": "a2dbb698abb2c4b1cb0616228a2df92d55ce436d669aa2f64bbb8cf2ef245575",
+  "receipt_sha256": "3d18950d4b6140572c2de587294d37ccf5f790749d92d1dda4af3cbe204f2c2a",
+  "environment_sha256": "2714166a1cb6eb93e6169d07be8354ccd7f6ca1ad319aa512297d1629903f19f",
+  "models": [
+    "openai/gpt-6-luna",
+    "openai/gpt-6-luna",
+    "gemini/gemini-3.5-flash-lite"
+  ],
+  "maximum_provider_requests": 432,
+  "local_estimate_guard_usd": "9.75",
+  "started_at": "2026-11-17T08:31:56.750629+00:00",
+  "finished_at": "2026-11-17T08:39:09.392703Z",
+  "game_illegal_actions": 9
+}
