@@ -51,7 +51,8 @@ python scripts/check_rooms.py
 `--list-rooms` returns metadata only, without loading credentials. TOML
 `match.room_id` defaults to `split_span`. CLI single matches and the workbench
 allow development execution. Held-out rooms require a registered protocol-2
-confirmation through the [campaign runner](CAMPAIGNS.md). Diagnostics/reruns cannot
+confirmation or matching protocol-3 exploratory validation through the
+[campaign runner](CAMPAIGNS.md). Diagnostics/reruns cannot
 select held-out rooms. Membership validation runs before credentials or output.
 
 The host-only certificates in `room_certificates.py` are solvability proofs,
