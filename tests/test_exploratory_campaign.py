@@ -4,10 +4,11 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import patch, AsyncMock
 
 from parallax_relay.campaign import (CampaignError, frozen_inputs, register,
-    read_registration, validate_registration, validate_pilot_transition)
+    read_registration, validate_registration, validate_pilot_transition, run_campaign)
+from parallax_relay.campaign_analysis import analyze, write_report
 from parallax_relay.campaign_models import CampaignSpec
 from parallax_relay.campaign_validation import validate_frozen
 from parallax_relay.exploratory import profile_spec
@@ -25,7 +26,7 @@ def eligible_pilot_report():
             'trials': [{'stop_reason': 'turn_limit', 'cleanup_status': 'ok'} for _ in range(60)]}
 
 
-class ExploratoryCampaignTests(unittest.TestCase):
+class ExploratoryCampaignTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         for target in ('parallax_relay.campaign.collect_source',
                        'parallax_relay.campaign_analysis.collect_source',
@@ -82,6 +83,131 @@ class ExploratoryCampaignTests(unittest.TestCase):
                 changed=copy.deepcopy(value['frozen']);changed[section]={}
                 with self.subTest(section=section),self.assertRaises(CampaignError):
                     validate_pilot_transition(a,b,registration['frozen'],changed)
+
+    def test_reports_are_explicitly_exploratory_without_any_confidence_intervals(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp)/'pilot';register(profile_spec('pilot'),root)
+            report=analyze(root)
+            self.assertEqual(report['analysis_version'],3)
+            self.assertEqual(report['profile_id'],'exploratory-under20-v1')
+            self.assertEqual(report['evidence_class'],'exploratory')
+            self.assertEqual(report['analysis_method'],'descriptive_per_room')
+            self.assertFalse(report['confirmatory_eligible'])
+            self.assertEqual(report['contrasts'],[])
+            self.assertEqual(report['counts']['planned'],60)
+            self.assertEqual(report['counts']['launched'],0)
+            self.assertEqual(len(report['descriptive_contrasts']),12)
+            self.assertTrue(all(c['observed_difference'] is None for c in report['descriptive_contrasts']))
+            self.assertTrue(all(c['all_planned_bounds']==[-1,1] for c in report['descriptive_contrasts']))
+            self.assertNotIn('wilson_95',json.dumps(report))
+            with patch('parallax_relay.campaign_analysis.paired_bootstrap',side_effect=AssertionError('no inference')):
+                write_report(analyze(root),Path(temp)/'report')
+            self.assertEqual(json.loads((Path(temp)/'report'/'report.json').read_text())['profile_id'],report['profile_id'])
+
+    async def test_low_disk_preflight_precedes_credentials_clients_and_attempt_markers(self):
+        class ForbiddenEnvironment(dict):
+            def keys(self):raise AssertionError('credentials read before disk preflight')
+            def __iter__(self):raise AssertionError('credentials read before disk preflight')
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp)/'pilot';register(profile_spec('pilot'),root)
+            before={p.name for p in root.iterdir()}
+            with patch('parallax_relay.campaign.shutil.disk_usage',return_value=type('Disk',(),{'free':5*1024**3-1})()),patch('parallax_relay.campaign.HTTPAgent',side_effect=AssertionError('client constructed')):
+                with self.assertRaisesRegex(CampaignError,'5 GiB'):
+                    await run_campaign(root,live=True,environ=ForbiddenEnvironment(OPENAI_API_KEY='FAKE',GEMINI_API_KEY='FAKE'))
+            self.assertEqual({p.name for p in root.iterdir()},before)
+
+    async def test_low_disk_between_trials_stops_launches_and_releases_the_entire_block(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp)/'pilot';register(profile_spec('pilot'),root)
+            disks=[type('Disk',(),{'free':5*1024**3})(),type('Disk',(),{'free':2*1024**3-1})()]
+            with patch('parallax_relay.campaign.shutil.disk_usage',side_effect=disks),patch('parallax_relay.campaign.HTTPAgent',side_effect=AssertionError('client constructed')):
+                await run_campaign(root,live=True,environ={'OPENAI_API_KEY':'FAKE','GEMINI_API_KEY':'FAKE'})
+            report=analyze(root)
+            self.assertEqual(report['campaign_stop']['reason'],'low_disk_space')
+            self.assertEqual(report['completion_status'],'incomplete')
+            self.assertFalse(report['cohort_eligible'])
+            self.assertEqual(report['counts']['launched'],0)
+            self.assertEqual(report['anomalies'],[])
+            self.assertEqual(report['campaign_accounting']['reservation_balance_calls'],0)
+            self.assertEqual(report['campaign_accounting']['reservation_balance_estimated_usd'],0)
+            self.assertTrue(all(t['unlaunched_reason']=='low_disk_space' for t in report['trials']))
+
+    async def test_real_recording_and_priced_fake_driver_support_both_stages_without_network(self):
+        from parallax_relay.policies import WaitAgent
+        from parallax_relay.protocol import ModelReply, Usage
+        from parallax_relay.room_execution import RoomExecutionPermit
+        class FakeHTTP(WaitAgent):
+            def __init__(self,provider,model,key,**kwargs):self.provider=provider
+            async def respond(self,request):
+                self.role=request.role
+                reply=await super().respond(request)
+                return ModelReply(reply.text,Usage(100,10))
+        with tempfile.TemporaryDirectory() as temp,patch('parallax_relay.campaign.HTTPAgent',FakeHTTP),patch('parallax_relay.campaign.asyncio.sleep',new_callable=AsyncMock),patch('parallax_relay.campaign_analysis.paired_bootstrap',side_effect=AssertionError('no inference')):
+            base=Path(temp);pilot=base/'pilot'
+            register(profile_spec('pilot'),pilot)
+            await run_campaign(pilot,live=True,environ={'OPENAI_API_KEY':'FAKE','GEMINI_API_KEY':'FAKE'})
+            p=analyze(pilot)
+            self.assertEqual(p['completion_status'],'complete',p['anomalies'])
+            self.assertTrue(p['cohort_eligible'])
+            self.assertEqual(p['counts']['artifact_available'],60)
+            validation=base/'validation'
+            reg=register(profile_spec('validation'),validation,pilot=pilot)
+            trial=next(t for t in reg['schedule'] if t['team']=='wait')
+            permit=RoomExecutionPermit.from_registration(reg,trial)
+            with self.assertRaisesRegex(ValueError,'held-out'):permit.validate('split_span')
+            await run_campaign(validation,live=True,environ={'OPENAI_API_KEY':'FAKE','GEMINI_API_KEY':'FAKE'})
+            v=analyze(validation)
+            for report,planned,paid_limit in [(p,60,2592),(v,120,5184)]:
+                self.assertEqual(report['completion_status'],'complete',report['anomalies'])
+                self.assertTrue(report['cohort_eligible'])
+                self.assertFalse(report['confirmatory_eligible'])
+                self.assertEqual(report['counts']['launched'],planned)
+                self.assertEqual(report['counts']['artifact_available'],planned)
+                self.assertEqual(report['anomalies'],[])
+                self.assertEqual(report['contrasts'],[])
+                self.assertTrue(all(c['observed_difference'] is not None for c in report['descriptive_contrasts']))
+                self.assertNotIn('wilson_95',json.dumps(report))
+                self.assertLessEqual(len(report['attempts']),paid_limit)
+                self.assertEqual(report['overall']['cost']['retained_estimate_usd'],0)
+                self.assertEqual(report['campaign_accounting']['reservation_balance_calls'],0)
+                self.assertEqual(report['campaign_accounting']['reservation_balance_estimated_usd'],0)
+            self.assertEqual(len({t['room'] for t in p['trials']}),3)
+            self.assertEqual(len({t['room'] for t in v['trials']}),6)
+
+    def test_fixed_profile_retains_unknown_retry_estimates_and_rejects_whole_phase_before_calls(self):
+        from decimal import Decimal
+        from parallax_relay.budget import Budget, BudgetExceeded
+        from parallax_relay.campaign_models import schedule, trial_settings
+        from parallax_relay.config import Rates
+        from parallax_relay.observations import observe
+        from parallax_relay.protocol import AgentRequest
+        from parallax_relay.state import initial_world
+        spec=CampaignSpec.model_validate(profile_spec('pilot'))
+        trial=next(t for t in schedule(spec) if t['team']=='models' and t['condition']=='full')
+        settings=trial_settings(spec,trial)
+        budget=Budget(settings,{r:Rates.model_validate(p['pricing']) for r,p in trial['players'].items()})
+        world=initial_world(trial['room'])
+        requests={r:AgentRequest(observe(world,r),'broadcast',max_output_tokens=4096) for r in trial['players']}
+        while True:
+            before=budget.summary()
+            try:tickets=budget.reserve_phase(requests)
+            except BudgetExceeded as error:
+                self.assertEqual(error.reason,'spend_budget')
+                self.assertEqual(budget.summary(),before)
+                break
+            for ticket in tickets.values():
+                for _ in range(settings.max_attempts):
+                    ticket.start();ticket.settle(None)
+                ticket.release()
+        self.assertGreater(budget.calls_started,0)
+        self.assertLess(budget.calls_started,216)
+        self.assertEqual(budget.known_usage_usd,0)
+        self.assertEqual(budget.spent,budget.retained_estimate_usd)
+        self.assertGreater(budget.spent,0)
+        self.assertLessEqual(budget.spent,Decimal('0.25'))
+        self.assertEqual(budget.reserved_usd,0)
+        self.assertEqual(budget.reserved_calls,0)
+        self.assertEqual(budget.unknown_usage_calls,budget.calls_started)
 
 
 if __name__=='__main__':unittest.main()

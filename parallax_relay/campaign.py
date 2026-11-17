@@ -12,6 +12,7 @@ from decimal import Decimal
 import json
 import os
 import re
+import shutil
 from pathlib import Path
 import sys
 from time import monotonic
@@ -302,6 +303,8 @@ async def run_campaign(root: Path, *, offline: bool = False, live: bool = False,
     matches = current == registration['frozen']
     if (spec.stage != 'diagnostic' or spec.protocol_version==2) and not matches:
         raise CampaignError('Frozen source/environment/inputs changed; register a new cohort')
+    if is_exploratory(spec) and shutil.disk_usage(root).free < 5*1024**3:
+        raise CampaignError('Exploratory execution requires at least 5 GiB free disk before launch')
     selected_env=dict(os.environ if environ is None else environ)
     if live:
         for player in spec.roster:
@@ -346,6 +349,9 @@ async def run_campaign(root: Path, *, offline: bool = False, live: bool = False,
             for trial, (max_calls, max_dollars) in zip(trials, exposure):
                 if last_launch is not None:
                     await asyncio.sleep(max(0, spec.min_trial_interval_seconds - (monotonic() - last_launch)))
+                if is_exploratory(spec) and shutil.disk_usage(root).free < 2*1024**3:
+                    stop = 'low_disk_space'
+                    break
                 checked=frozen_inputs(spec) if spec.stage!='diagnostic' or spec.protocol_version==2 else None
                 if checked is not None and checked != registration['frozen']:
                     stop = 'frozen_input_drift'
