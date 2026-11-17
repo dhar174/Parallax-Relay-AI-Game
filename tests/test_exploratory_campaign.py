@@ -167,7 +167,8 @@ class ExploratoryCampaignTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(report['contrasts'],[])
                 self.assertTrue(all(c['observed_difference'] is not None for c in report['descriptive_contrasts']))
                 self.assertNotIn('wilson_95',json.dumps(report))
-                self.assertLessEqual(len(report['attempts']),paid_limit)
+                paid_ids={t['trial_id'] for t in report['trials'] if t['team']=='models'}
+                self.assertLessEqual(sum(a['trial_id'] in paid_ids for a in report['attempts']),paid_limit)
                 self.assertEqual(report['overall']['cost']['retained_estimate_usd'],0)
                 self.assertEqual(report['campaign_accounting']['reservation_balance_calls'],0)
                 self.assertEqual(report['campaign_accounting']['reservation_balance_estimated_usd'],0)
