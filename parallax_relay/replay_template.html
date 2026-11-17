@@ -42,7 +42,11 @@ $('roster').textContent=roles.map(role=>{const p=manifest.players?.[role]??prove
 const resolved=records.filter(r=>r&&validTurn(r.turn)&&r.turn>0),resolvedTurns=new Set(resolved.map(r=>r.turn-1));
 const partial=[...new Set([...calls,...phases].filter(row=>row&&validTurn(row.turn)&&!resolvedTurns.has(row.turn)).map(row=>row.turn))];
 const finalTurn=DATA.final_state?.turn;
-const checkpoint=validTurn(result.turns)&&validTurn(finalTurn)&&result.turns===finalTurn&&resolved.every(r=>r.turn<=finalTurn)?finalTurn:null;
+const consistent=[...calls,...phases].every(row=>!validTurn(row?.turn)||row.turn<=finalTurn)&&resolved.every(r=>r.turn<=finalTurn&&
+ (r.state_after?.turn==null||r.state_after.turn===r.turn)&&
+ !((r.state_after?.win===true||r.state_after?.loss===true)&&
+   (r.turn!==finalTurn||r.state_after.win!==DATA.final_state?.win||r.state_after.loss!==DATA.final_state?.loss)));
+const checkpoint=validTurn(result.turns)&&validTurn(finalTurn)&&result.turns===finalTurn&&consistent?finalTurn:null;
 const nonterminal=result.completed===false&&result.win!==true&&result.loss!==true&&DATA.final_state?.win!==true&&DATA.final_state?.loss!==true;
 const classification=turn=>checkpoint===null?'unknown':turn<checkpoint?'missing':turn===checkpoint&&nonterminal?'unfinished':'unknown';
 const views=[...resolved.map(record=>({turn:record.turn-1,record})),...partial.map(turn=>({turn,status:classification(turn)}))].sort((a,b)=>a.turn-b.turn);

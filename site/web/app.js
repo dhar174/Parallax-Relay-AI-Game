@@ -61,7 +61,11 @@ function partialInspection(candidate){
  const validTurn=n=>Number.isSafeInteger(n)&&n>=0;
  const resolved=new Set(candidate.replay.map(record=>record.turn-1));
  const resultTurn=candidate.result.turns,finalTurn=candidate.final_state.turn;
- const checkpoint=validTurn(resultTurn)&&validTurn(finalTurn)&&resultTurn===finalTurn&&candidate.replay.every(record=>record.turn<=finalTurn)?finalTurn:null;
+ const consistent=[...candidate.calls,...candidate.phases].every(row=>!validTurn(row.turn)||row.turn<=finalTurn)&&candidate.replay.every(record=>record.turn<=finalTurn&&
+  (record.state_after?.turn==null||record.state_after.turn===record.turn)&&
+  !((record.state_after?.win===true||record.state_after?.loss===true)&&
+    (record.turn!==finalTurn||record.state_after.win!==candidate.final_state.win||record.state_after.loss!==candidate.final_state.loss)));
+ const checkpoint=validTurn(resultTurn)&&validTurn(finalTurn)&&resultTurn===finalTurn&&consistent?finalTurn:null;
  const nonterminal=candidate.result.completed===false&&!candidate.result.win&&!candidate.result.loss&&candidate.final_state.win!==true&&candidate.final_state.loss!==true;
  const rounds=[...new Set([...candidate.calls,...candidate.phases].filter(row=>validTurn(row.turn)&&!resolved.has(row.turn)).map(row=>row.turn))].sort((a,b)=>a-b);
  const ungrouped=candidate.phases.filter(phase=>!validTurn(phase.turn));
@@ -70,7 +74,10 @@ function partialInspection(candidate){
    const phases=candidate.phases.filter(phase=>phase.turn===turn),calls=candidate.calls.filter(call=>call.turn===turn);
    const state=checkpoint===null?'unknown':turn<checkpoint?'missing':turn===checkpoint&&nonterminal?'unfinished':'unknown';
    const label=state==='missing'?'resolved round record unavailable':state==='unfinished'?'unfinished':'resolution unknown';
-   const note=state==='unfinished'?'Completed commitments are recorded but not applied without resolution.':'Commitments are shown as recorded phase evidence.';
+   const hasCommitments=phases.some(phase=>phase.phase==='commit'&&phase.sealed_actions&&
+    typeof phase.sealed_actions==='object'&&!Array.isArray(phase.sealed_actions)&&Object.keys(phase.sealed_actions).length>0);
+   const note=!hasCommitments?'No completed commitments recorded for this round.':state==='unfinished'?
+    'Completed commitments are recorded but not applied without resolution.':'Commitments are shown as recorded phase evidence.';
    return '<details><summary>Round '+(turn+1)+' · '+label+' · before actions</summary><p>'+note+'</p><h3>Completed phases</h3><pre>'+esc(JSON.stringify(phases,null,2))+'</pre><h3>All call attempts</h3><pre>'+esc(JSON.stringify(calls,null,2))+'</pre></details>';
   }).join(''):'<p>No additional round evidence recorded.</p>')+
   '<details id="ungrouped-phases"><summary>Phase records without a usable round number</summary><pre>'+esc(JSON.stringify(ungrouped,null,2))+'</pre></details></section>';
