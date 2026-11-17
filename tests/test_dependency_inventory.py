@@ -129,6 +129,111 @@ class DependencyInventoryTests(unittest.TestCase):
         self.assertEqual(result["packages"][1]["license_files"][0]["text"], "Keep this notice")
         self.assertNotIn("FAKE-PRIVATE-PERMISSION-DETAIL", json.dumps(result))
 
+    def test_multiply_linked_licenses_are_rejected_before_reading(self):
+        module = self.load_collector()
+        for source_location in ("same-distribution", "other-distribution", "outside"):
+            with self.subTest(source_location=source_location), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                dist = root / "demo-1.0.dist-info"
+                (dist / "licenses").mkdir(parents=True)
+                (dist / "METADATA").write_bytes(b"Name: demo\nVersion: 1.0\n")
+                other = root / "other-1.0.dist-info"
+                other.mkdir()
+                (other / "METADATA").write_bytes(b"Name: other\nVersion: 1.0\n")
+                source = {"same-distribution": dist / "private.json",
+                          "other-distribution": other / "direct_url.json",
+                          "outside": root / "outside.txt"}[source_location]
+                source.write_bytes(b"FAKE-PRIVATE-HARDLINK-SENTINEL")
+                alias = dist / "licenses/LICENSE-alias"
+                try:
+                    alias.hardlink_to(source)
+                except (OSError, NotImplementedError) as error:
+                    self.skipTest(f"hardlink creation unavailable: {type(error).__name__}")
+                (dist / "licenses/LICENSE").write_bytes(b"Ordinary notice\n")
+                (dist / "RECORD").write_bytes(
+                    b"demo-1.0.dist-info/licenses/LICENSE,,\n"
+                    b"demo-1.0.dist-info/licenses/LICENSE-alias,,\n")
+                original = Path.read_bytes
+                reads = []
+
+                def read_bytes(path):
+                    reads.append(path)
+                    return original(path)
+
+                with patch.object(Path, "read_bytes", read_bytes):
+                    result = module.collect_inventory([tmp])
+                files = result["packages"][0]["license_files"]
+                self.assertNotIn(alias, reads)
+                self.assertNotIn("FAKE-PRIVATE-HARDLINK-SENTINEL", json.dumps(result))
+                self.assertEqual(files[0]["text"], "Ordinary notice\n")
+                self.assertIsNone(files[1]["text"])
+                self.assertIsNone(files[1]["sha256"])
+                self.assertTrue(files[1]["text_error"])
+
+    def test_missing_name_retains_unavailable_row_and_healthy_neighbor(self):
+        module = self.load_collector()
+        with tempfile.TemporaryDirectory() as tmp:
+            broken = Path(tmp) / "broken-1.0.dist-info"
+            broken.mkdir()
+            (broken / "METADATA").write_bytes(b"Version: 1.0\n")
+            good = Path(tmp) / "good-1.0.dist-info"
+            good.mkdir()
+            (good / "METADATA").write_bytes(b"Name: good\nVersion: 1.0\n")
+            result = module.collect_inventory([tmp])
+        self.assertEqual(len(result["packages"]), 2)
+        broken_row = next(p for p in result["packages"] if p["name"] is None)
+        self.assertTrue(broken_row["metadata_error"])
+        good_row = next(p for p in result["packages"] if p["name"] == "good")
+        self.assertEqual(good_row["version"], "1.0")
+        self.assertIsNone(good_row["metadata_error"])
+
+    def test_metadata_read_failure_retains_unavailable_row_and_healthy_neighbor(self):
+        module = self.load_collector()
+        with tempfile.TemporaryDirectory() as tmp:
+            broken = Path(tmp) / "broken-1.0.dist-info"
+            broken.mkdir()
+            (broken / "METADATA").write_bytes(b"Name: broken\nVersion: 1.0\n")
+            good = Path(tmp) / "good-1.0.dist-info"
+            good.mkdir()
+            (good / "METADATA").write_bytes(b"Name: good\nVersion: 1.0\n")
+            (good / "LICENSE").write_bytes(b"Keep healthy notice\n")
+            (good / "RECORD").write_bytes(b"good-1.0.dist-info/LICENSE,,\n")
+            original = module.metadata.PathDistribution.read_text
+
+            def read_text(distribution, filename):
+                if distribution._path == broken and filename == "METADATA":
+                    raise ValueError("FAKE-PRIVATE-METADATA-DETAIL")
+                return original(distribution, filename)
+
+            with patch.object(module.metadata.PathDistribution, "read_text", read_text):
+                result = module.collect_inventory([tmp])
+        self.assertEqual(len(result["packages"]), 2)
+        broken_row = next(p for p in result["packages"] if p["name"] is None)
+        self.assertEqual(broken_row["metadata_error"], "ValueError")
+        self.assertFalse(broken_row["file_inventory_available"])
+        self.assertEqual(broken_row["license_files"], [])
+        good_row = next(p for p in result["packages"] if p["name"] == "good")
+        self.assertEqual(good_row["license_files"][0]["text"], "Keep healthy notice\n")
+        self.assertIsNone(good_row["metadata_error"])
+        self.assertNotIn("FAKE-PRIVATE-METADATA-DETAIL", json.dumps(result))
+
+    def test_nul_license_declaration_is_unavailable_without_losing_healthy_notice(self):
+        module = self.load_collector()
+        with tempfile.TemporaryDirectory() as tmp:
+            dist = Path(tmp) / "demo-1.0.dist-info"
+            (dist / "licenses").mkdir(parents=True)
+            (dist / "METADATA").write_bytes(
+                b"Metadata-Version: 2.4\nName: demo\nVersion: 1.0\n"
+                b"License-File: LICENSE\nLicense-File: LICENSE\x00broken\n")
+            (dist / "licenses/LICENSE").write_bytes(b"Ordinary notice\n")
+            result = module.collect_inventory([tmp])
+        files = result["packages"][0]["license_files"]
+        self.assertEqual(len(files), 2)
+        self.assertEqual(files[0]["text"], "Ordinary notice\n")
+        self.assertIsNone(files[1]["text"])
+        self.assertIsNone(files[1]["sha256"])
+        self.assertEqual(files[1]["text_error"], "ValueError")
+
     def test_declared_license_absent_from_missing_record_is_explicit(self):
         module = self.load_collector()
         with tempfile.TemporaryDirectory() as tmp:
@@ -141,6 +246,22 @@ class DependencyInventoryTests(unittest.TestCase):
         self.assertEqual(len(files), 1)
         self.assertEqual(files[0]["path"], "declared-1.0.dist-info/licenses/COPYING")
         self.assertEqual(files[0]["text_error"], "FileNotFoundError")
+
+    def test_missing_recorded_license_remains_explicit_without_declaration(self):
+        module = self.load_collector()
+        with tempfile.TemporaryDirectory() as tmp:
+            dist = Path(tmp) / "demo-1.0.dist-info"
+            dist.mkdir()
+            (dist / "METADATA").write_bytes(b"Metadata-Version: 2.1\nName: demo\nVersion: 1.0\n")
+            (dist / "RECORD").write_bytes(b"demo-1.0.dist-info/LICENSE-missing,,\n")
+            result = module.collect_inventory([tmp])
+        package = result["packages"][0]
+        self.assertTrue(package["file_inventory_available"])
+        self.assertEqual(len(package["license_files"]), 1)
+        self.assertEqual(package["license_files"][0]["path"], "demo-1.0.dist-info/LICENSE-missing")
+        self.assertEqual(package["license_files"][0]["text_error"], "FileNotFoundError")
+        self.assertIsNone(package["license_files"][0]["text"])
+        self.assertIsNone(package["license_files"][0]["sha256"])
 
     def test_installed_metadata_keeps_license_text_and_explicit_unknowns(self):
         self.assertTrue(SCRIPT.exists(), "inventory collector is not implemented")

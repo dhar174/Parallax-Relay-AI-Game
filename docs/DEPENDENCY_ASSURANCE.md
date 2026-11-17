@@ -15,7 +15,14 @@ that committed harness's `tools/browser/package.json` and `package-lock.json`.
 [Evidence](audits/dependencies-2026-11-16/evidence.json) records input SHA-256s,
 actual tool results, exact inventories, OS release, advisory identifiers and
 publication/modification dates. These results cover those dependency inputs;
-subsequent source changes need their own behavioral verification.
+subsequent source changes need their own behavioral verification. Historical
+execution commits `3272faa2e9962cbcbad9009913680004de8f207c` and
+`572573c7c1ae126b0722fc0787e0fc91e17c392a` are retained in the original local
+repository, but were unavailable from a fresh remote clone during independent
+review. Their full historical test trees are therefore not remotely
+reconstructable from the published branch stack. The six recorded dependency and
+workflow input hashes match the reviewed stack; current-head verification is
+separate evidence and does not recreate those historical executions.
 
 Actual execution used Debian 13.6/Linux x86_64, Python 3.12.14, pip 26.3,
 pip-audit 2.10.1, uv 0.13.6, Node 24.22.1, and npm 11.9.0. Audit tooling lives in
@@ -160,8 +167,11 @@ installed metadata, supplied license texts and SHA-256s, including pip's vendor
 notices, uv's two licenses, npm LICENSE/NOTICE/sidecar texts and pinned action
 licenses. `scripts/dependency_inventory.py` collects those Python records offline
 with the selected interpreter, preserving missing metadata and undecodable text
-as explicit unknowns. It does not read environment variables or direct-install
-URLs. License labels alone are not a redistribution checklist.
+as explicit unknowns. It does not enumerate environment key/value pairs or collect
+direct-install URLs. Platform descriptions use Python's platform library, which
+can invoke an ambient-PATH `uname` on Linux; run collection only in a trusted
+installed environment. This is not a privacy boundary against hostile executables
+on PATH. License labels alone are not a redistribution checklist.
 
 Collector review follow-up: RECORD paths are checked against the distribution's
 own canonical metadata directory and license area before reading. Traversal,
@@ -207,6 +217,38 @@ full suite took 55.085 seconds). Actual environment readback preserved all 34
 notice hashes across 13 distributions with no unavailable entries. A new
 hosted run on the patched assembled revision is required for Windows acceptance;
 the prior six passing jobs do not establish that acceptance.
+
+### Independent collector review repairs — November 17, 2026 UTC
+
+The collector repair starts at `9b3b6b570c9cff4ed66f2e1fe4b36e0c7ba830f8`.
+License candidates that are regular files with more than one hard link are now
+rejected before reading, including aliases to another distribution or a file
+outside the installation. This conservatively marks genuinely shared hardlinked
+notices unavailable too. A missing distribution Name remains `null` with
+`metadata_error`; per-distribution metadata failures retain an unavailable row
+and an exception category without its message, while healthy neighbors remain
+available. Healthy rows have `metadata_error: null`.
+
+Raw RECORD CSV entries now supply candidates because Python 3.12's importlib can
+filter nonexistent files from its file inventory. Missing recorded licenses
+remain explicit even without a `License-File` declaration. Installations without
+RECORD retain the existing importlib file-inventory fallback. Embedded NUL paths
+receive a per-file `ValueError` category rather than aborting collection.
+
+Against the unchanged collector, 12 focused tests exited 1 with four failures
+(three hardlink cases and one missing recorded notice) and three errors (missing
+Name, metadata read failure and NUL path). After repair all 12 passed with no
+skips or warnings in 0.332 seconds. Real locked-environment readback preserved
+all 34 notice hashes across 13 distributions, with no metadata or text errors.
+The complete offline Python suite passed all 387 tests with no skips in
+141.259 seconds.
+`pip check`, compilation, the normal/fast mock verifier, and a real temporary
+no-RECORD egg-info SOURCES fallback check also passed. These checks used the
+existing locked Python 3.12 interpreter without changing its environment.
+
+This remains offline inventory repair: no advisory database refresh, formal
+security scan, hosted Windows acceptance, or zip-distribution support is claimed.
+The no-concurrent-installation-modification assumption above still applies.
 
 | Locked distribution | Version | Supplied license |
 |---|---|---|

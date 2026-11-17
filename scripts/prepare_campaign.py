@@ -36,10 +36,23 @@ EVENT_BYTES = 128
 UNICODE = '\U0010ffff'  # 12 ASCII bytes per character after ensure_ascii JSON.
 
 
+def read_json(path):
+    """Reject ambiguous objects before validating or hashing any input."""
+    def unique_object(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError('Duplicate JSON object key')
+            result[key] = value
+        return result
+    return json.loads(path.read_text(encoding='utf-8'), object_pairs_hook=unique_object)
+
+
 def load_inputs():
-    sources = json.loads(SOURCES.read_text(encoding='utf-8'))
-    profile = json.loads(PROFILE.read_text(encoding='utf-8'))
-    if sources['schema_version'] != 1 or date.fromisoformat(sources['verified_date']) > date.today():
+    sources = read_json(SOURCES)
+    profile = read_json(PROFILE)
+    if (type(sources['schema_version']) is not int or sources['schema_version'] != 1 or
+            date.fromisoformat(sources['verified_date']) > date.today()):
         raise ValueError('Invalid documentation verification date')
     common = {'communication_rounds': 2, 'max_attempts': 2,
         'timeout_seconds': 60.0, 'max_output_tokens': 4096, 'history_turns': 4,
@@ -227,7 +240,7 @@ def build_bundle():
             'planned_q_output_paths': 'not_started', 'exact_q_command': 'not_started',
             'launch_checkpoint': 'not_started', 'heartbeat': 'not_started'},
         'remaining_gates': ['Integrate Phase1 and freeze clean source/environment, then regenerate and check.',
-            'Review a current numeric Q receipt and obtain separate Q spending approval before registration/run.',
+            'Review a current numeric Q receipt and obtain separate Q spending approval before any live execution.',
             'Complete Q model/arm compatibility review before requesting separate pilot spending approval.',
             'Complete an eligible pilot before confirmation registration; preserve all frozen pilot inputs and obtain separate confirmation spending approval.']}
     return specs, receipt
@@ -239,7 +252,7 @@ def write_bundle(out):
     for filename, data in {**specs, 'receipt.json': receipt}.items():
         path = out / filename
         path.write_text(json.dumps(data, indent=2, allow_nan=False) + '\n', encoding='utf-8')
-        if canonical_hash(json.loads(path.read_text(encoding='utf-8'))) != canonical_hash(data):
+        if canonical_hash(read_json(path)) != canonical_hash(data):
             raise ValueError('Candidate write/readback mismatch')
     check_bundle(out, require_clean=False)
     return receipt
@@ -247,11 +260,11 @@ def write_bundle(out):
 
 def check_bundle(bundle, require_clean=False):
     specs, expected = build_bundle()
-    receipt = json.loads((bundle / 'receipt.json').read_text(encoding='utf-8'))
+    receipt = read_json(bundle / 'receipt.json')
     if canonical_hash(receipt) != canonical_hash(expected):
         raise ValueError('Receipt differs from current source/environment/inputs or worksheet')
     for filename, value in specs.items():
-        candidate = json.loads((bundle / filename).read_text(encoding='utf-8'))
+        candidate = read_json(bundle / filename)
         # Validate the unnormalized input just as registration does, then compare
         # raw canonical hashes so 2/2.0 and True/1 cannot compare equal.
         CampaignSpec.model_validate(candidate, strict=True)

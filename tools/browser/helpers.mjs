@@ -88,6 +88,12 @@ export async function native(environment, name) {
   return JSON.parse(await readFile(join(environment.fixtures, name, 'native.json'), 'utf8'));
 }
 export function viewerURL(environment, name) {return pathToFileURL(join(environment.fixtures, name, 'index.html')).href;}
+export async function openWorkbench(page, origin) {
+  await page.goto(origin);
+  // The module awaits /api/status before its initial render. A completed page
+  // load alone can still leave that render pending and replace a focused button.
+  await page.locator('.sidefoot').filter({hasText: /^REPO /}).waitFor();
+}
 export async function importJSON(page, environment, name) {
   await page.locator('[data-tab="evaluation"]').click();
   await page.locator('#json').setInputFiles(join(environment.fixtures, name, 'native.json'));
