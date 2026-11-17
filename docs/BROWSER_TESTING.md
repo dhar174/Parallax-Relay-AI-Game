@@ -37,6 +37,20 @@ missing PNGs, and actual historical schema-v2 files from `example_run/`, includi
 archives with omitted resolved replay rows. Counts are checked against native results; the call caps include phase reservation and
 therefore do not equal attempts started.
 
+Additional native stops include broadcast-only communication (call cap 7), a
+shape-error retry, and completed commitments before resolution fails, both before
+and after a resolved turn. Explicit contradictory derivatives disagree with the
+checkpoint through a nested turn, nested terminal snapshot, or later phase record.
+Both viewers must retain that evidence as resolution unknown, while consistent
+unfinished commitments remain labelled unapplied. Communication-only stops must
+not claim that commitments completed. The suite checks each missing sensor-image
+banner before switching to the final checkpoint, and workbench retry diagnostics.
+
+Companion navigation waits for the initial status lookup and UI render before
+keyboard interaction. A regression delays the real local status response and
+reproduces the focus replacement window; no sleep or longer timeout substitutes
+for application readiness.
+
 The browser context blocks service workers and WebSockets. Request interception
 allows only exact temporary companion origins and fixture/build file paths, and
 fails any attempted external request. This is browser interception, not OS-level

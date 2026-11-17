@@ -4,7 +4,7 @@ import { before, after, test } from 'node:test';
 import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { provision, companion, pageFor, native, viewerURL, importJSON, finalFrame, layout, results, root, settleImages, textContrast } from './helpers.mjs';
+import { provision, companion, pageFor, native, viewerURL, openWorkbench, importJSON, finalFrame, layout, results, root, settleImages, textContrast } from './helpers.mjs';
 
 let environment;
 before(async () => {environment = await provision();});
@@ -15,8 +15,15 @@ const cases = [
   ['later-partial', 'call_budget', 1, 15, 5], ['zero-turn-partial', 'call_budget', 0, 6, 2],
   ['zero-call', 'call_budget', 0, 0, 0], ['local-error', 'local_error', 0, 3, 1],
   ['cancelled', 'cancelled', 0, 3, 0], ['retry-shape', 'turn_limit', 2, 19, 6],
-  ['commit-unresolved', 'internal_error', 0, 9, 3],
+  ['commit-unresolved', 'internal_error', 0, 9, 3], ['later-commit-unresolved', 'internal_error', 1, 18, 6],
+  ['broadcast-only', 'call_budget', 0, 3, 1],
 ];
+
+function workbenchRound(page, round) {
+  return page.locator('#partial-rounds > details').filter({
+    has: page.locator('summary').filter({hasText: new RegExp('^Round ' + round + ' ')}),
+  });
+}
 
 for (const [name, stop, turns, calls, phases] of cases) {
   test('file viewer retains native final checkpoint and all diagnostics: ' + name, async t => {
@@ -128,7 +135,7 @@ test('model strings remain inert in standalone and workbench partial data', asyn
   assert.match(await page.locator('#chat').textContent(), /window.modelExecuted/);
   assert.equal(await page.evaluate(() => window.modelExecuted), undefined);
   assert.equal(await page.locator('img[src^="https:"]').count(), 0);
-  await page.goto(server.origin);
+  await openWorkbench(page, server.origin);
   await importJSON(page, environment, 'malicious-import');
   assert.match(await page.locator('#partial-rounds').textContent(), /window.modelExecuted/);
   assert.equal(await page.evaluate(() => window.modelExecuted), undefined);
@@ -140,6 +147,11 @@ test('missing images are explicit without losing final state or diagnostics', as
   const missing = ['turn_00_spectra.png', 'turn_00_pyra.png', 'turn_00_flux.png', 'turn_00_spectator.png', 'final_spectator.png'].map(name => base + name);
   const page = await pageFor(t, environment, {missing});
   await page.goto(viewerURL(environment, 'missing-images'));
+  for (const role of ['SPECTRA', 'PYRA', 'FLUX', 'SPECTATOR']) {
+    await page.locator('#' + role + 'Unavailable').waitFor({state: 'visible'});
+    assert.equal(await page.locator('#' + role).isVisible(), false);
+    assert.match(await page.locator('#' + role + 'Unavailable').textContent(), /unavailable|missing/i);
+  }
   await finalFrame(page);
   assert.deepEqual(JSON.parse(await page.locator('#finalState').textContent()), (await native(environment, 'missing-images')).final_state);
   await page.locator('#SPECTATORUnavailable').waitFor({state: 'visible'});
@@ -151,7 +163,7 @@ test('built workbench imports actual legacy v2 and new v3 directories and JSON',
   const server = await companion();
   t.after(() => server.close());
   const page = await pageFor(t, environment, {origin: server.origin});
-  await page.goto(server.origin);
+  await openWorkbench(page, server.origin);
   assert.match(await page.title(), /Parallax Relay/);
   await page.locator('[data-tab="evaluation"]').click();
   await page.getByRole('button', {name: 'Import run folder', exact: true}).focus();
@@ -174,6 +186,22 @@ test('built workbench imports actual legacy v2 and new v3 directories and JSON',
     if (name === 'later-partial' || name === 'zero-turn-partial') {
       assert.match(await page.locator('#partial-rounds').textContent(), /broadcast|negotiate/);
     }
+    if (name === 'retry-shape') {
+      const failures = page.locator('section.card').filter({has: page.getByRole('heading', {name: 'Failure evidence and phase records', exact: true})}).locator(':scope > pre');
+      assert.deepEqual(JSON.parse(await failures.textContent()), data.calls.filter(call => call.status !== 'ok'));
+      const failed = JSON.parse(await failures.textContent());
+      assert.deepEqual(failed.map(call => [call.role, call.turn, call.phase, call.attempt, call.status]),
+        [['SPECTRA', 0, 'broadcast', 1, 'invalid_json_schema']]);
+      assert.equal(data.phases.find(phase => phase.turn === 0 && phase.phase === 'broadcast').statuses.SPECTRA, 'ok');
+    }
+    if (name === 'commit-unresolved' || name === 'later-commit-unresolved') {
+      const turn = name === 'commit-unresolved' ? 0 : 1;
+      const round = workbenchRound(page, turn + 1);
+      assert.match(await round.locator('summary').textContent(), /unfinished/);
+      assert.match(await round.locator(':scope > p').textContent(), /Completed commitments.*not applied.*without resolution/i);
+      assert.deepEqual(JSON.parse(await round.locator('pre').nth(0).textContent()), data.phases.filter(phase => phase.turn === turn));
+      assert.deepEqual(JSON.parse(await round.locator('pre').nth(1).textContent()), data.calls.filter(call => call.turn === turn));
+    }
   }
   await importJSON(page, environment, 'missing-images');
   assert.match(await page.locator('#final-spectator').textContent(), /unavailable/i);
@@ -189,11 +217,46 @@ test('built workbench imports actual legacy v2 and new v3 directories and JSON',
   }
 });
 
+test('workbench readiness waits for delayed initial status before keyboard import', async t => {
+  const server = await companion();
+  t.after(() => server.close());
+  const page = await pageFor(t, environment, {origin: server.origin});
+  let releaseStatus;
+  const released = new Promise(resolve => {releaseStatus = resolve;});
+  const requested = page.waitForRequest(server.origin + '/api/status');
+  await page.route(server.origin + '/api/status', async route => {
+    await released;
+    await route.continue();
+  });
+  let ready = false;
+  const opening = openWorkbench(page, server.origin).then(() => {ready = true;});
+  try {
+    await requested;
+    await page.waitForLoadState('load');
+    // Reproduce the lost-focus window without fabricating a companion response.
+    await page.locator('[data-tab="evaluation"]').click();
+    await page.getByRole('button', {name: 'Import run folder', exact: true}).focus();
+    assert.equal(await page.locator('#import-directory').evaluate(el => el === document.activeElement), true);
+    assert.equal(ready, false, 'Navigation must remain pending until the initial status render completes');
+  } finally {
+    releaseStatus();
+    await opening;
+  }
+  assert.equal(await page.locator('#import-directory').evaluate(el => el === document.activeElement), false,
+    'The real status continuation replaced the formerly focused button');
+  await page.getByRole('button', {name: 'Import run folder', exact: true}).focus();
+  const chooser = page.waitForEvent('filechooser');
+  await page.keyboard.press('Enter');
+  await (await chooser).setFiles(join(root, 'example_run'));
+  await page.locator('#final-state').waitFor();
+  assert.deepEqual(JSON.parse(await page.locator('#final-state pre').textContent()), (await native(environment, 'legacy-v2')).final_state);
+});
+
 test('actual loopback companion executes one-turn mock through built workbench', async t => {
   const server = await companion();
   t.after(() => server.close());
   const page = await pageFor(t, environment, {origin: server.origin});
-  await page.goto(server.origin);
+  await openWorkbench(page, server.origin);
   await page.locator('[data-match="max_turns"]').fill('1');
   await page.locator('[data-tab="offline"]').click();
   const response = page.waitForResponse(response => response.url() === server.origin + '/api/mock', {timeout: 60_000});
@@ -257,7 +320,7 @@ for (const name of ['missing-replay', 'missing-middle-replay']) {
     const server = await companion();
     t.after(() => server.close());
     const workbench = await pageFor(t, environment, {origin: server.origin});
-    await workbench.goto(server.origin);
+    await openWorkbench(workbench, server.origin);
     await importJSON(workbench, environment, name);
     const summaries = await workbench.locator('#partial-rounds > details > summary').allTextContents();
     for (const turn of orphan) {
@@ -272,6 +335,85 @@ for (const name of ['missing-replay', 'missing-middle-replay']) {
     assert.deepEqual(JSON.parse(await workbench.locator('#final-state pre').textContent()), data.final_state);
   });
 }
+
+for (const name of ['checkpoint-turn-conflict', 'checkpoint-terminal-conflict', 'checkpoint-later-phase-conflict']) {
+  test('contradictory checkpoint keeps native commitments resolution unknown in both viewers: ' + name, async t => {
+    const data = await native(environment, name);
+    assert.equal(data.result.turns, 1);
+    assert.equal(data.final_state.turn, 1);
+    assert.equal(data.replay[0].turn, 1);
+    const commitments = data.phases.find(phase => phase.turn === 1 && phase.phase === 'commit').sealed_actions;
+    assert.deepEqual(Object.keys(commitments).sort(), ['FLUX', 'PYRA', 'SPECTRA']);
+    if (name === 'checkpoint-turn-conflict') assert.equal(data.replay[0].state_after.turn, 2);
+    else if (name === 'checkpoint-terminal-conflict') {
+      assert.equal(data.replay[0].state_after.win, true);
+      assert.equal(data.final_state.win, false);
+    } else assert.equal(data.phases.at(-1).turn, 2);
+
+    await t.test('standalone', async t => {
+      const page = await pageFor(t, environment);
+      await page.goto(viewerURL(environment, name));
+      await page.locator('#round').fill('1');
+      await page.locator('#round').dispatchEvent('input');
+      await settleImages(page);
+      assert.match(await page.locator('#roundLabel').textContent(), /^Round 2 .*resolution unknown/);
+      assert.doesNotMatch(await page.locator('#roundLabel').textContent(), /unfinished|resolved round record unavailable/);
+      const frame = await selectedDiagnostics(page);
+      assert.equal(frame.turn, 1);
+      assertFrameDiagnostics(data, frame);
+      const actions = await page.locator('#actions .entry').allTextContents();
+      assert.equal(actions.length, 3);
+      for (const [role, action] of Object.entries(commitments)) {
+        assert.ok(actions.some(text => text.startsWith(role + ':') && text.includes(JSON.stringify(action))));
+      }
+      assert.doesNotMatch(await page.locator('#actions').textContent(), /not applied|unresolved|unapplied/i);
+      await finalFrame(page);
+      assert.deepEqual(JSON.parse(await page.locator('#finalState').textContent()), data.final_state);
+      await assertFinalImage(page, new URL('final_spectator.png', viewerURL(environment, name)).href);
+    });
+    await t.test('workbench', async t => {
+      const server = await companion();
+      t.after(() => server.close());
+      const workbench = await pageFor(t, environment, {origin: server.origin});
+      await openWorkbench(workbench, server.origin);
+      await importJSON(workbench, environment, name);
+      const round = workbenchRound(workbench, 2);
+      assert.match(await round.locator('summary').textContent(), /^Round 2 .*resolution unknown/);
+      assert.doesNotMatch(await round.textContent(), /unfinished|not applied|unapplied/i);
+      assert.deepEqual(JSON.parse(await round.locator('pre').nth(0).textContent()), data.phases.filter(phase => phase.turn === 1));
+      assert.deepEqual(JSON.parse(await round.locator('pre').nth(1).textContent()), data.calls.filter(call => call.turn === 1));
+      assert.deepEqual(JSON.parse(await workbench.locator('#final-state pre').textContent()), data.final_state);
+    });
+  });
+}
+
+test('broadcast-only native stop shows no completed commitments in either viewer', async t => {
+  const data = await native(environment, 'broadcast-only');
+  assert.equal(data.result.turns, 0);
+  assert.deepEqual(data.phases.map(phase => phase.phase), ['broadcast']);
+  assert.equal(data.calls.length, 3);
+  await t.test('standalone', async t => {
+    const page = await pageFor(t, environment);
+    await page.goto(viewerURL(environment, 'broadcast-only'));
+    assert.match(await page.locator('#roundLabel').textContent(), /^Round 1 .*unfinished/);
+    assertFrameDiagnostics(data, await selectedDiagnostics(page));
+    assert.equal(await page.locator('#actions .entry').count(), 0);
+    assert.doesNotMatch(await page.locator('#actions').textContent(), /commitments recorded|not applied/i);
+  });
+  await t.test('workbench', async t => {
+    const server = await companion();
+    t.after(() => server.close());
+    const workbench = await pageFor(t, environment, {origin: server.origin});
+    await openWorkbench(workbench, server.origin);
+    await importJSON(workbench, environment, 'broadcast-only');
+    const round = workbenchRound(workbench, 1);
+    assert.match(await round.locator('summary').textContent(), /^Round 1 .*unfinished/);
+    assert.match(await round.locator(':scope > p').textContent(), /No completed commitments recorded/i);
+    assert.doesNotMatch(await round.textContent(), /Completed commitments are recorded|not applied/i);
+    assert.deepEqual(JSON.parse(await round.locator('pre').nth(0).textContent()), data.phases);
+    assert.deepEqual(JSON.parse(await round.locator('pre').nth(1).textContent()), data.calls);
+  });
+});
 
 
 test('per-frame checks reject a rotating call and phase mutant accepted by aggregate checks', async t => {

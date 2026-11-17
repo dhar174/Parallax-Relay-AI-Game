@@ -23,8 +23,11 @@ checks every file back. The checker independently rebuilds them using current
 code, catalog, smoke profile, source-verification record and environment. It strictly
 validates each candidate against `CampaignSpec` and compares raw canonical hashes
 for specs, receipt and write/readback, rejecting integer/float/boolean substitutions
-as well as edits or drift. `--require-clean` also requires clean Git and complete environment
-identity. It never reads credential files, resolves keys, constructs HTTP agents,
+as well as edits or drift. Source, profile, specs, receipt and written-file readback
+reject duplicate JSON object keys at any depth before validation or hashing; the
+source record also requires an integer schema version. `--require-clean` also
+requires clean Git and complete environment identity. It never reads credential
+files, resolves keys, constructs HTTP agents,
 registers campaigns or executes trials. Shared Git provenance probes look up only
 the [public process settings allowlist](PROVENANCE.md), rather than copying the
 whole process environment into Git children. This is a privacy boundary, not a
@@ -196,10 +199,11 @@ request. Qualification is the eventual approved test of remote account/model acc
    checker with `--require-clean`. Review exact source/environment/input/spec hashes,
    documentation date, numeric Q quotes and all guards before asking for Q spending
    approval. Preserve this receipt alongside the eventual registration for review.
-2. Only after separate explicit **Q spending approval**, register that exact Q
-   candidate with the existing campaign CLI, verify registration readback and its
-   spec/frozen identities against the receipt, then run the exact registration.
-   Registration itself does not authorize execution or enlarge exposure. Q must
+2. Register that exact Q candidate offline with the existing campaign CLI and
+   verify its readback and spec/frozen identities against the receipt for concrete
+   review. Registration itself does not authorize execution or enlarge exposure.
+   Obtain separate explicit **Q spending approval** for the reviewed receipt and
+   registration before running that exact registration. Q must
    produce reviewed model/arm compatibility evidence; refusals, invalid outputs,
    failures, stopped trials and omissions remain in the evidence.
 3. Review Q and obtain separate explicit **P spending approval** for the concrete

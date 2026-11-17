@@ -159,6 +159,17 @@ test('standalone preserves victory and scores when the operational stop is local
  app.next();assert.match(n('private').textContent,/100/);
 });
 
+test('contradictory result and final outcome flags are visible as a conflict in both viewers',async t=>{
+ const data=structuredClone(fixture);
+ data.final_state.win=false;
+ assert.doesNotThrow(()=>checkRun(data));
+ const replay=await standaloneReplay({...data,records:data.replay});
+ assert.match(replay.node('outcome').textContent,/outcome conflict/i);
+ const app=await workbench(t);await app.importJSON(data);
+ assert.match(app.node('panel').innerHTML,/Team outcome[\s\S]*?<strong>Outcome conflict<\/strong>/);
+ assert.deepEqual(await app.exportJSON(),data);
+});
+
 test('standalone zero-turn replay shows only evidence actually present and keeps final state available',async()=>{
  const result={...fixture.result,win:false,loss:false,completed:false,scores:null,turns:0,stop_reason:'call_budget'};
  const app=await standaloneReplay({manifest:fixture.manifest,result,records:[],calls:[],phases:[],final_state:{turn:0,energy:6}}),n=app.node;
@@ -214,6 +225,44 @@ test('replay rows beyond the checkpoint leave orphan resolution unknown in both 
  assert.match(replay.node('roundLabel').textContent,/Round 1.*resolution unknown/i);
  const app=await workbench(t);await app.importJSON(data);
  assert.match(app.node('panel').innerHTML,/Round 1 · resolution unknown/);
+ assert.deepEqual(await app.exportJSON(),data);
+});
+
+test('contradictory nested checkpoint evidence cannot establish unapplied commitments',async t=>{
+ const app=await workbench(t);
+ for(const conflict of ['turn','terminal','later-evidence']){
+  const data=structuredClone(fixture);
+  data.replay=data.replay.slice(0,1);
+  Object.assign(data.result,{turns:1,win:false,loss:false,completed:false,scores:null});
+  data.final_state=structuredClone(data.replay[0].state_after);
+  data.calls=[];data.phases=[{turn:1,phase:'commit',sealed_actions:{PYRA:{kind:'WAIT'}}}];
+  if(conflict==='turn')data.replay[0].state_after.turn=2;
+  else if(conflict==='terminal')data.replay[0].state_after.win=true;
+  else data.phases.push({turn:2,phase:'broadcast',messages:[]});
+  assert.doesNotThrow(()=>checkRun(data));
+  const replay=await standaloneReplay({...data,records:data.replay});
+  replay.next();
+  assert.match(replay.node('roundLabel').textContent,/Round 2.*resolution unknown/i,conflict);
+  assert.doesNotMatch(replay.node('actions').textContent,/not applied|unresolved/i,conflict);
+  await app.importJSON(data);
+  const partial=app.node('panel').innerHTML.split('id="partial-rounds"')[1].split('</section>')[0];
+  assert.match(partial,/Round 2.*resolution unknown/i,conflict);
+  assert.doesNotMatch(partial,/not applied|unfinished/i,conflict);
+  assert.deepEqual(await app.exportJSON(),data);
+ }
+});
+
+test('communication-only stops do not claim completed commitments',async t=>{
+ const app=await workbench(t),data=structuredClone(fixture);
+ Object.assign(data.result,{turns:0,win:false,loss:false,completed:false,scores:null});
+ data.final_state.turn=0;data.final_state.win=false;data.final_state.loss=false;
+ data.replay=[];data.calls=data.calls.filter(call=>call.turn===0&&call.phase==='broadcast');
+ data.phases=[{turn:0,phase:'broadcast',messages:[]}];
+ await app.importJSON(data);
+ const partial=app.node('panel').innerHTML.split('id="partial-rounds"')[1].split('</section>')[0];
+ assert.match(partial,/Round 1.*unfinished/i);
+ assert.doesNotMatch(partial,/Completed commitments are recorded|not applied/i);
+ assert.match(partial,/No completed commitments recorded/i);
  assert.deepEqual(await app.exportJSON(),data);
 });
 

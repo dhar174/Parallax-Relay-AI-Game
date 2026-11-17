@@ -82,6 +82,82 @@ class CampaignPreparationTests(unittest.TestCase):
                         prep.check_bundle(bundle)
                     (bundle / filename).write_text(originals[filename])
 
+    def test_source_and_profile_reject_duplicate_nested_keys(self):
+        from scripts import prepare_campaign as prep
+        with tempfile.TemporaryDirectory() as temp:
+            for name, original_path, attribute, old, new in (
+                ('source', prep.SOURCES, 'SOURCES',
+                 '"input_per_million": 0.1',
+                 '"input_per_million": 0.01, "input_per_million": 0.1'),
+                ('profile', prep.PROFILE, 'PROFILE',
+                 '"provider": "openai"',
+                 '"provider": "anthropic", "provider": "openai"'),
+            ):
+                with self.subTest(file=name):
+                    text = original_path.read_text()
+                    mutated = text.replace(old, new, 1)
+                    self.assertNotEqual(mutated, text)
+                    path = Path(temp) / (name + '.json')
+                    path.write_text(mutated)
+                    with patch.object(prep, attribute, path), self.assertRaises(ValueError):
+                        prep.load_inputs()
+
+    def test_source_schema_version_requires_an_integer(self):
+        from scripts import prepare_campaign as prep
+        with tempfile.TemporaryDirectory() as temp:
+            for version in (True, 1.0):
+                with self.subTest(version=version):
+                    source = json.loads(prep.SOURCES.read_text())
+                    source['schema_version'] = version
+                    path = Path(temp) / 'source.json'
+                    path.write_text(json.dumps(source))
+                    with patch.object(prep, 'SOURCES', path), self.assertRaises(ValueError):
+                        prep.load_inputs()
+
+    def test_checker_rejects_duplicate_nested_keys_in_spec_and_receipt(self):
+        from scripts import prepare_campaign as prep
+        specs, receipt = prep.build_bundle()
+        with tempfile.TemporaryDirectory() as temp:
+            bundle = Path(temp)
+            for name, value in {**specs, 'receipt.json': receipt}.items():
+                (bundle / name).write_text(json.dumps(value, indent=2))
+            cases = (
+                ('qualification.json', '"max_estimated_cost_usd": 0.65',
+                 '"max_estimated_cost_usd": 0.01, "max_estimated_cost_usd": 0.65'),
+                ('receipt.json', '"campaign_estimate_guard_usd": 9.75',
+                 '"campaign_estimate_guard_usd": 0.01, "campaign_estimate_guard_usd": 9.75'),
+            )
+            # Reuse a real rebuilt result so the test exercises the checker at
+            # both file boundaries without repeating the expensive worksheet.
+            with patch.object(prep, 'build_bundle', return_value=(specs, receipt)):
+                for filename, old, new in cases:
+                    with self.subTest(file=filename):
+                        path = bundle / filename
+                        original = path.read_text()
+                        mutated = original.replace(old, new, 1)
+                        self.assertNotEqual(mutated, original)
+                        path.write_text(mutated)
+                        try:
+                            with self.assertRaises(ValueError):
+                                prep.check_bundle(bundle)
+                        finally:
+                            path.write_text(original)
+
+    def test_write_readback_rejects_duplicate_nested_keys(self):
+        from scripts import prepare_campaign as prep
+        original_write = Path.write_text
+        def write_ambiguous(path, content, *args, **kwargs):
+            if path.name == 'qualification.json':
+                changed = content.replace('"limit": 0.65', '"limit": 0.01, "limit": 0.65', 1)
+                self.assertNotEqual(changed, content)
+                content = changed
+            return original_write(path, content, *args, **kwargs)
+        with tempfile.TemporaryDirectory() as temp, \
+             patch.object(prep, 'build_bundle', return_value=({'qualification.json': {'limit': 0.65}}, {})), \
+             patch.object(prep, 'check_bundle'), patch.object(Path, 'write_text', new=write_ambiguous):
+            with self.assertRaises(ValueError):
+                prep.write_bundle(Path(temp) / 'candidate')
+
     def test_receipt_leaves_operational_approval_gates_unverified(self):
         from scripts import prepare_campaign as prep
         _, receipt = prep.build_bundle()
