@@ -101,6 +101,12 @@ into confirmation; missing/failed trials cannot be replaced for favorable result
 
 ## Explicit exploratory profile
 
+The separate [all-Luna qualification](LUNA_QUALIFICATION.md) adds protocol 4:
+five missing model cases with a committed 55-case evidence selection, followed
+by a hash-bound composite qualification gate for held-out validation. It uses
+`--qualification-selection` / `--qualification`, keeps `pilot=null`, and retains
+the original mixed pilot as incomplete. Native/request format 3 is unchanged.
+
 Protocol 3 retains specification schema 2 and registration envelope 2. It supports
 only `exploratory-under20-v1`: one fixed assignment per room, one repetition per
 arm, all five arms and all three baseline policies. It schedules 15 model plus 45

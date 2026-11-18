@@ -21,7 +21,7 @@ from .protocol import ROLES
 from .campaign_validation import validate_summary, BUDGET_COUNTS, BUDGET_MONEY, utc, cross_artifacts
 from .policies import policy_identity
 from .money import amount, total as money_total, difference, json_fields
-from .exploratory import is_exploratory, PROFILE_ID
+from .exploratory import is_exploratory, PROFILE_ID, is_luna, is_descriptive, LUNA_PROFILE_ID
 from uuid import UUID
 
 TRIAL_STOPS = frozenset({'victory', 'defeat', 'turn_limit', 'call_budget', 'spend_budget',
@@ -94,7 +94,10 @@ def paired_bootstrap(strata: dict[str, list[tuple[int, int]]], *, resamples: int
             'prng': 'random.Random', 'interpretation': 'Fixed-room comparison; a degenerate interval does not establish equivalence.'}
 
 
-def _jsonl(path: Path) -> list[dict]:
+def _jsonl(path: Path, *, strict: bool=False) -> list[dict]:
+    if strict:
+        from .qualification import strict_jsonl
+        return strict_jsonl(path)
     rows = []
     for line in path.read_text(encoding='utf-8').splitlines():
         if line.strip():
@@ -136,7 +139,12 @@ def _artifacts(root: Path, trial: dict, registration: dict) -> tuple[dict, list[
     data, issues = {}, []
     for name in ('manifest', 'result', 'final_state', 'calls', 'phases', 'replay'):
         try:
-            data[name] = _jsonl(path / (name+'.jsonl')) if name in ('calls', 'phases', 'replay') else read_json(path / (name+'.json'))
+            if is_luna(registration['spec']):
+                from .qualification import load
+                data[name]=(_jsonl(path/(name+'.jsonl'),strict=True) if name in ('calls','phases','replay')
+                            else load(path/(name+'.json')))
+            else:
+                data[name] = _jsonl(path / (name+'.jsonl')) if name in ('calls', 'phases', 'replay') else read_json(path / (name+'.json'))
         except (OSError, ValueError, TypeError, RecursionError):
             issues.append(name + '_unavailable')
     settings = trial_settings(CampaignSpec.model_validate(registration['spec']), trial)
@@ -304,7 +312,11 @@ def analyze(root: Path) -> dict:
         with ledger_path.open(encoding='utf-8') as handle:
             for sequence, line in enumerate(handle, 1):
                 try:
-                    row = json.loads(line,parse_constant=lambda _: (_ for _ in ()).throw(ValueError()))
+                    if is_luna(spec):
+                        from .qualification import strict_loads
+                        row=strict_loads(line)
+                    else:
+                        row = json.loads(line,parse_constant=lambda _: (_ for _ in ()).throw(ValueError()))
                     if (type(row['sequence']) is not int or row['sequence'] != sequence or
                             type(row['schema_version']) is not int or row['schema_version'] != 1):
                         raise ValueError()
@@ -338,7 +350,7 @@ def analyze(root: Path) -> dict:
                         raise ValueError()
                     if event == 'campaign_stopped' and row.get('reason') not in (TRIAL_STOPS | {
                             'completed', 'frozen_input_drift', 'accounting_overrun', 'campaign_call_budget', 'campaign_spend_budget'} |
-                            ({'low_disk_space'} if is_exploratory(spec) else set())):
+                            ({'low_disk_space'} if is_descriptive(spec) else set())):
                         raise ValueError()
                     if event == 'trial_launched':
                         if row['trial_id'] in launched:
@@ -484,7 +496,7 @@ def analyze(root: Path) -> dict:
         cells[(row['room'], row['team'], row['assignment_id'], row['condition'])].append(row)
     cell_reports = [{'room': key[0], 'team': key[1], 'assignment_id': key[2], 'condition': key[3],
                      'deterministic_control': key[1] in ('scripted', 'wait'),
-                     **(_descriptive_summary(group,unknown_as_null=True) if is_exploratory(spec) else _summary(group))}
+                     **(_descriptive_summary(group,unknown_as_null=True) if is_descriptive(spec) else _summary(group))}
                     for key, group in sorted(cells.items())]
     arm_groups = defaultdict(list)
     for cell in cell_reports:
@@ -530,7 +542,7 @@ def analyze(root: Path) -> dict:
             if 'room' in row:row.update(labels(row['room']))
     descriptive={}
     def descriptive_summary(group):
-        return _descriptive_summary(group,unknown_as_null=is_exploratory(spec))
+        return _descriptive_summary(group,unknown_as_null=is_descriptive(spec))
     for dimension in ('family','split'):
         groups=defaultdict(list)
         for row in rows:groups[row[dimension]].append(row)
@@ -541,7 +553,7 @@ def analyze(root: Path) -> dict:
               'registration': registration, 'completion_status': 'complete' if complete else 'incomplete',
               'cohort_eligible': eligible,
               'confirmatory_eligible': bool(spec.stage == 'confirmatory' and inference_eligible),
-              'counts': counts, 'overall': (descriptive_summary(rows) if is_exploratory(spec) or len({row['room'] for row in rows})>1 else _summary(rows)), 'cells': cell_reports,
+              'counts': counts, 'overall': (descriptive_summary(rows) if is_descriptive(spec) or len({row['room'] for row in rows})>1 else _summary(rows)), 'cells': cell_reports,
               'equal_weight_arm_summaries': equal_weight_arms,
               'overall_interpretation': 'Descriptive accounting across the full schedule; comparisons use room/team/assignment cells and registered equal weights.',
               'contrasts': contrasts, 'trials': rows, 'attempts': attempt_rows,**descriptive,
@@ -576,8 +588,8 @@ def analyze(root: Path) -> dict:
                               'Unsigned files and fingerprints establish consistency, not authenticity.']}
     if not inference_eligible:
         report['limitations'].append('Incomplete or ineligible cohort: report descriptive rates/bounds without confirmatory inference.')
-    if is_exploratory(spec):
-        report.update(analysis_version=3, profile_id=PROFILE_ID,
+    if is_descriptive(spec):
+        report.update(analysis_version=4 if is_luna(spec) else 3, profile_id=LUNA_PROFILE_ID if is_luna(spec) else PROFILE_ID,
                       evidence_class='exploratory', analysis_method='descriptive_per_room',
                       confirmatory_eligible=False)
         paired = defaultdict(dict)

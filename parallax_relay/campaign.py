@@ -33,7 +33,7 @@ from .money import total as money_total, difference, json_fields, amount
 from .campaign_validation import validate_frozen, utc, equal_money
 from .state import initial_world
 from .rooms import get_room, rooms, catalog_identity
-from .exploratory import is_exploratory, profile_analysis
+from .exploratory import is_exploratory, profile_analysis, is_luna, is_descriptive, luna_profile_analysis
 
 
 class CampaignError(ValueError):
@@ -65,15 +65,15 @@ def read_json(path: Path):
             nonlocal exploratory_seen
             value = {}
             for key,item in pairs:
-                if key == 'protocol_version' and type(item) is int and item == 3:
+                if key == 'protocol_version' and type(item) is int and item in (3,4):
                     exploratory_seen = True
                 if key in value:duplicates.append(key)
                 value[key] = item
             return value
         value = json.loads(path.read_text(encoding='utf-8'), object_pairs_hook=object_pairs,
                            parse_constant=lambda _: (_ for _ in ()).throw(ValueError()))
-        if duplicates and (exploratory_seen or is_exploratory(value) or
-                isinstance(value,dict) and is_exploratory(value.get('spec'))):
+        if duplicates and (exploratory_seen or is_descriptive(value) or
+                isinstance(value,dict) and is_descriptive(value.get('spec'))):
             raise ValueError()
         return value
     except (OSError, ValueError, RecursionError):
@@ -85,10 +85,10 @@ def frozen_inputs(spec: CampaignSpec) -> dict:
             'catalog': catalog_identity(),
             'inputs': {room.id: {name: input_identities(initial_world(room.id).snapshot(),
                        trial_settings(spec, {'room':room.id,'condition': name, 'team': 'models' if spec.mode == 'live' else 'wait'}))
-                       for name in spec.conditions} for room in rooms() if spec.protocol_version in (2,3) or room.id=='split_span'},
+                       for name in spec.conditions} for room in rooms() if spec.protocol_version in (2,3,4) or room.id=='split_span'},
             'provider_contracts': {p.provider: provider_contract(p.provider) for p in spec.roster},
             'sampling': 'provider_default', 'known_model_revisions': None,
-            'analysis': profile_analysis() if is_exploratory(spec) else {'version': 2, 'bootstrap_resamples': 10000, 'seed': 0,
+            'analysis': (luna_profile_analysis() if is_luna(spec) else profile_analysis()) if is_descriptive(spec) else {'version': 2, 'bootstrap_resamples': 10000, 'seed': 0,
                          'percentile': 'Hyndman-Fan-7', 'prng': 'random.Random',
                          'concurrency': 1, 'primary_contrast': ['full', 'disabled']}}
 
@@ -108,14 +108,35 @@ def validate_pilot_transition(pilot: CampaignSpec, confirmation: CampaignSpec, b
         raise CampaignError('Changed frozen inputs, settings or design require a new development pilot')
 
 
-def register(value: dict, out: Path, *, pilot: Path | None = None) -> dict:
+def register(value: dict, out: Path, *, pilot: Path | None = None,
+             qualification_selection: Path | None = None, qualification: Path | None = None,
+             evidence_root: Path | None = None, source_bridge: Path | None = None) -> dict:
     spec = CampaignSpec.model_validate(value)
+    luna=is_luna(spec)
+    if (sum(p is not None for p in (pilot,qualification_selection,qualification))>1 or
+        not luna and any(p is not None for p in (qualification_selection,qualification,evidence_root,source_bridge))):
+        raise CampaignError('Qualification authorization requires the all-Luna profile and one binding')
     frozen = frozen_inputs(spec)  # Before creating output; never resolves credentials.
     if spec.stage != 'diagnostic' and (frozen['source']['status'] != 'clean' or
                                       frozen['environment']['value']['status'] != 'complete'):
         raise CampaignError('Protocol cohorts require clean source and complete environment identity')
     pilot_record = None
-    if spec.stage in ('confirmatory','validation'):
+    qualification_record = None
+    if luna:
+        from .qualification import selection_binding, check_receipt
+        if pilot is not None:raise CampaignError('All-Luna qualification cannot reference an old pilot')
+        if spec.stage=='qualification':
+            if qualification_selection is None or evidence_root is None or source_bridge is None or qualification is not None:
+                raise CampaignError('Qualification supplement requires committed selection, evidence root and source bridge')
+            qualification_record=selection_binding(qualification_selection,evidence_root,source_bridge,frozen)
+        else:
+            if qualification is None or any(p is not None for p in (qualification_selection,evidence_root,source_bridge)):
+                raise CampaignError('All-Luna validation requires a checked qualification receipt')
+            receipt=check_receipt(qualification,frozen=frozen)
+            qualification_record={'kind':'qualified','receipt_path':str(qualification.resolve()),
+                'receipt_sha256':receipt['sha256'],'selection_sha256':receipt['selection_sha256'],
+                'source_bridge_sha256':receipt['source_bridge_sha256']}
+    elif spec.stage in ('confirmatory','validation'):
         label='Validation' if spec.stage=='validation' else 'Confirmation'
         if pilot is None:
             raise CampaignError(label+' requires a completed pilot registration')
@@ -150,6 +171,7 @@ def register(value: dict, out: Path, *, pilot: Path | None = None) -> dict:
     data = {'schema_version': 2, 'experiment_id': str(uuid4()), 'created_at': now(),
             'spec': spec.model_dump(mode='json'), 'frozen': frozen, 'pilot': pilot_record,
             'schedule': schedule(spec)}
+    if luna:data['qualification']=qualification_record
     exposures = [trial_exposure(spec, trial) for trial in data['schedule']]
     data['planned_exposure'] = json_fields({'calls': sum(c for c, _ in exposures),
                                 'estimated_usd': money_total(Decimal(str(d)) for _, d in exposures),
@@ -181,7 +203,17 @@ def validate_registration(data: dict) -> dict:
         if data['schema_version']==2 and data['spec'].get('schema_version')!=2:raise ValueError()
         validate_frozen(data['frozen'],spec,version=data['schema_version'])
         pilot=data['pilot']
-        if spec.stage in ('confirmatory','validation'):
+        if is_luna(spec):
+            if pilot is not None:raise ValueError()
+            binding=data['qualification']
+            kind='selection' if spec.stage=='qualification' else 'qualified'
+            keys=({'kind','selection_path','evidence_root','source_bridge_path','selection_sha256','source_bridge_sha256'}
+                  if kind=='selection' else {'kind','receipt_path','receipt_sha256','selection_sha256','source_bridge_sha256'})
+            if (type(binding) is not dict or set(binding)!=keys or binding['kind']!=kind or
+                any(type(binding[k]) is not str or not binding[k] for k in keys) or
+                any(not re.fullmatch(r'[0-9a-f]{64}',binding[k]) for k in keys if k.endswith('_sha256'))):
+                raise ValueError()
+        elif spec.stage in ('confirmatory','validation'):
             if (not isinstance(pilot,dict) or not isinstance(pilot.get('registration_sha256'),str) or
                 not re.fullmatch(r'[0-9a-f]{64}',pilot['registration_sha256']) or
                 type(pilot.get('match_settings_changed')) is not bool or
@@ -209,7 +241,7 @@ def validate_registration(data: dict) -> dict:
             blocks[trial['block_id']] = group
             payload={k:v for k,v in trial.items() if k not in ('trial_id','block_id')}
             wanted={k:v for k,v in template.items() if k not in ('trial_id','block_id')}
-            if (canonical_hash(payload)!=canonical_hash(wanted) if is_exploratory(spec) else payload!=wanted):
+            if (canonical_hash(payload)!=canonical_hash(wanted) if is_descriptive(spec) else payload!=wanted):
                 raise ValueError()
         if len(blocks) != len(set(blocks.values())):
             raise ValueError()
@@ -328,8 +360,12 @@ def _execution_preflight(root: Path, registration: dict, *, offline: bool, live:
     matches = current == registration['frozen']
     if (spec.stage != 'diagnostic' or spec.protocol_version==2) and not matches:
         raise CampaignError('Frozen source/environment/inputs changed; register a new cohort')
-    if is_exploratory(spec) and _available_disk_bytes(root) < 5*1024**3:
+    if is_descriptive(spec) and _available_disk_bytes(root) < 5*1024**3:
         raise CampaignError('Exploratory execution requires at least 5 GiB free disk before launch')
+    if is_luna(spec):
+        from .qualification import check_binding
+        check_binding(registration['qualification'],current,
+                      kind='selection' if spec.stage=='qualification' else 'qualified')
     return spec, matches
 
 
@@ -381,7 +417,7 @@ async def run_campaign(root: Path, *, offline: bool = False, live: bool = False,
             for trial, (max_calls, max_dollars) in zip(trials, exposure):
                 if last_launch is not None:
                     await asyncio.sleep(max(0, spec.min_trial_interval_seconds - (monotonic() - last_launch)))
-                if is_exploratory(spec) and _available_disk_bytes(root) < 2*1024**3:
+                if is_descriptive(spec) and _available_disk_bytes(root) < 2*1024**3:
                     stop = 'low_disk_space'
                     break
                 checked=frozen_inputs(spec) if spec.stage!='diagnostic' or spec.protocol_version==2 else None
@@ -455,7 +491,12 @@ def main(argv: list[str] | None = None) -> int:
     registration = commands.add_parser('register', help='Freeze a campaign without provider requests.')
     registration.add_argument('--spec', type=Path, required=True)
     registration.add_argument('--out', type=Path, required=True)
-    registration.add_argument('--pilot', type=Path)
+    bindings=registration.add_mutually_exclusive_group()
+    bindings.add_argument('--pilot', type=Path)
+    bindings.add_argument('--qualification-selection',type=Path)
+    bindings.add_argument('--qualification',type=Path)
+    registration.add_argument('--evidence-root',type=Path)
+    registration.add_argument('--source-bridge',type=Path)
     run = commands.add_parser('run', help='Execute a registered campaign once.')
     run.add_argument('--campaign', type=Path, required=True)
     modes = run.add_mutually_exclusive_group(required=True)
@@ -468,12 +509,14 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         if args.command == 'register':
-            data = register(read_json(args.spec), args.out, pilot=args.pilot)
+            data = register(read_json(args.spec), args.out, pilot=args.pilot,
+                qualification_selection=args.qualification_selection,qualification=args.qualification,
+                evidence_root=args.evidence_root,source_bridge=args.source_bridge)
             print(f"Registered {len(data['schedule'])} trials; no API requests made.")
         elif args.command == 'run':
             registered=read_registration(args.campaign)
             if registered['schema_version']!=2:raise CampaignError('Historical campaigns require a fresh registration for current execution')
-            if is_exploratory(registered['spec']):
+            if is_descriptive(registered['spec']):
                 _execution_preflight(args.campaign,registered,offline=args.offline,live=args.live)
             env = dict(os.environ)
             if args.env_file is not None:

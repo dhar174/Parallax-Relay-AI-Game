@@ -14,7 +14,7 @@ from .protocol import Usage
 from .protocol import ROLES
 from .providers import provider_contract
 from .provenance import _SourceInfo, _Fingerprint, _EnvironmentValue, _SchemaValue, _RoomValue, _RoomValueV3, _APIContract, canonical_hash
-from .exploratory import is_exploratory, profile_analysis
+from .exploratory import is_exploratory, profile_analysis, is_luna, is_descriptive, luna_profile_analysis
 
 TRIAL_STOPS = frozenset({'victory','defeat','turn_limit','call_budget','spend_budget','provider_error',
                          'unreliable_agent','internal_error','local_error','cancelled','setup_failure'})
@@ -128,7 +128,7 @@ def validate_frozen(value,spec,*,version=2):
         certificates=catalog.value['certificates']
         if set(certificates)!=set(by_id) or any(not isinstance(s,str) or not re.fullmatch(r'[0-9a-f]{64}',s) for s in certificates.values()):
             raise ValueError('Invalid certificate identities')
-        expected=set(by_id) if spec.protocol_version in (2,3) else {'split_span'}
+        expected=set(by_id) if spec.protocol_version in (2,3,4) else {'split_span'}
         if not isinstance(value['inputs'],dict) or set(value['inputs'])!=expected:raise ValueError('Invalid frozen rooms')
         entries=[]
         for room_id,arms in value['inputs'].items():
@@ -162,9 +162,9 @@ def validate_frozen(value,spec,*,version=2):
             if not isinstance(header,str) or not re.fullmatch(r'\d{4}-\d{2}-\d{2}',header):raise ValueError('Invalid API version')
         elif header is not None:raise ValueError('Invalid API version')
     analysis=value['analysis']
-    if is_exploratory(spec):
+    if is_descriptive(spec):
         if (value['sampling']!='provider_default' or value['known_model_revisions'] is not None or
-            canonical_hash(analysis)!=canonical_hash(profile_analysis())):
+            canonical_hash(analysis)!=canonical_hash(luna_profile_analysis() if is_luna(spec) else profile_analysis())):
             raise ValueError('Invalid frozen exploratory analysis')
         return
     expected={'version':version,'bootstrap_resamples':10000,'seed':0,'percentile':'Hyndman-Fan-7',
