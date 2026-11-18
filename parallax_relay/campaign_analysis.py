@@ -14,11 +14,11 @@ import random
 from statistics import NormalDist
 
 from .campaign import CampaignError, atomic_json, now, read_json, read_registration
-from .campaign_models import CampaignSpec, trial_settings
+from .campaign_models import CampaignSpec, trial_settings, trial_exposure
 from .conditions import CONDITIONS
 from .provenance import ROOT, collect_source, read_provenance, _WorldSnapshot
 from .protocol import ROLES
-from .campaign_validation import validate_summary, BUDGET_COUNTS, BUDGET_MONEY, utc, cross_artifacts
+from .campaign_validation import validate_summary, BUDGET_COUNTS, BUDGET_MONEY, utc, cross_artifacts, equal_money
 from .policies import policy_identity
 from .money import amount, total as money_total, difference, json_fields
 from .exploratory import is_exploratory, PROFILE_ID, is_luna, is_descriptive, LUNA_PROFILE_ID
@@ -230,6 +230,8 @@ def _artifacts(root: Path, trial: dict, registration: dict) -> tuple[dict, list[
             data.pop(name, None)
     result = data.get('result')
     if result:
+        if is_luna(registration['spec']) and result['stop_reason']=='turn_limit' and result['turns']!=settings.max_turns:
+            issues.append('premature_turn_limit')
         if 'calls' in data:
             if len(data['calls']) != result['budget']['calls_started']:
                 issues.append('call_count_mismatch')
@@ -447,6 +449,19 @@ def analyze(root: Path) -> dict:
             if receipt['run_id']!=native['run_id']:issues.append('run_id_mismatch')
             if receipt['recording_stop_reason']!=life['stop_reason']:issues.append('recording_stop_mismatch')
             if receipt['execution_stop_reason']!=life['execution_stop_reason']:issues.append('execution_stop_mismatch')
+        if is_luna(spec) and receipt and data.get('result'):
+            # Balanced ledger entries alone cannot establish settled exposure:
+            # reconcile each one against validated native attempt accounting.
+            budget=data['result']['budget']
+            max_calls,max_usd=trial_exposure(spec,trial)
+            native_calls=budget['calls_started']
+            native_usd=amount(budget,'estimated_cost_usd') if trial['team']=='models' else Decimal(0)
+            if (native_usd is None or receipt['accounted_calls']!=native_calls or
+                receipt['released_calls']!=max(0,max_calls-native_calls) or
+                not equal_money(receipt,'accounted_estimated_usd',native_usd) or
+                not equal_money(receipt,'released_estimated_usd',max(Decimal(0),difference(Decimal(str(max_usd)),native_usd)))):
+                issues.append('ledger_native_accounting_mismatch')
+                anomalies.append('ledger_native_accounting_mismatch')
         row['artifact_available'] = bool(launch and not issues)
         provenance = data.get('provenance')
         if provenance:

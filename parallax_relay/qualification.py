@@ -10,6 +10,7 @@ import ast
 from decimal import Decimal
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import subprocess
@@ -39,7 +40,11 @@ def strict_loads(raw: str):
             value[key]=item
         return value
     def nonfinite(_):raise ValueError('Nonfinite JSON value')
-    return json.loads(raw,object_pairs_hook=pairs,parse_constant=nonfinite)
+    def finite_float(raw):
+        value=float(raw)
+        if not math.isfinite(value):raise ValueError('Nonfinite JSON value')
+        return value
+    return json.loads(raw,object_pairs_hook=pairs,parse_constant=nonfinite,parse_float=finite_float)
 
 
 def load(path: Path):
@@ -92,8 +97,16 @@ def native_inventory(path: Path, turns: int) -> dict[str,str]:
           for role in ('spectra','pyra','flux','spectator'))}
     if {p.name for p in path.iterdir()}!=expected:raise ValueError('Native file inventory mismatch')
     result={name:file_hash(path/name) for name in sorted(expected)}
-    for name in NATIVE_JSON:load(path/name)
-    for name in NATIVE_JSONL:strict_jsonl(path/name)
+    records={name.removesuffix('.json'):load(path/name) for name in NATIVE_JSON}
+    records.update({name.removesuffix('.jsonl'):strict_jsonl(path/name) for name in NATIVE_JSONL})
+    # Use the exact unchanged recorder template and native payload. Merely
+    # hashing a newly produced viewer would certify empty or truncated HTML.
+    payload={'manifest':records['manifest'],'result':records['result'],'records':records['replay'],
+             'calls':records['calls'],'phases':records['phases'],'final_state':records['final_state']}
+    encoded=json.dumps(payload,ensure_ascii=True).replace('<','\\u003c').replace('>','\\u003e').replace('&','\\u0026')
+    template=Path(__file__).with_name('replay_template.html').read_text(encoding='utf-8')
+    if (path/'index.html').read_bytes()!=template.replace('__REPLAY_DATA__',encoded).encode('utf-8'):
+        raise ValueError('Native viewer does not match its complete native payload')
     for name in expected:
         if name.endswith('.png'):
             try:
@@ -111,6 +124,7 @@ def eligible_row(row: dict) -> bool:
     return bool(row.get('launched') is True and row.get('artifact_available') is True and
         row.get('artifact_issues')==[] and row.get('cleanup_status')=='ok' and
         row.get('stop_reason') in ('victory','defeat','turn_limit') and
+        (row['stop_reason']!='turn_limit' or type(row.get('turns')) is int and row['turns']==12) and
         row.get('recording_stop_reason')==row['stop_reason']==row.get('execution_stop_reason') and
         type(row.get('operational_success')) is bool and
         all(type(row.get(k)) is int and row[k]>=0 for k in counts) and
@@ -151,6 +165,15 @@ def _phase_integrity(data: dict, trial: dict) -> None:
         if ([c['attempt'] for c in calls]!=list(range(1,len(calls)+1)) or
             calls[-1]['status']!='ok' or any(c['status']=='ok' for c in calls[:-1])):
             raise ValueError('Unresolved or contradictory attempts')
+        recoverable={'timeout','network_error','invalid_provider_response','incomplete',
+                     'invalid_json_schema','stale_turn','response_size','response_failed','http_error'}
+        for call in calls[:-1]:
+            if call['status'] not in recoverable:
+                raise ValueError('Impossible or unknown retry attempt')
+            http=call.get('http_status')
+            if call['status']=='http_error' and (type(http) is not int or not (
+                    http in (408,409,429) or 500<=http<=599)):
+                raise ValueError('Non-retryable HTTP attempt')
 
 
 def _origin(root: Path, origin: dict) -> tuple[dict,dict]:

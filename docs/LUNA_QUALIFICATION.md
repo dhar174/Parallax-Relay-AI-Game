@@ -56,6 +56,12 @@ must come from completed eligible all-Luna origins. Recoverable bounded retries
 are allowed when every role phase eventually succeeds. Unknown usage retains
 conservative accounting; it is never counted as free.
 
+Each protocol-4 ledger settlement and release must match the validated native
+budget and registered exposure. A turn-limit result must reach all 12 turns.
+Viewer bytes must match the immutable template and complete native payload.
+Retry histories reject unknown and definitely fatal statuses; existing logs do
+not distinguish fatal versus recoverable `response_failed` backend error codes.
+
 A clean-source bridge pins both complete Git trees, their modes/object identities,
 the exact changed-path set and its canonical transition digest. It defaults to
 denial outside the qualification/profile/campaign/preparation/tests/docs changes.
@@ -63,6 +69,9 @@ Match execution helpers, their existing imports/global bindings and all unchange
 engine/provider/settings/observation/recording modules are protected. A fresh
 reviewer must inspect the whole specific bridge diff before spending. The target
 source, environment and all nine room inputs then stay frozen through validation.
+At the measured seven seconds per 55-case audit, two full checks per held-out case
+would add roughly 28 minutes across 120 cases, before provider/game time. This
+is an indicative local measurement, not a duration guarantee; retain both checks.
 
 This operates on a **trusted locked host**. Git/package fingerprints establish
 local consistency; they do not attest installed binary bytes, ignored import

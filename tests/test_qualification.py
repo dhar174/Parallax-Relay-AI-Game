@@ -12,7 +12,7 @@ from parallax_relay.provenance import canonical_hash
 class QualificationIntegrityTests(unittest.TestCase):
     def test_strict_json_rejects_duplicate_discriminators_nonfinite_and_jsonl_arrays(self):
         from parallax_relay.qualification import strict_loads, strict_jsonl
-        for raw in ('{"x":1,"x":2}', '{"protocol_version":4,"protocol_version":2}', '{"x":NaN}'):
+        for raw in ('{"x":1,"x":2}', '{"protocol_version":4,"protocol_version":2}', '{"x":NaN}', '{"x":1e999}'):
             with self.subTest(raw=raw), self.assertRaises(ValueError):strict_loads(raw)
         with tempfile.TemporaryDirectory() as temp:
             p=Path(temp)/'calls.jsonl';p.write_text('{}\n[]\n')
@@ -37,7 +37,9 @@ class QualificationIntegrityTests(unittest.TestCase):
             p=Path(temp)
             for name in ('manifest.json','result.json','final_state.json'):p.joinpath(name).write_text('{}')
             for name in ('calls.jsonl','phases.jsonl','replay.jsonl'):p.joinpath(name).write_text('')
-            p.joinpath('index.html').write_text('<!doctype html>')
+            payload={'manifest':{},'result':{},'records':[],'calls':[],'phases':[],'final_state':{}}
+            template=Path('parallax_relay/replay_template.html').read_text()
+            p.joinpath('index.html').write_bytes(template.replace('__REPLAY_DATA__',json.dumps(payload)).encode())
             for name in ('spectra','pyra','flux','spectator'):
                 Image.new('RGB',(2,2)).save(p/f'turn_00_{name}.png')
             Image.new('RGB',(2,2)).save(p/'final_spectator.png')
@@ -115,6 +117,22 @@ class QualificationIntegrityTests(unittest.TestCase):
             after[modules[0]]=saved
             trees[target]['parallax_relay/providers.py']={'mode':'100644','oid':'c'*40}
             with self.assertRaises(ValueError):q.build_bridge()
+
+    def test_only_recoverable_attempts_can_precede_a_successful_phase(self):
+        from parallax_relay.qualification import _phase_integrity
+        data={'result':{'turns':1},'phases':[{'turn':0,'phase':'commit',
+            'statuses':dict.fromkeys(('SPECTRA','PYRA','FLUX'),'ok')}],
+            'calls':[{'turn':0,'phase':'commit','role':r,'attempt':1,'status':'ok','http_status':None}
+                     for r in ('SPECTRA','PYRA','FLUX')]}
+        trial={'condition':'disabled'}
+        for status,http in [('timeout',None),('invalid_json_schema',None),('http_error',503),
+                            ('quota_exhausted',429),('cancelled',None),('internal_error',None),
+                            ('nonsense',None),('refusal',None),('http_error',401)]:
+            fixture=copy.deepcopy(data);fixture['calls'][0]['attempt']=2
+            fixture['calls'].insert(0,{**fixture['calls'][0],'attempt':1,'status':status,'http_status':http})
+            if status in ('timeout','invalid_json_schema') or http==503:_phase_integrity(fixture,trial)
+            else:
+                with self.subTest(status=status,http=http),self.assertRaises(ValueError):_phase_integrity(fixture,trial)
 
 
 if __name__=='__main__':unittest.main()
