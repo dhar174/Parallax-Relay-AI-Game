@@ -38,8 +38,9 @@ class QualificationIntegrityTests(unittest.TestCase):
             for name in ('manifest.json','result.json','final_state.json'):p.joinpath(name).write_text('{}')
             for name in ('calls.jsonl','phases.jsonl','replay.jsonl'):p.joinpath(name).write_text('')
             payload={'manifest':{},'result':{},'records':[],'calls':[],'phases':[],'final_state':{}}
-            template=Path('parallax_relay/replay_template.html').read_text()
-            p.joinpath('index.html').write_bytes(template.replace('__REPLAY_DATA__',json.dumps(payload)).encode())
+            template = Path('parallax_relay/replay_template.html').read_text(encoding='utf-8')
+            viewer = template.replace('__REPLAY_DATA__', json.dumps(payload))
+            p.joinpath('index.html').write_bytes(viewer.encode('utf-8'))
             for name in ('spectra','pyra','flux','spectator'):
                 Image.new('RGB',(2,2)).save(p/f'turn_00_{name}.png')
             Image.new('RGB',(2,2)).save(p/'final_spectator.png')

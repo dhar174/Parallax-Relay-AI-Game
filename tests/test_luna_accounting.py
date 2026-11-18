@@ -155,7 +155,9 @@ class LunaAccountingTests(unittest.TestCase):
                 payload={'manifest':q.load(path/'manifest.json'),'result':result,'records':q.strict_jsonl(path/'replay.jsonl'),
                          'calls':calls,'phases':q.strict_jsonl(path/'phases.jsonl'),'final_state':q.load(path/'final_state.json')}
                 encoded=json.dumps(payload,ensure_ascii=True).replace('<','\\u003c').replace('>','\\u003e').replace('&','\\u0026')
-                (path/'index.html').write_bytes(Path('parallax_relay/replay_template.html').read_text().replace('__REPLAY_DATA__',encoded).encode())
+                template = Path('parallax_relay/replay_template.html').read_text(encoding='utf-8')
+                viewer = template.replace('__REPLAY_DATA__', encoded)
+                (path/'index.html').write_bytes(viewer.encode('utf-8'))
                 report=analyze(self.root)
                 self.assertTrue(report['cohort_eligible'],report['trials'][0]['artifact_issues'])
                 if status=='timeout':

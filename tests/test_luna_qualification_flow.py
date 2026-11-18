@@ -99,10 +99,16 @@ class LunaQualificationFlowTests(unittest.TestCase):
                 native.write_bytes(saved)
                 # Rehashing both receipt and native manifest is insufficient:
                 # the committed selection and own-origin provenance still bind.
-                duplicate=origin/'trials'/selected['trial_id']/'calls.jsonl'
-                saved=duplicate.read_text();duplicate.write_text(saved.replace('"attempt": 1','"attempt": 2, "attempt": 1',1))
-                with self.assertRaises(ValueError):q.check_receipt(receiptpath)
-                duplicate.write_text(saved)
+                duplicate = origin/'trials'/selected['trial_id']/'calls.jsonl'
+                original_calls = duplicate.read_bytes()
+                modified_calls = original_calls.replace(b'"attempt": 1', b'"attempt": 2, "attempt": 1', 1)
+                self.assertNotEqual(modified_calls, original_calls)
+                try:
+                    duplicate.write_bytes(modified_calls)
+                    with self.assertRaises(ValueError):
+                        q.check_receipt(receiptpath)
+                finally:
+                    duplicate.write_bytes(original_calls)
                 self.assertTrue(q.check_receipt(receiptpath)['qualified'])
 
 
