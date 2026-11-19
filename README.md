@@ -1,9 +1,11 @@
 # Parallax Relay
 
-A cooperative puzzle game for three independent multimodal AI players. Each robot
-sees a different sensor image, exchanges public messages, and commits one action
-without seeing its teammates' current actions. A deterministic Python engine
-resolves the turn.
+Parallax Relay's intended direction is a real-time cooperative platformer,
+adventure, and puzzle game for three independent multimodal AI players. The current prototype is
+turn-based: each robot sees a different sensor image, exchanges public messages,
+and commits one action without seeing its teammates' current actions. A
+deterministic Python engine resolves the turn. The game direction and its open
+design questions are described in the [real-time game vision](docs/REALTIME_GAME_VISION.md).
 
 **Status:** Milestone 2 is a coordination prototype with a verified one-turn live
 smoke: two independent `gpt-6-luna` agents and `gemini-3.5-flash-lite` completed
@@ -60,7 +62,7 @@ For a ready-made replay, download or clone the repository and open
 [`example_run/index.html`](example_run/index.html) locally, keeping its PNGs beside
 it. GitHub's file view displays source rather than running the viewer.
 
-## How the game works
+## How the current prototype works
 
 The default room, **The Split Span**, is a single horizontal lane. The
 [room catalog](docs/ROOMS.md) also includes crossing variants, retrieval/return
@@ -125,8 +127,8 @@ confirmation. Host certificates establish solvability; the original fixed script
 remains a Split Span memorization control. It has no platformer physics, procedural rooms, playable
 ECHO role, live dashboard, or validated benchmark results.
 
-The [roadmap](ROADMAP.md) prioritizes reliable execution and reproducible evaluation
-before expanding the cooperative puzzles. The [verification record](docs/VERIFICATION.md)
+The [roadmap](ROADMAP.md) records the existing reliability and evaluation work and
+the intended real-time direction. The [verification record](docs/VERIFICATION.md)
 separates original milestone evidence from subsequent checks.
 
 ## Documentation
@@ -137,6 +139,7 @@ separates original milestone evidence from subsequent checks.
 | [Workbench guide](docs/WORKBENCH.md) | Browser configuration, native imports, and local companion |
 | [Running guide](docs/RUNNING.md) | Configuration, limits, troubleshooting, and replay files |
 | [Architecture](docs/ARCHITECTURE.md) | Modules, data flow, and extension boundaries |
+| [Real-time game vision](docs/REALTIME_GAME_VISION.md) | Intended player experience, next-stage exploration, and open decisions |
 | [Protocol](docs/PROTOCOL.md) | Player inputs, reply contracts, phases, and outcomes |
 | [Run provenance](docs/PROVENANCE.md) | Source, effective configuration, identities, timing, and compatibility |
 | [Campaign guide](docs/CAMPAIGNS.md) | Registration, offline trials, budgets and JSON/CSV analysis |
