@@ -29,13 +29,13 @@ before(async () => {
   for (const name of ['win', 'later-partial', 'legacy-v2', 'missing-images', 'malicious', 'withheld']) {
     runPython(['tools/spectator/export_replay.py', join(environment.fixtures, name), '--out', exported(name)]);
   }
-  // Synthetic sheets exercise playback even before optional artwork is installed.
+  // Prefer real sheets; synthetic sheets exercise playback if optional artwork is absent.
   const base = await readFile(join(exported('win'), 'index.html'), 'utf8');
   const image = 'data:image/png;base64,' + (await readFile(join(root, 'tools/spectator/artwork/light-review/spectra-idle.png'))).toString('base64');
   const sheets = Object.fromEntries(['spectra', 'pyra', 'flux'].flatMap(role => ['idle', 'walk'].map(action => [role + '-' + action, image])));
   async function variant(name, mutate) {
     const html = base.replace(/const DATA=(.*);\nconst \$=/, (_, json) => {
-      const data = JSON.parse(json); data.animation_sheets = {...sheets}; mutate(data);
+      const data = JSON.parse(json); data.animation_sheets = {...sheets, ...data.animation_sheets}; mutate(data);
       return 'const DATA=' + JSON.stringify(data).replaceAll('<', '\\u003c') + ';\nconst $=';
     });
     assert.notEqual(html, base);
@@ -53,6 +53,10 @@ before(async () => {
   for (const [name, from, to] of [
     ['shared-arrival', [3, 4, 4], [4, 4, 5]],
     ['shared-departure', [4, 4, 5], [3, 4, 4]],
+    ['swap', [3, 5, 9], [5, 3, 9]],
+    ['stationary-crossing', [3, 4, 9], [5, 4, 9]],
+    ['three-way', [3, 4, 5], [5, 4, 3]],
+    ['long-labels', [10, 11, 12], [12, 11, 10]],
   ]) await variant(name, data => {
     for (const [i, role] of ['SPECTRA', 'PYRA', 'FLUX'].entries()) {
       data.manifest.provenance.inputs.room.value.initial_state.robots[role].x = from[i];
@@ -438,7 +442,7 @@ test('blocked robots stay put and a newly powered bridge appears before movement
   assert.match(await page.locator('#roundLabel').textContent(), /transition/i);
   assert.equal(await page.locator('#feedBoard [data-role="SPECTRA"].walking').count(), 0);
   assert.equal(await page.locator('#feedBoard .tile').count(), 13);
-  assert.match(await page.locator('#feedBoard .board-status').textContent(), /Bridge: extended/);
+  assert.match(await page.locator('#feedBoard .board-status').textContent(), /Bridge: retracted/);
   await page.locator('#roundLabel').filter({hasText: /Round 2/}).waitFor();
 });
 
@@ -489,20 +493,180 @@ test('closing an expanded transition and changing motion preference settle immed
 });
 
 
-for (const name of ['shared-arrival', 'shared-departure']) {
-  test(`${name} repositions an idle robot and its label without a walking sprite`, async t => {
-    const page = await pageFor(t, environment);
+for (const name of ['shared-arrival', 'shared-departure', 'swap', 'stationary-crossing', 'three-way']) {
+  test(`${name} keeps role portraits and labels separate through the transition`, async t => {
+    const page = await pageFor(t, environment, {viewport: {width: 1280, height: 900}});
     await page.goto(exportURL(name));
-    const robot = page.locator('#feedBoard [data-role="PYRA"]');
-    const label = page.locator('#feedBoard [data-role-label="PYRA"]');
-    const startingLeft = await robot.evaluate(el => el.style.left);
+    const initial = await page.evaluate(() => Object.fromEntries(roles.map(role => [role, roomValue.initial_state.robots[role].x])));
+    const target = await page.evaluate(() => Object.fromEntries(roles.map(role => [role, DATA.records[0].state_after.robots[role].x])));
+    const pyraStart = await page.locator('#feedBoard [data-role="PYRA"]').evaluate(el => el.style.left);
     await page.locator('#next').click();
-    await page.waitForFunction(start => document.querySelector('#feedBoard [data-role="PYRA"]').style.left !== start, startingLeft, {timeout: 500});
-    assert.equal(await robot.evaluate(el => el.classList.contains('walking')), false);
-    const targetLeft = await robot.evaluate(el => el.style.left);
-    assert.equal(await label.evaluate(el => el.style.left), targetLeft);
+    assert.equal(await page.locator('#feedBoard .transition-role').count(), 3);
+    assert.equal(await page.locator('#feedBoard .board-stage [data-role-label="PYRA"]').isVisible(), false);
+    assert.match(await page.locator('#feedBoard .transition-roles').textContent(), /SPECTRA.*PYRA.*FLUX/);
+    for (const role of Object.keys(initial)) {
+      assert.equal(await page.locator(`#feedBoard [data-role="${role}"].walking`).count(), initial[role] === target[role] ? 0 : 1);
+    }
+    for (const delay of [100, 160, 160]) {
+      await page.waitForTimeout(delay);
+      const boxes = await page.locator('#feedBoard .transition-role').evaluateAll(cards => cards.map((el, i) => {const r = el.getBoundingClientRect(); return {role:i, left:r.left, right:r.right, top:r.top, bottom:r.bottom};}));
+      for (const a of boxes) for (const b of boxes) if (a.role !== b.role) {
+        assert.ok(a.right <= b.left || b.right <= a.left || a.bottom <= b.top || b.bottom <= a.top,
+          `${name}: ${JSON.stringify([a,b])}`);
+      }
+    }
+    let sharingTarget = null;
+    if (name === 'shared-arrival' || name === 'shared-departure') {
+      const robotLeft = await page.locator('#feedBoard [data-role="PYRA"]').evaluate(el => el.style.left);
+      const labelLeft = await page.locator('#feedBoard [data-role-label="PYRA"]').evaluate(el => el.style.left);
+      assert.notEqual(robotLeft, pyraStart, 'stationary robot shifts only its sharing offset');
+      assert.equal(labelLeft, robotLeft);
+      sharingTarget = robotLeft;
+    }
     await page.locator('#roundLabel').filter({hasText: /Round 2/}).waitFor();
-    assert.equal(await robot.evaluate(el => el.style.left), targetLeft);
-    assert.equal(await label.evaluate(el => el.style.left), targetLeft);
+    assert.equal(await page.locator('#feedBoard .transition-role').count(), 3);
+    assert.deepEqual(await page.locator('#feedBoard .transition-role').allTextContents(), ['SPECTRA', 'PYRA', 'FLUX']);
+    if (sharingTarget !== null) {
+      assert.equal(await page.locator('#feedBoard [data-role="PYRA"]').evaluate(el => el.style.left), sharingTarget);
+      assert.equal(await page.locator('#feedBoard [data-role-label="PYRA"]').evaluate(el => el.style.left), sharingTarget);
+    }
+    const accessible = await page.locator('#feedBoard .board-stage').getAttribute('aria-label');
+    for (const role of Object.keys(target)) assert.match(accessible, new RegExp(role + ' at tile ' + target[role] + '(?:,|\\.)'));
   });
 }
+
+for (const board of ['feedBoard', 'dialogBoard']) {
+  test(`mobile ${board} offers keyboard and mouse scrolling with a return to overview`, async t => {
+    const page = await pageFor(t, environment, {viewport: {width: 320, height: 844}});
+    await page.goto(exportURL('win'));
+    if (board === 'dialogBoard') await page.getByRole('button', {name: 'Expand SPECTATOR feed'}).click();
+    const container = page.locator('#' + board), zoom = container.locator('.board-tools button');
+    const viewport = container.locator('.board-viewport');
+    assert.equal(await zoom.getAttribute('aria-pressed'), 'false');
+    await zoom.click();
+    assert.equal(await zoom.getAttribute('aria-pressed'), 'true');
+    assert.ok(await viewport.evaluate(el => el.scrollWidth > el.clientWidth));
+    assert.equal(await container.locator('[data-role-label="SPECTRA"]').isVisible(), true);
+    const initialScroll = await viewport.evaluate(el => el.scrollLeft);
+    assert.ok(initialScroll > 0, 'enlargement initially centers on the robots');
+    await viewport.focus();
+    await page.keyboard.press('ArrowRight');
+    await page.waitForFunction(({id, initial}) => document.querySelector('#' + id + ' .board-viewport').scrollLeft > initial, {id:board, initial:initialScroll});
+    assert.equal(await page.locator('#round').inputValue(), '0');
+    const afterKeys = await viewport.evaluate(el => el.scrollLeft);
+    await viewport.hover();
+    await page.mouse.wheel(180, 0);
+    await page.waitForFunction(({id, start}) => document.querySelector('#' + id + ' .board-viewport').scrollLeft > start, {id:board, start:afterKeys});
+    assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth));
+    await container.getByRole('button', {name: 'Show board overview'}).click();
+    assert.equal(await viewport.evaluate(el => el.scrollWidth <= el.clientWidth), true);
+    if (board === 'dialogBoard') {
+      await page.keyboard.press('Escape');
+      assert.equal(await page.getByRole('button', {name: 'Expand SPECTATOR feed'}).evaluate(el => el === document.activeElement), true);
+    }
+  });
+}
+
+for (const board of ['feedBoard', 'dialogBoard']) {
+  test(`mobile ${board} keeps zoom and separate roles during a three-way crossing`, async t => {
+    const page = await pageFor(t, environment, {viewport: {width: 320, height: 844}});
+    await page.goto(exportURL('three-way'));
+    if (board === 'dialogBoard') await page.getByRole('button', {name: 'Expand SPECTATOR feed'}).click();
+    const container = page.locator('#' + board);
+    await container.getByRole('button', {name: 'Enlarge board'}).click();
+    const viewport = container.locator('.board-viewport');
+    await viewport.evaluate(el => {el.scrollLeft = 120});
+    await page.locator(board === 'feedBoard' ? '#next' : '#dialogNext').click();
+    await page.waitForTimeout(300);
+    assert.equal(await container.locator('.board-tools button').getAttribute('aria-pressed'), 'true');
+    assert.ok(await viewport.evaluate(el => el.scrollLeft > 0));
+    const boxes = await container.locator('.transition-role').evaluateAll(cards => cards.map((el,i) => {
+      const r = el.getBoundingClientRect(); return {role:i, left:r.left,right:r.right,top:r.top,bottom:r.bottom};
+    }));
+    assert.equal(boxes.length, 3);
+    for (const a of boxes) for (const b of boxes) if (a.role !== b.role)
+      assert.ok(a.right <= b.left || b.right <= a.left || a.bottom <= b.top || b.bottom <= a.top, JSON.stringify([a,b]));
+  });
+}
+
+for (const width of [320, 1280]) {
+  test(`viewport ${width} enlarges the board and keeps controls stationary during overlap`, async t => {
+    const page = await pageFor(t, environment, {viewport: {width, height: 900}});
+    await page.goto(exportURL('three-way'));
+    const stage = page.locator('#feedBoard .board-stage');
+    const overview = await stage.evaluate(el => el.getBoundingClientRect().width);
+    await page.locator('#feedBoard .board-tools button').click();
+    assert.ok(await stage.evaluate((el, old) => el.getBoundingClientRect().width > old, overview));
+    assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth));
+    const bounds = async () => page.evaluate(() => ['#feedTitle', '#feedBoard', '#feedBoard .board-status', '#feedBoard .board-tools', '#feedBoard .board-viewport', '#feedBoard .board-stage', '#feedBoard .board-legend', '#feedBoard .board-caption', '#next', '#chat'].map(selector => {
+      const r = document.querySelector(selector).getBoundingClientRect(); return {top:r.top + window.scrollY, height:r.height};
+    }));
+    const before = await bounds();
+    await page.locator('#next').click();
+    assert.equal(await page.locator('#feedBoard .transition-role').count(), 3);
+    const during = await bounds();
+    assert.deepEqual(during, before, 'temporary role strip must not move the stage or controls');
+  });
+}
+
+test('newly powered bridge labels starting resources and the movement graphic', async t => {
+  const page = await pageFor(t, environment);
+  const native = JSON.parse(await readFile(join(environment.fixtures, 'win', 'native.json'), 'utf8'));
+  const before = native.manifest.provenance.inputs.room.value.initial_state;
+  const after = native.replay[0].state_after;
+  assert.equal(before.powered_bridges.includes('bridge_0'), false);
+  assert.equal(after.powered_bridges.includes('bridge_0'), true);
+  await page.goto(exportURL('win'));
+  await page.locator('#next').click();
+  const status = await page.locator('#feedBoard .board-status').textContent();
+  assert.match(status, /Resources before actions/);
+  for (const value of ['Energy: ' + before.energy, 'Coolant: ' + before.coolant,
+    'Motor heat: ' + before.motor_heats.bridge_0, 'Bridge: retracted']) assert.ok(status.includes(value), status);
+  assert.equal(await page.locator('#feedBoard .tile').count(), 13);
+  const aria = await page.locator('#feedBoard .board-stage').getAttribute('aria-label');
+  assert.match(aria, /Bridge: retracted/);
+  assert.match(aria, /starting positions and resource values/i);
+  assert.match(aria, /bridge graphic shows the newly powered state for movement/i);
+  assert.match(await page.locator('#feedBoard .board-caption').textContent(), /resources show the starting checkpoint/);
+  await page.locator('#roundLabel').filter({hasText: /Round 2/}).waitFor();
+  await assertBoard(page, after);
+  assert.match(await page.locator('#feedBoard .board-status').textContent(), /Bridge: extended/);
+});
+
+test('mobile role details keep long labels readable and unclipped', async t => {
+  const page = await pageFor(t, environment, {viewport: {width: 320, height: 900}});
+  await page.goto(exportURL('long-labels'));
+  await page.locator('#next').click();
+  const cards = page.locator('#feedBoard .transition-role');
+  assert.equal(await cards.count(), 3);
+  assert.match(await cards.first().textContent(), /SPECTRA: tile 10 → 12/);
+  assert.match(await cards.nth(1).textContent(), /PYRA: tile 11 \(stationary\)/);
+  for (const card of await cards.all()) {
+    const dimensions = await card.evaluate(el => {
+      const parent = el.parentElement.getBoundingClientRect(), box = el.getBoundingClientRect(), label = el.lastElementChild;
+      const text = label.getBoundingClientRect();
+      return {font:parseFloat(getComputedStyle(el).fontSize), left:box.left, right:box.right, top:box.top, bottom:box.bottom,
+        parentLeft:parent.left,parentRight:parent.right,parentTop:parent.top,parentBottom:parent.bottom,
+        textLeft:text.left,textRight:text.right,textTop:text.top,textBottom:text.bottom,scrollWidth:label.scrollWidth,clientWidth:label.clientWidth};
+    });
+    assert.ok(dimensions.font >= 12, JSON.stringify(dimensions));
+    assert.ok(dimensions.left >= dimensions.parentLeft && dimensions.right <= dimensions.parentRight && dimensions.top >= dimensions.parentTop && dimensions.bottom <= dimensions.parentBottom, JSON.stringify(dimensions));
+    assert.ok(dimensions.textLeft >= dimensions.left && dimensions.textRight <= dimensions.right && dimensions.textTop >= dimensions.top && dimensions.textBottom <= dimensions.bottom && dimensions.scrollWidth <= dimensions.clientWidth, JSON.stringify(dimensions));
+  }
+});
+
+test('desktop overview shows the complete grounded scene in a 1280 by 720 viewport', async t => {
+  const page = await pageFor(t, environment, {viewport: {width: 1280, height: 720}});
+  await page.goto(exportURL('win'));
+  const stage = page.locator('#feedBoard .board-stage');
+  const metrics = await stage.evaluate(el => {
+    const bounds = el.getBoundingClientRect();
+    const objects = [...el.querySelectorAll('.robot, .tile')].map(child => {
+      const r = child.getBoundingClientRect(); return {top:r.top, bottom:r.bottom};
+    });
+    return {width:bounds.width, left:bounds.left, right:bounds.right, viewport:innerWidth, height:innerHeight, objects};
+  });
+  assert.ok(metrics.width <= 900 && metrics.width >= 850, JSON.stringify(metrics));
+  assert.ok(Math.abs(metrics.left - (metrics.viewport - metrics.right)) < 3, JSON.stringify(metrics));
+  assert.ok(metrics.objects.length >= 13 && metrics.objects.every(item => item.top >= 0 && item.bottom <= metrics.height), JSON.stringify(metrics));
+});

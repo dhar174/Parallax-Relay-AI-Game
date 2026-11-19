@@ -282,10 +282,10 @@
           239
         ],
         [
-          39,
+          71,
           23,
-          201,
-          246
+          184,
+          238
         ],
         [
           71,
@@ -296,7 +296,7 @@
         [
           71,
           25,
-          206,
+          184,
           238
         ]
       ],
@@ -309,7 +309,8 @@
         "previews/flux-idle-contact.png"
       ],
       "normalized_master_reference": "references/flux-idle-normalized-master.png",
-      "normalization": "RGBA; scale 210/1073; resize full master to rounded dimensions using LANCZOS; alpha-composite at (round(128 - 589.5 * scale), round(236 - 1147 * scale)) on a transparent 256x256 canvas."
+      "normalization": "RGBA; scale 210/1073; resize full master to rounded dimensions using LANCZOS; alpha-composite at (round(128 - 589.5 * scale), round(236 - 1147 * scale)) on a transparent 256x256 canvas.",
+      "alpha_cleanup": "Removed only 8-connected nonzero-alpha components with maximum alpha 1; retained all other RGBA pixels. FLUX idle frame 01 is unchanged."
     },
     {
       "role": "FLUX",
@@ -336,38 +337,38 @@
       "alpha_bounds_xyxy_exclusive": [
         [
           71,
-          0,
-          225,
-          240
-        ],
-        [
-          27,
-          0,
-          225,
-          240
-        ],
-        [
-          27,
-          0,
-          221,
-          241
-        ],
-        [
-          28,
-          0,
-          225,
+          24,
+          184,
           239
         ],
         [
-          31,
-          0,
-          222,
+          71,
+          24,
+          184,
+          240
+        ],
+        [
+          71,
+          24,
+          185,
           241
         ],
         [
-          29,
-          0,
-          213,
+          67,
+          24,
+          190,
+          239
+        ],
+        [
+          72,
+          27,
+          185,
+          241
+        ],
+        [
+          71,
+          26,
+          186,
           239
         ]
       ],
@@ -379,7 +380,8 @@
       "previews": [
         "previews/flux-walk.gif",
         "previews/flux-walk-contact.png"
-      ]
+      ],
+      "alpha_cleanup": "Removed only 8-connected nonzero-alpha components with maximum alpha 1; retained all other RGBA pixels. FLUX idle frame 01 is unchanged."
     }
   ]
 }
