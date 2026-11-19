@@ -30,6 +30,25 @@ usable turn remain visible separately. Engine
 outcome and scores remain separate from the operational stop reason. The import
 validation and complete JSON export retain their existing data and schema versions.
 
+## Standalone spectator export
+
+Create a portable viewer from a completed or partial native recording with a fresh
+destination directory outside the recording:
+
+```bash
+python tools/spectator/export_replay.py runs/my-run --out runs/my-spectator
+```
+
+Open `runs/my-spectator/index.html` locally. The exported file embeds the recorded
+images and data, including private spectator information, so keep it private. The
+native recording and its qualification viewer are left intact. Schema versions 2
+and 3, missing optional images, and partial rounds are supported.
+
+For Split Span recordings with a usable room definition and matching world
+snapshots, the spectator feed shows a light illustrated board reconstructed from
+recorded state. When those inputs are unavailable, it displays the recorded
+spectator PNG. Role feeds continue to display their recorded sensor images.
+
 ## Focused frontend verification
 
 With the repository's Python environment activated and Node.js 24 available:
