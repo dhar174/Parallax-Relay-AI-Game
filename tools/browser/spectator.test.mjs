@@ -609,6 +609,76 @@ for (const width of [320, 1280]) {
   });
 }
 
+for (const expanded of [false, true]) {
+  test(`round label wrapping does not move ${expanded ? 'expanded' : 'main'} transport during playback`, async t => {
+    const page = await pageFor(t, environment, {viewport: {width: 320, height: 900}});
+    await page.goto(exportURL('three-way'));
+    if (expanded) await page.getByRole('button', {name: 'Expand SPECTATOR feed'}).click();
+    const label = page.locator(expanded ? '#dialogLabel' : '#roundLabel');
+    const next = page.locator(expanded ? '#dialogNext' : '#next');
+    const differentWrap = await label.evaluate(el => {
+      const text = document.createTreeWalker(el, NodeFilter.SHOW_TEXT).nextNode(), original = text.nodeValue;
+      let found = false;
+      for (let size = 22; size <= 40 && !found; size++) {
+        el.style.font = `${size}px/1.2 monospace`;
+        const lines = value => {
+          text.nodeValue = value;
+          const range = document.createRange(); range.selectNodeContents(text);
+          const rects = range.getClientRects();
+          return {count:rects.length, height:range.getBoundingClientRect().height};
+        };
+        const before = lines(original), during = lines('Round 1 · transition');
+        found = before.count !== during.count && Math.max(before.height, during.height) > 57;
+      }
+      text.nodeValue = original;
+      return found;
+    });
+    assert.equal(differentWrap, true, 'test must exercise different label wrapping');
+    const geometry = () => next.evaluate(el => {
+      const transport = el.closest('.transport'), button = el.getBoundingClientRect(), box = transport.getBoundingClientRect();
+      return {buttonTop: button.top - box.top, transportHeight: box.height};
+    });
+    const before = await geometry();
+    await next.click();
+    assert.match(await label.textContent(), /transition/);
+    assert.deepEqual(await geometry(), before);
+  });
+}
+
+test('mobile partial checkpoint labels remain readable at increased text size', async t => {
+  const page = await pageFor(t, environment, {viewport: {width: 320, height: 900}});
+  await page.goto(exportURL('later-partial'));
+  await page.addStyleTag({content: '.round-label {font: 20px/1.3 monospace}'});
+  const slider = page.locator('#round');
+  await slider.fill(String(Number(await slider.getAttribute('max')) - 1));
+  await slider.dispatchEvent('input');
+
+  async function checkLabel(selector) {
+    const label = page.locator(selector);
+    assert.match(await label.textContent(), /^Round \d+ · (unfinished|resolution unknown) · before actions$/i);
+    const dimensions = await label.evaluate(el => {
+      const range = document.createRange(); range.selectNodeContents(el.firstElementChild);
+      const box = el.getBoundingClientRect(), next = el.nextElementSibling.getBoundingClientRect();
+      return {box: {left:box.left, right:box.right, top:box.top, bottom:box.bottom}, nextLeft:next.left,
+        text: Array.from(range.getClientRects(), r => ({left:r.left, right:r.right, top:r.top, bottom:r.bottom})),
+        documentWidth:document.documentElement.clientWidth, documentScroll:document.documentElement.scrollWidth};
+    });
+    assert.ok(dimensions.text.length > 1, 'the longer label should wrap at mobile width');
+    for (const rect of dimensions.text) {
+      assert.ok(rect.left >= dimensions.box.left - 1 && rect.right <= dimensions.box.right + 1 &&
+        rect.top >= dimensions.box.top - 1 && rect.bottom <= dimensions.box.bottom + 1, JSON.stringify(dimensions));
+    }
+    assert.ok(dimensions.box.right <= dimensions.nextLeft + 1, JSON.stringify(dimensions));
+    assert.ok(dimensions.documentScroll <= dimensions.documentWidth + 1, JSON.stringify(dimensions));
+  }
+
+  await checkLabel('#roundLabel');
+  await page.getByRole('button', {name: 'Expand SPECTATOR feed'}).click();
+  await checkLabel('#dialogLabel');
+  const dialog = await page.locator('#dialog').evaluate(el => ({width:el.clientWidth, scroll:el.scrollWidth}));
+  assert.ok(dialog.scroll <= dialog.width + 1, JSON.stringify(dialog));
+});
+
 test('newly powered bridge labels starting resources and the movement graphic', async t => {
   const page = await pageFor(t, environment);
   const native = JSON.parse(await readFile(join(environment.fixtures, 'win', 'native.json'), 'utf8'));
