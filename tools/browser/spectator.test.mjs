@@ -29,6 +29,40 @@ before(async () => {
   for (const name of ['win', 'later-partial', 'legacy-v2', 'missing-images', 'malicious', 'withheld']) {
     runPython(['tools/spectator/export_replay.py', join(environment.fixtures, name), '--out', exported(name)]);
   }
+  // Synthetic sheets exercise playback even before optional artwork is installed.
+  const base = await readFile(join(exported('win'), 'index.html'), 'utf8');
+  const image = 'data:image/png;base64,' + (await readFile(join(root, 'tools/spectator/artwork/light-review/spectra-idle.png'))).toString('base64');
+  const sheets = Object.fromEntries(['spectra', 'pyra', 'flux'].flatMap(role => ['idle', 'walk'].map(action => [role + '-' + action, image])));
+  async function variant(name, mutate) {
+    const html = base.replace(/const DATA=(.*);\nconst \$=/, (_, json) => {
+      const data = JSON.parse(json); data.animation_sheets = {...sheets}; mutate(data);
+      return 'const DATA=' + JSON.stringify(data).replaceAll('<', '\\u003c') + ';\nconst $=';
+    });
+    assert.notEqual(html, base);
+    await cp(exported('win'), exported(name), {recursive: true});
+    await writeFile(join(exported(name), 'index.html'), html);
+  }
+  await variant('animated', data => {data.artwork.extra = image;});
+  await variant('missing-sheet', data => {delete data.animation_sheets['flux-walk'];});
+  await variant('invalid-state', data => {data.records[0].state_after.robots.SPECTRA.x = 'bad';});
+  await variant('blocked', data => {
+    data.records[0].state_after.robots.SPECTRA.x = data.manifest.provenance.inputs.room.value.initial_state.robots.SPECTRA.x;
+    data.records[0].state_after.powered_bridges = ['bridge_0'];
+  });
+  await variant('partial-target', data => {data.records = data.records.filter(row => row.turn !== 2);});
+  for (const [name, from, to] of [
+    ['shared-arrival', [3, 4, 4], [4, 4, 5]],
+    ['shared-departure', [4, 4, 5], [3, 4, 4]],
+  ]) await variant(name, data => {
+    for (const [i, role] of ['SPECTRA', 'PYRA', 'FLUX'].entries()) {
+      data.manifest.provenance.inputs.room.value.initial_state.robots[role].x = from[i];
+      data.records[0].state_after.robots[role].x = to[i];
+    }
+  });
+  await variant('leftward', data => {
+    data.manifest.provenance.inputs.room.value.initial_state.robots.SPECTRA.x = 2;
+    data.records[0].state_after.robots.SPECTRA.x = 1;
+  });
 });
 after(async () => {if (environment) await environment.close();});
 
@@ -127,6 +161,27 @@ for (const width of [320, 390]) {
     assert.equal(await page.locator('#dialogBoard').isVisible(), true);
     const dialog = await page.locator('#dialog').evaluate(el => ({width: el.clientWidth, scroll: el.scrollWidth}));
     assert.ok(dialog.scroll <= dialog.width + 1, JSON.stringify(dialog));
+  });
+}
+
+for (const width of [320, 390, 1280]) {
+  test(`viewport ${width} keeps both exit labels inside the illustrated stage`, async t => {
+    const page = await pageFor(t, environment, {viewport: {width, height: 844}});
+    await page.goto(exportURL('win'));
+    for (const [index, text] of [['0', 'Exit locked'], [await page.locator('#round').getAttribute('max'), 'Exit unlocked']]) {
+      await seek(page, index);
+      for (const selector of ['#feedBoard', '#dialogBoard']) {
+        if (selector === '#dialogBoard') await page.getByRole('button', {name: 'Expand SPECTATOR feed'}).click();
+        const stage = page.locator(selector + ' .board-stage'), label = stage.locator('.exit-label');
+        assert.equal(await label.textContent(), text);
+        const bounds = await stage.evaluate(stage => {
+          const board = stage.getBoundingClientRect(), label = stage.querySelector('.exit-label').getBoundingClientRect();
+          return {boardLeft: board.left, boardRight: board.right, labelLeft: label.left, labelRight: label.right};
+        });
+        assert.ok(bounds.labelLeft >= bounds.boardLeft && bounds.labelRight <= bounds.boardRight, JSON.stringify(bounds));
+        if (selector === '#dialogBoard') await page.keyboard.press('Escape');
+      }
+    }
   });
 }
 
@@ -291,3 +346,163 @@ test('stale role image callbacks cannot replace the spectator board', async t =>
   });
   assert.deepEqual(result, {hadCallback: true, imageHidden: true, boardHidden: false, missingHidden: true});
 });
+
+
+test('real embedded idle and walk sheets advance in the normal export', async t => {
+  const page = await pageFor(t, environment);
+  await page.goto(exportURL('win'));
+  const available = await page.evaluate(() => Object.keys(DATA.animation_sheets).length === 6);
+  if (!available) {t.skip('optional animation sheets are unavailable'); return;}
+  const actual = 'data:image/png;base64,' + (await readFile(join(root, 'tools/spectator/artwork/light-review/animations/sheets/spectra-idle.png'))).toString('base64');
+  assert.equal(await page.evaluate(() => DATA.animation_sheets['spectra-idle']), actual);
+  const idle = page.locator('#feedBoard [data-role="SPECTRA"]');
+  const idleState = await idle.evaluate(el => ({position: getComputedStyle(el).backgroundPosition,
+    source: getComputedStyle(el).backgroundImage}));
+  assert.ok(idleState.source.includes(await page.evaluate(() => DATA.animation_sheets['spectra-idle'])));
+  await page.waitForFunction(position => getComputedStyle(document.querySelector('#feedBoard [data-role="SPECTRA"]')).backgroundPosition !== position, idleState.position);
+  await page.locator('#next').click();
+  const walking = page.locator('#feedBoard .walking').first();
+  const walkState = await walking.evaluate(el => ({role: el.dataset.role.toLowerCase(),
+    position: getComputedStyle(el).backgroundPosition, source: getComputedStyle(el).backgroundImage}));
+  assert.ok(walkState.source.includes(await page.evaluate(role => DATA.animation_sheets[role + '-walk'], walkState.role)));
+  await page.waitForFunction(({role, position}) => {
+    const el = document.querySelector('#feedBoard [data-role="' + role.toUpperCase() + '"]');
+    return el.classList.contains('walking') && getComputedStyle(el).backgroundPosition !== position;
+  }, walkState, {timeout: 700});
+  await page.locator('#roundLabel').filter({hasText: /Round 2/}).waitFor();
+  assert.equal(await page.locator('#feedBoard .walking').count(), 0);
+});
+
+test('adjacent playback follows recorded movement and settles to the exact state', async t => {
+  const page = await pageFor(t, environment);
+  const native = JSON.parse(await readFile(join(environment.fixtures, 'win', 'native.json'), 'utf8'));
+  await page.goto(exportURL('animated'));
+  const before = native.manifest.provenance.inputs.room.value.initial_state, after = native.replay[0].state_after;
+  await page.locator('#next').click();
+  assert.match(await page.locator('#roundLabel').textContent(), /transition/i);
+  for (const role of ['SPECTRA', 'PYRA', 'FLUX']) {
+    assert.equal(await page.locator(`#feedBoard [data-role="${role}"]`).evaluate(el => el.classList.contains('walking')), before.robots[role].x !== after.robots[role].x);
+  }
+  if (after.powered_bridges.includes('bridge_0')) assert.equal(await page.locator('#feedBoard .tile').count(), 13);
+  await page.locator('#roundLabel').filter({hasText: /Round 2/}).waitFor();
+  await assertBoard(page, after);
+});
+
+test('interruption, keyboard, expanded view, and role feeds settle coherently', async t => {
+  const page = await pageFor(t, environment);
+  const native = JSON.parse(await readFile(join(environment.fixtures, 'win', 'native.json'), 'utf8'));
+  await page.goto(exportURL('animated'));
+  const expand = page.getByRole('button', {name: 'Expand SPECTATOR feed'});
+  await expand.click();
+  await page.keyboard.press('ArrowRight');
+  assert.match(await page.locator('#dialogLabel').textContent(), /transition/i);
+  assert.equal(await page.locator('#dialogBoard .walking').count(), await page.locator('#feedBoard .walking').count());
+  await page.keyboard.press('ArrowLeft');
+  assert.equal(await page.locator('#round').inputValue(), '0');
+  await page.waitForTimeout(850);
+  assert.equal(await page.locator('#round').inputValue(), '0');
+  await assertBoard(page, native.manifest.provenance.inputs.room.value.initial_state);
+  await page.keyboard.press('ArrowRight');
+  await page.keyboard.press('Escape');
+  assert.equal(await expand.evaluate(el => el === document.activeElement), true);
+  await page.locator('[data-feed="PYRA"] .select').click();
+  assert.match(await page.locator('#feedTitle').textContent(), /PYRA/);
+  await page.waitForTimeout(850);
+  assert.match(await page.locator('#feedTitle').textContent(), /PYRA/);
+  await page.locator('#next').click();
+  assert.match(await page.locator('#roundLabel').textContent(), /Round 3/);
+});
+
+test('reduced motion, absent sheets and malformed states use immediate checkpoints', async t => {
+  const page = await pageFor(t, environment);
+  await page.emulateMedia({reducedMotion: 'reduce'});
+  await page.goto(exportURL('animated'));
+  assert.equal(await page.locator('#feedBoard .animated-robot').first().evaluate(el => getComputedStyle(el).animationName), 'none');
+  await page.locator('#next').click();
+  assert.match(await page.locator('#roundLabel').textContent(), /Round 2/);
+  await page.emulateMedia({reducedMotion: 'no-preference'});
+  await page.goto(exportURL('missing-sheet'));
+  assert.equal(await page.locator('#feedBoard .animated-robot').count(), 0);
+  await page.locator('#next').click();
+  assert.match(await page.locator('#roundLabel').textContent(), /Round 2/);
+  await page.goto(exportURL('invalid-state'));
+  await page.locator('#next').click();
+  assert.doesNotMatch(await page.locator('#roundLabel').textContent(), /transition/i);
+});
+
+
+test('blocked robots stay put and a newly powered bridge appears before movement', async t => {
+  const page = await pageFor(t, environment);
+  await page.goto(exportURL('blocked'));
+  await page.locator('#next').click();
+  assert.match(await page.locator('#roundLabel').textContent(), /transition/i);
+  assert.equal(await page.locator('#feedBoard [data-role="SPECTRA"].walking').count(), 0);
+  assert.equal(await page.locator('#feedBoard .tile').count(), 13);
+  assert.match(await page.locator('#feedBoard .board-status').textContent(), /Bridge: extended/);
+  await page.locator('#roundLabel').filter({hasText: /Round 2/}).waitFor();
+});
+
+test('partial checkpoints and slider navigation do not animate', async t => {
+  const page = await pageFor(t, environment);
+  await page.goto(exportURL('partial-target'));
+  await page.locator('#next').click();
+  assert.doesNotMatch(await page.locator('#roundLabel').textContent(), /transition/i);
+  await page.goto(exportURL('animated'));
+  await page.locator('#next').click();
+  await seek(page, 3);
+  assert.match(await page.locator('#roundLabel').textContent(), /Round 4/);
+  await page.waitForTimeout(850);
+  assert.match(await page.locator('#roundLabel').textContent(), /Round 4/);
+});
+
+
+test('leftward motion mirrors only the robot and keeps source logs until settled', async t => {
+  const page = await pageFor(t, environment);
+  await page.goto(exportURL('leftward'));
+  const sourceChat = await page.locator('#chat').textContent();
+  const sourceActions = await page.locator('#actions').textContent();
+  await page.locator('#next').click();
+  assert.equal(await page.locator('#feedBoard [data-role="SPECTRA"].face-left').count(), 1);
+  assert.equal(await page.locator('#feedBoard [data-role-label="SPECTRA"].face-left').count(), 0);
+  assert.equal(await page.locator('#chat').textContent(), sourceChat);
+  assert.equal(await page.locator('#actions').textContent(), sourceActions);
+  await page.locator('#roundLabel').filter({hasText: /Round 2/}).waitFor();
+  assert.equal(await page.locator('#feedBoard .face-left').count(), 0);
+});
+
+test('closing an expanded transition and changing motion preference settle immediately', async t => {
+  const page = await pageFor(t, environment);
+  await page.goto(exportURL('animated'));
+  const expand = page.getByRole('button', {name: 'Expand SPECTATOR feed'});
+  await expand.click();
+  await page.keyboard.press('ArrowRight');
+  assert.match(await page.locator('#roundLabel').textContent(), /transition/i);
+  await page.keyboard.press('Escape');
+  await page.locator('#roundLabel').filter({hasText: /Round 2/}).waitFor();
+  assert.equal(await expand.evaluate(el => el === document.activeElement), true);
+  await page.locator('#next').click();
+  assert.match(await page.locator('#roundLabel').textContent(), /transition/i);
+  await page.emulateMedia({reducedMotion: 'reduce'});
+  await page.locator('#roundLabel').filter({hasText: /Round 3/}).waitFor();
+  assert.equal(await page.locator('#feedBoard .walking').count(), 0);
+  assert.equal(await page.locator('#feedBoard .animated-robot').first().evaluate(el => getComputedStyle(el).animationName), 'none');
+});
+
+
+for (const name of ['shared-arrival', 'shared-departure']) {
+  test(`${name} repositions an idle robot and its label without a walking sprite`, async t => {
+    const page = await pageFor(t, environment);
+    await page.goto(exportURL(name));
+    const robot = page.locator('#feedBoard [data-role="PYRA"]');
+    const label = page.locator('#feedBoard [data-role-label="PYRA"]');
+    const startingLeft = await robot.evaluate(el => el.style.left);
+    await page.locator('#next').click();
+    await page.waitForFunction(start => document.querySelector('#feedBoard [data-role="PYRA"]').style.left !== start, startingLeft, {timeout: 500});
+    assert.equal(await robot.evaluate(el => el.classList.contains('walking')), false);
+    const targetLeft = await robot.evaluate(el => el.style.left);
+    assert.equal(await label.evaluate(el => el.style.left), targetLeft);
+    await page.locator('#roundLabel').filter({hasText: /Round 2/}).waitFor();
+    assert.equal(await robot.evaluate(el => el.style.left), targetLeft);
+    assert.equal(await label.evaluate(el => el.style.left), targetLeft);
+  });
+}
