@@ -1,8 +1,11 @@
 # Roadmap
 
-The goal is a reliable research game in which distinct observations and public
-communication matter to successful cooperation. This is a proposed sequence with
-completion gates, not a dated release commitment. The current implementation is
+The intended destination is a real-time cooperative platformer, adventure, and
+puzzle game in which distinct observations and public communication matter to
+successful cooperation. The [real-time game vision](docs/REALTIME_GAME_VISION.md)
+describes the intended experience, next-stage exploration, and unresolved timing
+decisions. The work below records existing milestones and proposals with completion
+gates, not a dated release commitment. The current turn-based implementation is
 nine curated rooms (three development, six held-out), three active roles, explicit
 evaluation controls, a bounded campaign runner, and one verified bounded live turn.
 A full real-model victory, controlled model campaigns, and benchmark results remain
@@ -143,14 +146,17 @@ set and evidence; incompatible objectives require an explicit scoring design.
 in merged PRs #43/#44, with [current verification and limits](docs/verification/2026-11-17-reviewed-stack-and-q.md).
 This completes Phase 1 of the
 [completion plan](docs/superpowers/plans/2026-11-16-four-phase-completion.md).
-Parent #12's acceptance criteria are satisfied. Optional expansion below remains deferred.
+Parent #12's acceptance criteria are satisfied. The real-time game is the intended
+next direction; its mechanics and implementation are not delivered by this milestone.
+Other optional expansion below remains deferred.
 
 Preserve replay accessibility and unfinished-run inspection with reproducible
-browser regressions. Consider a live
-spectator interface, additional roles including ECHO, richer mechanics, or deployment
-only through separate proposals that state their effect on reproducibility and
-information boundaries.
+browser regressions. The [real-time game vision](docs/REALTIME_GAME_VISION.md)
+includes a live spectator experience; its implementation needs a separately scoped
+proposal. Additional roles including ECHO and deployment remain optional, and
+likewise require proposals addressing reproducibility and information boundaries.
 
 **Completion gate for starting a proposal:** describe the intended user, concrete
-problem, maintenance cost, security boundary changes, and success criteria. These
-optional expansion items are not scheduled deliverables of the completion plan.
+problem, maintenance cost, security boundary changes, and success criteria. The
+real-time implementation and optional expansion items are not scheduled deliverables
+of the completion plan.
