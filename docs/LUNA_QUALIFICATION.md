@@ -7,12 +7,15 @@ The explicit `exploratory-luna-under20-v1` profile uses three fresh independent
 continues to configure/import individual matches; it does not launch campaigns.
 
 This gate reuses a fixed, committed selection of ten completed all-Luna development
-model cases and 45 completed controls. Five Split Span model cases remain to be
-run, one for each arm. The original mixed-provider pilot remains incomplete;
+model cases and 45 completed controls. The supplement supplies five Split Span
+model cases, one for each arm. The original mixed-provider pilot remains incomplete;
 its stopped model trial and all costs remain in historical accounting. Successful
 completion yields a **retrospective composite exploratory qualification**, not a
 repaired original pilot or formal confirmation under the original research gate.
 Completed defeats are eligible. There is no qualification win-rate threshold.
+
+See the [November 18 qualification evidence](verification/2026-11-18-luna-qualification.md)
+for the completed supplement and the status of held-out validation.
 
 ## Fixed design
 
