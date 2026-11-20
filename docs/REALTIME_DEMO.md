@@ -32,6 +32,9 @@ match or reconnect the browser. Press Ctrl+C in the launcher to close the
 viewer. Start a fresh launcher for each new match. The offline modes use no
 provider credentials or calls.
 
+The verified walkthrough includes Chromium captures of readiness, the jump,
+extraction, and a failed manual crossing. [Screenshots and recording evidence](verification/2026-11-20-realtime-demo.md)
+
 ## Walk through a manual crossing
 
 ```bash
