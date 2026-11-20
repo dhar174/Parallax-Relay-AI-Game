@@ -362,9 +362,95 @@ def _build_exploratory_bundle():
     return specs, receipt
 
 
+def _build_luna_bundle():
+    from parallax_relay.exploratory import LUNA_PROFILE_ID, luna_profile_spec, luna_profile_analysis
+    sources, smoke = _exploratory_inputs()
+    specs, stages, frozen_stages = {}, {}, []
+    qualification_spec = None
+    for stage, counts in (('qualification', (5, 5, 0, 864, 864, 1.25)),
+                          ('validation', (120, 30, 90, 20736, 5184, 7.5))):
+        spec = CampaignSpec.model_validate(luna_profile_spec(stage), strict=True)
+        value = spec.model_dump(mode='json')
+        trials = schedule(spec)
+        paid = [trial for trial in trials if trial['team'] == 'models']
+        calls = sum(trial_exposure(spec, trial)[0] for trial in trials)
+        paid_calls = sum(trial_exposure(spec, trial)[0] for trial in paid)
+        cap = sum((Decimal(str(trial_exposure(spec, trial)[1])) for trial in paid), Decimal(0))
+        if ((len(trials), len(paid), len(trials) - len(paid), calls, paid_calls, float(cap)) != counts or
+                cap != Decimal(str(spec.campaign_max_estimated_cost_usd)) or
+                spec.match.max_estimated_cost_usd != 0.25):
+            raise ValueError('Luna schedule or guard arithmetic differs from approved limits')
+        frozen = frozen_inputs(spec)
+        if (set(frozen['inputs']) != {room.id for room in rooms()} or
+                canonical_hash(frozen['analysis']) != canonical_hash(luna_profile_analysis())):
+            raise ValueError('Luna frozen inputs must cover all rooms and descriptive analysis')
+        frozen_stages.append(frozen)
+        specs[stage + '.json'] = value
+        stages[stage] = {'spec_file': stage + '.json', 'spec_sha256': canonical_hash(value),
+            'frozen_inputs_sha256': canonical_hash(frozen), 'trials': len(trials),
+            'model_trials': len(paid), 'baseline_trials': len(trials) - len(paid),
+            'assignments_per_room': 1, 'max_calls': calls, 'max_provider_attempts': paid_calls,
+            'match_estimate_guard_usd': 0.25, 'campaign_estimate_guard_usd': float(cap),
+            'baseline_provider_cost_usd': 0.0}
+        if stage == 'qualification':
+            qualification_spec = spec
+    if canonical_hash(frozen_stages[0]) != canonical_hash(frozen_stages[1]):
+        raise ValueError('Qualification and validation must freeze identical source/environment/inputs')
+    frozen = frozen_stages[0]
+    conservative = _envelope_summary(worksheet(qualification_spec))
+    nominal = _envelope_summary(worksheet(qualification_spec, openai_input_rate=0.1))
+    price_inputs = {'nominal_openai_input_per_million': 0.1,
+        'safety_openai_input_per_million': 0.125, 'openai_output_per_million': 0.5,
+        'runtime_rate_basis': 'All three OpenAI roles use the default 30-minute cache-write input rate.',
+        'actual_cache_activity': 'unknown', 'source_record_uses_nominal_rates': True,
+        'runtime_uses_safety_rates': True}
+    prior_estimate = Decimal('1.044149250')
+    receipt = {'schema_version': 1, 'kind': 'offline_preparation_candidate',
+        'profile_id': LUNA_PROFILE_ID, 'evidence_class': 'exploratory', 'confirmatory_eligible': False,
+        'spending_authorized': False, 'registration_created': False,
+        'credential_resolution_performed': False, 'provider_clients_constructed': False,
+        'sources': sources, 'source_record_sha256': canonical_hash(sources),
+        'smoke_profile_sha256': canonical_hash(smoke), 'price_inputs': price_inputs,
+        'price_inputs_sha256': canonical_hash(price_inputs),
+        'source': frozen['source'], 'source_sha256': canonical_hash(frozen['source']),
+        'environment': frozen['environment'], 'environment_sha256': frozen['environment']['sha256'],
+        'catalog_sha256': frozen['catalog']['sha256'], 'frozen_inputs_sha256': canonical_hash(frozen),
+        'analysis': luna_profile_analysis(), 'stages': stages,
+        'limits': {'match_guard_usd': 0.25, 'full_five_arm_model_block_guard_usd': 1.25,
+            'new_campaign_guards_usd': 8.75, 'prior_q_allowance_usd': 0.25,
+            'prior_pilot_and_continuation_estimate_usd': str(prior_estimate),
+            'prior_usage_completeness': 'unknown',
+            'combined_local_guard_allowance_usd': float(prior_estimate + Decimal('9.00')),
+            'user_combined_budget_usd': 20.0, 'cost_is_estimate_not_billing_guarantee': True},
+        'guard_feasibility': {'match_guard_usd': 0.25,
+            'conservative_envelope': conservative, 'nominal_rate_comparison': nominal,
+            'binding_possible': conservative['retained_quote_bound_usd'] > 0.25,
+            'full_match_completion_demonstrated': False, 'qualification_cap_assessment_required': True,
+            'binding_qualification_guard_blocks_validation': True,
+            'interpretation': 'The fixed .25 local match guard can bind. Qualification must assess all retained evidence and costs without increasing guards or automatically continuing.'},
+        'pricing_limitations': [
+            'Local guards and token quotes are estimates, never provider invoice ceilings or expected invoice claims.',
+            'Prior pilot and continuation estimates retain unknown usage and all failed costs; the original mixed pilot remains incomplete.',
+            'Safety rates cover the stated all-input-cache-write scenario; actual caching, provider usage, quota and backend revisions remain unknown.'],
+        'operational_planning': {'status': 'not_started', 'time_projection': 'not_started',
+            'storage_projection': 'not_started', 'provider_account_quota': 'unverified',
+            'disk_free_check': 'not_started', 'required_initial_disk_gib': 5,
+            'stop_new_trials_below_disk_gib': 2, 'launch_checkpoint': 'not_started',
+            'heartbeat': 'not_started'},
+        'remaining_gates': [
+            'Freeze the reviewed evidence selection and source bridge, then register only the five-case qualification supplement.',
+            'Obtain separate exact $1.25 and 864-request supplement approval before paid execution.',
+            'Revalidate complete composite qualification and all artifact/accounting evidence before validation registration; there is no win threshold.',
+            'Obtain separate $7.50 validation spending approval after qualification succeeds.',
+            'Report retrospective exploratory qualification; the original mixed pilot is never repaired or pooled as complete.']}
+    return specs, receipt
+
+
 def build_bundle(profile=None):
     if profile is None:
         return _build_standard_bundle()
+    if profile == 'exploratory-luna-under20-v1':
+        return _build_luna_bundle()
     if profile != 'exploratory-under20-v1':
         raise ValueError('Unknown preparation profile')
     return _build_exploratory_bundle()
@@ -414,7 +500,7 @@ def main(argv=None):
     check.add_argument('--bundle', type=Path, required=True)
     check.add_argument('--require-clean', action='store_true')
     for command in (prepare, check):
-        command.add_argument('--profile', choices=['exploratory-under20-v1'])
+        command.add_argument('--profile', choices=['exploratory-under20-v1', 'exploratory-luna-under20-v1'])
     args = parser.parse_args(argv)
     try:
         receipt = (write_bundle(args.out, profile=args.profile) if args.command == 'prepare' else
@@ -428,8 +514,10 @@ def main(argv=None):
                 for stage, row in receipt['stages'].items()}
         else:
             summary.update(profile_id=receipt['profile_id'], evidence_class=receipt['evidence_class'],
-                           combined_local_guard_allowance_usd=receipt['limits']['combined_local_guard_allowance_usd'],
-                           pilot_cap_assessment_required=receipt['guard_feasibility']['pilot_cap_assessment_required'])
+                           combined_local_guard_allowance_usd=receipt['limits']['combined_local_guard_allowance_usd'])
+            assessment = ('qualification_cap_assessment_required' if args.profile == 'exploratory-luna-under20-v1'
+                          else 'pilot_cap_assessment_required')
+            summary[assessment] = receipt['guard_feasibility'][assessment]
         print(json.dumps(summary))
         return 0
     except (OSError, ValueError, KeyError, TypeError):

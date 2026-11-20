@@ -1,4 +1,5 @@
 """Versioned campaign designs and preallocated, split-aware schedules."""
+from collections.abc import Mapping
 from itertools import permutations
 import random
 from typing import Literal
@@ -8,7 +9,7 @@ from pydantic import Field, model_validator
 
 from .conditions import CONDITIONS, ConditionName
 from .config import MatchSettings, Rates, Settings
-from .exploratory import GEMINI_ROLE_BY_ROOM, is_exploratory, profile_spec
+from .exploratory import GEMINI_ROLE_BY_ROOM, is_exploratory, is_luna, profile_spec, luna_profile_spec
 from .protocol import ROLES
 from .provenance import canonical_hash
 from .rooms import get_room,rooms as catalog_rooms,catalog_identity,room_hash
@@ -36,8 +37,8 @@ class CampaignModel(Settings):
 
 class CampaignSpec(Settings):
     schema_version: Literal[2] = 2
-    protocol_version: Literal[1,2,3] = 2
-    stage: Literal['diagnostic', 'pilot', 'confirmatory', 'validation'] = 'diagnostic'
+    protocol_version: Literal[1,2,3,4] = 2
+    stage: Literal['diagnostic', 'pilot', 'confirmatory', 'validation', 'qualification'] = 'diagnostic'
     mode: Literal['offline', 'live'] = 'offline'
     policies: list[Literal['scripted', 'wait', 'uniform']] = Field(default_factory=lambda: ['scripted', 'wait', 'uniform'])
     roster: list[CampaignModel] = Field(default_factory=list)
@@ -55,6 +56,8 @@ class CampaignSpec(Settings):
     @model_validator(mode='before')
     @classmethod
     def adapt_version(cls,value):
+        if isinstance(value, Mapping) and value.get('protocol_version') == 4 and type(value) is not dict:
+            raise ValueError('Luna profile requires an exact raw JSON object')
         if not isinstance(value,dict):return value
         value=dict(value)
         version=value.get('schema_version',2)
@@ -74,6 +77,14 @@ class CampaignSpec(Settings):
             except (TypeError, ValueError):
                 matches = False
             if not matches:raise ValueError('Exploratory profile must match the approved specification')
+        if is_luna(value):
+            try:
+                expected = luna_profile_spec(value.get('stage'))
+                matches = (_same_profile_types(value, expected) and
+                           canonical_hash(value) == canonical_hash(expected))
+            except (TypeError, ValueError):
+                matches = False
+            if not matches:raise ValueError('Luna profile must match the approved specification')
         if 'rooms' not in value:
             value['rooms']=(['split_span'] if value.get('protocol_version',2)==1 else
                 [r.id for r in catalog_rooms(split='held_out' if value.get('stage')=='confirmatory' else 'development')])
@@ -81,8 +92,10 @@ class CampaignSpec(Settings):
 
     @model_validator(mode='after')
     def coherent_design(self):
-        if self.stage == 'validation' and self.protocol_version != 3:
-            raise ValueError('Validation requires exploratory protocol 3')
+        if self.stage == 'validation' and self.protocol_version not in (3, 4):
+            raise ValueError('Validation requires exploratory protocol 3 or 4')
+        if self.stage == 'qualification' and self.protocol_version != 4:
+            raise ValueError('Qualification requires Luna protocol 4')
         for values in (self.policies, self.rooms, self.conditions):
             if len(set(values)) != len(values):
                 raise ValueError('Duplicate campaign cells')
@@ -92,6 +105,8 @@ class CampaignSpec(Settings):
         if self.match.room_id!='split_span':raise ValueError('Select campaign rooms through rooms, not match.room_id')
         if self.protocol_version==1:
             if self.rooms!=['split_span']:raise ValueError('Protocol 1 requires Split Span')
+        elif self.protocol_version==4 and self.stage=='qualification':
+            if self.rooms!=['split_span']:raise ValueError('Qualification requires Split Span')
         elif self.stage=='diagnostic':
             if any(room.split!='development' for room in selected):raise ValueError('Diagnostics require development rooms')
         elif set(self.rooms)!={r.id for r in catalog_rooms(split='development' if self.stage=='pilot' else 'held_out')}:
@@ -112,11 +127,12 @@ class CampaignSpec(Settings):
         if self.mode == 'offline' and self.campaign_max_estimated_cost_usd is not None:
             raise ValueError('Unpriced offline policy costs remain null; omit the dollar guard')
         if self.stage != 'diagnostic':
-            if set(self.policies) != {'scripted', 'wait', 'uniform'}:
+            expected_policies = set() if self.protocol_version == 4 and self.stage == 'qualification' else {'scripted', 'wait', 'uniform'}
+            if set(self.policies) != expected_policies:
                 raise ValueError('Protocol cohorts require the prescribed baseline policies')
             if set(self.conditions) != set(CONDITIONS):
                 raise ValueError('Protocol campaigns require all five arms')
-            expected = 1 if self.protocol_version == 3 else (5 if self.stage == 'pilot' else 30)
+            expected = 1 if self.protocol_version in (3, 4) else (5 if self.stage == 'pilot' else 30)
             if self.repetitions not in (None, expected):
                 raise ValueError('Protocol repetition count is fixed')
         if bool(self.rerun_of) != bool(self.rerun_reason):
@@ -135,7 +151,7 @@ class CampaignSpec(Settings):
 
     @property
     def repeats(self) -> int:
-        return self.repetitions or {'diagnostic': 1, 'pilot': 5, 'confirmatory': 30, 'validation': 1}[self.stage]
+        return self.repetitions or {'diagnostic': 1, 'pilot': 5, 'confirmatory': 30, 'validation': 1, 'qualification': 1}[self.stage]
 
 
 def assignments(spec: CampaignSpec) -> list[dict]:

@@ -1,5 +1,11 @@
 # Run provenance
 
+Protocol-4 [all-Luna qualification](LUNA_QUALIFICATION.md) retains native/request
+format 3. Its registration envelope remains 2 and adds hash-bound qualification
+metadata, original artifact inventories and a reviewed full-tree source bridge.
+Receipt checks revalidate native evidence; local digests attest consistency,
+not installed binaries, provider delivery, remote revisions or billing.
+
 New runs use manifest/result/provenance/request version **3**. Call/phase/turn
 records retain their compatible field structure; room snapshots carry room ID/version
 and canonical per-controller/bridge/cell state. Provenance is spectator information:

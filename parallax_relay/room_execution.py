@@ -31,9 +31,19 @@ class RoomExecutionPermit:
         # entry without repeating the launch's Git/package/input scan.
         checked=json.loads(self.checked_inputs_json)
         spec=CampaignSpec.model_validate(registration['spec'])
+        if spec.protocol_version==4:
+            from .campaign import validate_registration
+            from .qualification import check_binding, strict_loads
+            # Direct construction must not bypass the file reader's ambiguity
+            # checks. Reparse all three serialized authority inputs strictly.
+            registration=strict_loads(self.registration_json)
+            trial=strict_loads(self.trial_json)
+            checked=strict_loads(self.checked_inputs_json)
+            validate_registration(registration)
+            check_binding(registration['qualification'],checked,kind='qualified')
         if (registration.get('schema_version')!=2 or
-            (spec.protocol_version,spec.stage) not in ((2,'confirmatory'),(3,'validation')) or
-            not isinstance(registration.get('pilot'),dict) or not registration['pilot'].get('registration_sha256') or
+            (spec.protocol_version,spec.stage) not in ((2,'confirmatory'),(3,'validation'),(4,'validation')) or
+            spec.protocol_version!=4 and (not isinstance(registration.get('pilot'),dict) or not registration['pilot'].get('registration_sha256')) or
             registration.get('sha256')!=canonical_hash({k:v for k,v in registration.items() if k!='sha256'}) or
             trial not in registration['schedule'] or trial['room']!=room_id or
             get_room(room_id).split!='held_out' or trial.get('split')!='held_out' or

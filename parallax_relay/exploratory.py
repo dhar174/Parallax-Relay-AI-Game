@@ -7,6 +7,7 @@ from types import MappingProxyType
 
 
 PROFILE_ID = 'exploratory-under20-v1'
+LUNA_PROFILE_ID = 'exploratory-luna-under20-v1'
 
 # One Gemini role per room, fixed across the development and held-out splits.
 GEMINI_ROLE_BY_ROOM = MappingProxyType({
@@ -58,3 +59,37 @@ def is_exploratory(spec) -> bool:
     """Identify protocol 3 in either a validated spec or its raw mapping."""
     version = spec.get('protocol_version') if isinstance(spec, Mapping) else getattr(spec, 'protocol_version', None)
     return type(version) is int and version == 3
+
+
+def luna_profile_spec(stage: str) -> dict:
+    """Return the fixed all-Luna supplement or held-out validation design."""
+    if type(stage) is not str or stage not in ('qualification', 'validation'):
+        raise ValueError('Luna profile supports only qualification and validation')
+    value = profile_spec('validation')
+    value.update(protocol_version=4, stage=stage)
+    # Each role has its own entry, even though their public configurations agree.
+    value['roster'] = [dict(provider='openai', model='gpt-6-luna',
+        api_key_env='OPENAI_API_KEY',
+        pricing={'input_per_million': 0.125, 'output_per_million': 0.5}) for _ in range(3)]
+    if stage == 'qualification':
+        value.update(policies=[], rooms=['split_span'], campaign_max_calls=864,
+                     campaign_max_estimated_cost_usd=1.25)
+    return value
+
+
+def luna_profile_analysis() -> dict:
+    """Declare retrospective exploratory qualification without inference."""
+    value = profile_analysis()
+    value.update(version=4, profile_id=LUNA_PROFILE_ID)
+    return value
+
+
+def is_luna(spec) -> bool:
+    """Identify only protocol 4, without coercing its discriminator."""
+    version = spec.get('protocol_version') if isinstance(spec, Mapping) else getattr(spec, 'protocol_version', None)
+    return type(version) is int and version == 4
+
+
+def is_descriptive(spec) -> bool:
+    """Identify either versioned descriptive profile."""
+    return is_exploratory(spec) or is_luna(spec)

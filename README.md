@@ -123,7 +123,8 @@ requests. Diagnostic fixtures do not establish model ability or benchmark result
 
 This release has nine curated rooms, three active roles and compatible objectives.
 Three development rooms support tuning; six held-out rooms require registered
-protocol-2 confirmation or [protocol-3 exploratory validation](docs/EXPLORATORY_STUDY.md).
+protocol-2 confirmation, [protocol-3 exploratory validation](docs/EXPLORATORY_STUDY.md),
+or [protocol-4 all-Luna qualification and validation](docs/LUNA_QUALIFICATION.md).
 Host certificates establish solvability; the original fixed script
 remains a Split Span memorization control. It has no platformer physics, procedural rooms, playable
 ECHO role, live dashboard, or validated benchmark results.

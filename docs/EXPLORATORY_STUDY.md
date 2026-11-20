@@ -1,5 +1,9 @@
 # Under-$20 exploratory pilot and held-out validation
 
+For the user's subsequent all-OpenAI testing preference, see the separate
+[retrospective all-Luna qualification](LUNA_QUALIFICATION.md), protocol 4. It
+preserves this mixed-provider profile and its incomplete pilot evidence.
+
 The explicit `exploratory-under20-v1` profile is implemented for review as a
 bounded descriptive study. It preserves the formal
 [protocol-2 evaluation](EVALUATION.md), including its five pilot and 30
