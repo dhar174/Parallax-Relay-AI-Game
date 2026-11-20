@@ -27,10 +27,11 @@ view** to inspect the optical, thermal, or circuit PNG sampled at the start of
 the current window. Select **Spectator view** to watch the whole room. Open
 **Released plans** to check the programs and their shared start tick.
 
-The spectator runs on the local machine. Keep the launcher open to revisit the
-match or reconnect the browser. Press Ctrl+C in the launcher to close the
-viewer. Start a fresh launcher for each new match. The offline modes use no
-provider credentials or calls.
+Select **Restart Match** during or after an offline match to return the room
+to tick zero. The server stays on the same URL. The room and manual drafts
+reset, and the next match gets its own recording directory alongside the
+previous one. Select **Start match** when ready. Press Ctrl+C in the launcher
+to close the viewer. The offline modes use no provider credentials or calls.
 
 The verified walkthrough includes Chromium captures of readiness, the jump,
 extraction, and a failed manual crossing. [Screenshots and recording evidence](verification/2026-11-20-realtime-demo.md)

@@ -39,15 +39,17 @@ class SpectatorSession(Protocol):
 
 
 class SpectatorServer(ThreadingHTTPServer):
-    """One session; request threads never run the simulation or hold its clock."""
+    """Serve one active session at a time; the simulation owns its clock."""
 
     daemon_threads = True
     request_queue_size = 32
 
-    def __init__(self, session: SpectatorSession, host: str = '127.0.0.1', port: int = 0):
+    def __init__(self, session: SpectatorSession, host: str = '127.0.0.1', port: int = 0,
+                 *, new_session: Callable[[], SpectatorSession] | None = None):
         if host not in ('127.0.0.1', 'localhost'):
             raise ValueError('The spectator requires the IPv4 loopback address.')
         self.session = session
+        self.new_session = new_session
         self.token = secrets.token_urlsafe(32)
         self._controls = Lock()
         self._closed = False
@@ -56,22 +58,45 @@ class SpectatorServer(ThreadingHTTPServer):
         self.authority = '127.0.0.1' if self.server_port == 80 else f'127.0.0.1:{self.server_port}'
         self.url = f'http://{self.authority}/'
 
+    def public_status(self) -> dict:
+        status = self.session.status()
+        public = {key: status[key] for key in PUBLIC_STATUS_FIELDS if key in status}
+        if self.new_session is not None and status['mode'] in OFFLINE_MODES:
+            public['restart_available'] = True
+        return {**public, 'token': self.token}
+
     def control(self, route: str, data: dict) -> tuple[int, dict]:
         with self._controls:
             if self._closed:
                 return 409, {'error': 'The session is closed.'}
-            mode = self.session.status()['mode']
+            session = self.session
+            status = session.status()
+            mode = status['mode']
+            if route in ('/api/start', '/api/restart') and data.get('run_id', status['run_id']) != status['run_id']:
+                return 409, {'error': 'The match has changed. Try again on the current match.'}
             if route == '/api/start':
                 if mode not in OFFLINE_MODES:
                     return 403, {'error': 'The browser can start only an offline session.'}
-                if self.session.start():
+                if session.start():
                     return 200, {'started': True}
                 return 409, {'error': 'This session has already started.'}
+            if route == '/api/restart':
+                if self.new_session is None or mode not in OFFLINE_MODES:
+                    return 403, {'error': 'Restart is available only in the offline viewer.'}
+                if status['status'] == 'idle':
+                    return 409, {'error': 'The match is already ready to start.'}
+                if status['status'] == 'running':
+                    session.close()
+                    if session.status()['status'] != 'ended':
+                        return 409, {'error': 'The previous match is still stopping. Try again shortly.'}
+                replacement = self.new_session()
+                self.session = replacement
+                return 200, {'run_id': replacement.status()['run_id']}
             if mode != 'manual':
                 return 403, {'error': 'Plans can be submitted only in manual mode.'}
         # Admission may wait for the match loop. Other requests and shutdown
         # must remain able to run while this role awaits its individual receipt.
-        verdict = self.session.submit(data)
+        verdict = session.submit(data)
         return (200 if verdict['ok'] else 409), verdict
 
     def server_close(self) -> None:
@@ -147,9 +172,7 @@ class SpectatorHandler(BaseHTTPRequestHandler):
             return
         try:
             if self.path == '/api/status':
-                status = self.server.session.status()
-                self._json(200, {**{key: status[key] for key in PUBLIC_STATUS_FIELDS if key in status},
-                                 'token': self.server.token})
+                self._json(200, self.server.public_status())
                 return
             path, separator, query = self.path.partition('?')
             if path == '/api/events':
@@ -164,9 +187,10 @@ class SpectatorHandler(BaseHTTPRequestHandler):
                 return
             match = re.fullmatch(r'/api/feed/([A-Z]+)/([0-9]{1,16})', self.path)
             if match and match[1] in ROLES:
-                png = self.server.session.feed(match[1], int(match[2]))
+                session = self.server.session
+                png = session.feed(match[1], int(match[2]))
                 if png is not None:
-                    describe = getattr(self.server.session, 'feed_description', None)
+                    describe = getattr(session, 'feed_description', None)
                     caption = describe(match[1], int(match[2])) if describe else ''
                     self._send(200, png, 'image/png', description=caption)
                     return
@@ -221,7 +245,7 @@ class SpectatorHandler(BaseHTTPRequestHandler):
         if not self._allowed(token=True):
             self._error(403, 'Session rejected.')
             return
-        if self.path not in ('/api/start', '/api/plan'):
+        if self.path not in ('/api/start', '/api/restart', '/api/plan'):
             self._error(404, 'Not found.')
             return
         try:
@@ -229,9 +253,11 @@ class SpectatorHandler(BaseHTTPRequestHandler):
         except (OSError, ValueError, RecursionError):
             self._error(400, 'Expected a bounded UTF-8 JSON object with a valid length.')
             return
-        if self.path == '/api/start' and body:
-            self._error(400, 'Start expects an empty object.')
-            return
+        if self.path in ('/api/start', '/api/restart'):
+            valid_id = body.keys() == {'run_id'} and isinstance(body['run_id'], str) and bool(body['run_id'])
+            if not (valid_id or self.path == '/api/start' and not body):
+                self._error(400, 'Expected the current match ID.')
+                return
         if self.path == '/api/plan' and (
                 body.keys() != {'window', 'role', 'request_id', 'actions'}
                 or type(body['window']) is not int or body['window'] < 0
@@ -247,9 +273,10 @@ class SpectatorHandler(BaseHTTPRequestHandler):
 
 
 def serve(session: SpectatorSession, host: str = '127.0.0.1', port: int = 0,
-          ready: Callable[[str], None] | None = None) -> None:
+          ready: Callable[[str], None] | None = None, *,
+          new_session: Callable[[], SpectatorSession] | None = None) -> None:
     """Publish the bound URL before accepting controls; keep serving after the run ends."""
-    with SpectatorServer(session, host, port) as server:
+    with SpectatorServer(session, host, port, new_session=new_session) as server:
         print(f'Open {server.url} in your browser.', flush=True)
         try:
             if ready is not None:

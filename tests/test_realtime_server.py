@@ -134,9 +134,9 @@ class SpectatorTransportTests(unittest.TestCase):
                 self.assertEqual(code, 403)
                 self.assertNotIn('token', json.loads(data))
 
-    def test_data_and_both_controls_require_one_matching_header_token(self):
+    def test_data_and_controls_require_one_matching_header_token(self):
         for method, path in [('GET', '/api/events?after=0'), ('GET', '/api/feed/FLUX/1'),
-                             ('POST', '/api/start'), ('POST', '/api/plan')]:
+                             ('POST', '/api/start'), ('POST', '/api/restart'), ('POST', '/api/plan')]:
             for token_values in ([], ['wrong'], [self.server.token] * 2):
                 headers = [*self.host, *(('X-Relay-Token', token) for token in token_values)]
                 with self.subTest(method=method, path=path, supplied=len(token_values)):
@@ -213,15 +213,48 @@ class SpectatorTransportTests(unittest.TestCase):
 
     def test_start_and_manual_controls_are_gated_by_the_host_mode(self):
         self.assertEqual(self.post('/api/start', {'mode': 'live'})[0], 400)
+        self.assertEqual(self.post('/api/restart', {})[0], 400)
+        restart = {'run_id': self.journal.run_id}
+        self.assertEqual(self.post('/api/restart', restart)[0], 403)
         for mode in ('live', 'unknown'):
             self.session.mode = mode
             self.assertEqual(self.post('/api/start', {})[0], 403)
+            with patch.object(self.server, 'new_session') as factory:
+                self.assertEqual(self.post('/api/restart', restart)[0], 403)
+                factory.assert_not_called()
             self.assertEqual(self.post('/api/plan', manual_plan())[0], 403)
         for mode in ('reactive', 'baseline', 'test'):
             self.session.mode = mode
             self.assertEqual(self.post('/api/plan', manual_plan())[0], 403)
         self.assertEqual(self.session.starts, 0)
         self.assertEqual(self.session.plans, [])
+
+    def test_restart_stops_the_old_worker_and_rejects_duplicate_or_stale_requests(self):
+        old_id = self.journal.run_id
+        self.journal.emit('dialogue', text='Previous match', role='PYRA')
+
+        def make_session():
+            return SessionProbe(Journal(self.root / 'next'))
+
+        with patch.object(self.server, 'new_session', side_effect=make_session) as factory:
+            self.assertTrue(json.loads(self.get('/api/status')[2])['restart_available'])
+            self.assertEqual(self.post('/api/restart', {'run_id': old_id})[0], 409)
+            self.assertEqual(self.post('/api/start', {'run_id': old_id})[0], 200)
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                responses = list(pool.map(lambda _: self.post('/api/restart', {'run_id': old_id}), range(2)))
+            self.assertCountEqual([code for code, _, _ in responses], [200, 409])
+            factory.assert_called_once_with()
+        self.assertFalse(self.session.worker.is_alive())
+        self.assertEqual(self.session.closes, 1)
+        new_id = json.loads(next(body for code, _, body in responses if code == 200))['run_id']
+        self.assertNotEqual(new_id, old_id)
+        status = json.loads(self.get('/api/status')[2])
+        self.assertEqual((status['run_id'], status['status'], status['token']), (new_id, 'idle', self.server.token))
+        journal = json.loads(self.get('/api/events?after=0')[2])
+        self.assertEqual((journal['run_id'], journal['events']), (new_id, []))
+        self.assertIn('Previous match', (self.journal.out / 'events.jsonl').read_text(encoding='utf-8'))
+        self.assertEqual(self.post('/api/start', {'run_id': old_id})[0], 409)
+        self.assertEqual(self.post('/api/start', {'run_id': new_id})[0], 200)
 
     def test_plan_shape_and_controller_admission_result(self):
         for invalid in ({}, [], manual_plan(extra='field'), manual_plan(role='ECHO'),
@@ -244,7 +277,9 @@ class SpectatorTransportTests(unittest.TestCase):
                       [media, ('Content-Length', '16385')], [media, ('Content-Length', '0')],
                       [media, ('Content-Length', '-2')]):
             with self.subTest(extra=extra):
-                self.assertEqual(self.exchange('POST', '/api/start', [*self.auth, *extra], b'{}')[0], 400)
+                # Invalid headers are rejected before any body is read. Sending
+                # an unsolicited body can turn that immediate close into a TCP reset.
+                self.assertEqual(self.exchange('POST', '/api/start', [*self.auth, *extra])[0], 400)
         for raw in (b'[]', b'invalid', b'{"mode":1,"mode":2}', b'{"x":NaN}', b'{"x":"\xff"}'):
             headers = [*self.auth, media, ('Content-Length', str(len(raw)))]
             self.assertEqual(self.exchange('POST', '/api/plan', headers, raw)[0], 400)

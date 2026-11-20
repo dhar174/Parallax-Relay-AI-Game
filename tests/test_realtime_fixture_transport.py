@@ -57,10 +57,11 @@ class FixtureTransportTests(unittest.IsolatedAsyncioTestCase):
         await self.run_match((0.0, 0.0, 0.0))
 
     async def test_scaled_historical_trace_runs_whole_match(self):
-        delays = historical_delays(scale=0.001)
+        # Keep even the shortest phase above the host clock resolution on Windows.
+        delays = historical_delays(scale=0.01)
         self.assertEqual(len(delays), 3)
         self.assertTrue(all(len(role) == 3 for role in delays))
-        self.assertAlmostEqual(max(max(role) for role in delays), 0.0161724)
+        self.assertAlmostEqual(max(max(role) for role in delays), 0.161724)
         _, phases = await self.run_match(delays)
         self.assertEqual([phase['phase'] for phase in phases[:3]], ['broadcast', 'negotiate', 'commit'])
         self.assertTrue(all(phase['elapsed_seconds'] > 0 for phase in phases))

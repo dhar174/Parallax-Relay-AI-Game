@@ -101,6 +101,12 @@ test('reactive spectator waits for Start and runs multiple real windows', {timeo
   await page.waitForFunction(count => document.querySelectorAll('#transcript [data-seq]').length >= count, beforeReload.length);
   const afterReload = await page.locator('#transcript [data-seq]').evaluateAll(nodes => nodes.map(node => node.dataset.seq));
   assert.deepEqual(afterReload, beforeReload, 'Reload restores each published message once');
+  const finishedRun = await page.locator('#run-id').textContent();
+  await page.getByRole('button', {name: 'Restart Match'}).click();
+  await page.locator('#tick').filter({hasText: /^0$/}).waitFor();
+  assert.notEqual(await page.locator('#run-id').textContent(), finishedRun);
+  assert.equal(await page.locator('#result').isVisible(), false);
+  assert.equal(await page.getByRole('button', {name: 'Start match'}).isEnabled(), true);
 });
 
 for (const [name, viewport, reduced] of [
@@ -195,6 +201,44 @@ for (const jump of [0, 24]) {
     await screenshot(page, `manual-${jump}-result`);
   });
 }
+
+test('restart clears an active manual match and synchronizes another tab', {timeout: 45000}, async t => {
+  const origin = await server(t, 'manual');
+  const page = await pageFor(t, origin, {width: 1280, height: 800});
+  const observer = await page.context().newPage();
+  await observer.goto(origin);
+  await page.getByRole('button', {name: 'Start match'}).click();
+  const spectra = page.locator('[data-editor="SPECTRA"]');
+  const pyra = page.locator('[data-editor="PYRA"]');
+  const flux = page.locator('[data-editor="FLUX"]');
+  await spectra.locator('[data-submit]:enabled').waitFor();
+  const oldRun = await page.locator('#run-id').textContent();
+  await observer.locator('#run-id').filter({hasText: oldRun}).waitFor();
+  await configure(spectra, [{kind:'RUN', direction:1, ticks:42}]);
+  await configure(pyra, [{kind:'VENT'}]);
+  await configure(flux, [{kind:'REROUTE'}]);
+  for (const editor of [spectra, pyra, flux]) await editor.locator('[data-submit]').click();
+  await page.locator('#bridge').filter({hasText: 'Powered'}).waitFor();
+  await observer.locator('#bridge').filter({hasText: 'Powered'}).waitFor();
+  await spectra.locator('[data-submit]:enabled').waitFor();
+  await configure(spectra, [{kind:'RUN', direction:1, ticks:57}, {kind:'WAIT', ticks:1}]);
+  const restart = page.getByRole('button', {name: 'Restart Match'});
+  await restart.focus();
+  await page.keyboard.press('Enter');
+  for (const tab of [page, observer]) {
+    await tab.locator('#phase').filter({hasText: 'Ready to start'}).waitFor();
+    await tab.locator('#bridge').filter({hasText: 'Retracted'}).waitFor();
+    assert.notEqual(await tab.locator('#run-id').textContent(), oldRun);
+    assert.equal(await tab.locator('#tick').textContent(), '0');
+    assert.equal(await tab.locator('#transcript [data-seq], #consequences [data-seq]').count(), 0);
+    assert.equal(tab.url(), origin);
+  }
+  assert.equal(await spectra.locator('[data-kind]').count(), 1);
+  assert.equal(await spectra.locator('[data-kind]').inputValue(), 'WAIT');
+  assert.equal(await spectra.locator('[data-submit]').isEnabled(), false);
+  await page.getByRole('button', {name: 'Start match'}).click();
+  await spectra.locator('[data-submit]:enabled').waitFor();
+});
 
 
 

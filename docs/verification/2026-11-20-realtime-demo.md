@@ -87,3 +87,52 @@ with exit code zero.
 | `python tools/realtime_spectator/pack_art.py --check` | Nine clips, 42 frames, nine GIFs and six contact sheets reproduced |
 | `python -m parallax_relay.realtime --check --profile dev-bridge-live-v1` | Zero provider calls, opening reservation $0.0217970, $0.9782030 remaining estimated headroom |
 | `python scripts/check_committed_diff.py` and `git diff --check origin/main...HEAD` | Committed source diff passed whitespace checks |
+
+## Restart Match follow-up · November 20, 2026
+
+The reactive demo finished at tick 288. Clicking **Restart Match** in the
+browser returned to tick zero on the same URL with a new run ID. The preceding
+recording still replayed to the completed checkpoint. A Chromium regression
+restarted an ongoing manual match after the bridge was powered. Both open tabs
+showed the bridge retracted at tick zero, with the public event lists empty and
+the manual draft cleared. The new match opened fresh manual command slots
+after Start. The interrupted recording replayed to tick 120 with a
+`cancelled` outcome.
+
+All 45 Chromium checks, 77 Node workbench checks and 12 focused loopback tests
+passed. The loopback checks include concurrent restart requests, stale match IDs
+and the live-mode guard. The final Python run completed 496 tests with six
+Windows filesystem-link skips. All matches in these checks were offline.
+
+## Authorized live model run · November 20, 2026
+
+The single Raised Span run used independent `gpt-6-luna` contexts for SPECTRA
+and PYRA, and `gemini-3.5-flash-lite` for FLUX. The four-window, 36-attempt,
+240-second profile used a $1 local estimated spending limit. The live
+spectator opened during the first window. The launcher exited zero with
+`window_limit` at tick 480. Deterministic replay verified all 480 ticks with
+bound run identity.
+
+PYRA vented and FLUX powered the bridge on tick 1. SPECTRA collected the shard
+and unlocked extraction on tick 148. SPECTRA and PYRA reached extraction.
+FLUX finished on the deck below the raised bank, so the team checkpoint
+remained incomplete. The three roles shared each of the four release ticks
+(1, 121, 241 and 361).
+
+| Role | Attempts | Accepted replies | Latency minimum / median / maximum |
+|---|---:|---:|---:|
+| SPECTRA | 12 | 12 | 1.812 / 3.156 / 9.890 s |
+| PYRA | 12 | 12 | 2.016 / 3.071 / 13.344 s |
+| FLUX | 12 | 11 | 0.734 / 1.102 / 1.657 s |
+
+The validator rejected FLUX's fourth-window commitment as an invalid action
+plan. All 36 attempts returned within 15 seconds. Median latency was
+2.593 seconds and elapsed match time was 68.359 seconds. The budget settled
+all 36 attempts, with reported input and output usage for each. The
+$0.0297597 local estimate uses the profile rates and reported usage.
+
+The recorded source revision was `f75b06d` with the Restart Match work
+present as local modifications. This single run demonstrates live provider
+integration and partial team progress on one development room. The published
+evidence consists of aggregate counts, timings and outcomes. Full journals,
+private role data and sensor images remain in the ignored local recording.

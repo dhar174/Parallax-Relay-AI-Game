@@ -42,8 +42,10 @@ shape. Local manual input goes through the real-time validator and scheduler.
 
 The loopback spectator reads committed events through a cursor API and fetches
 role feed PNGs by sampled window. It renders the scene in Canvas and DOM, with
-public dialogue and room events. It is a privileged local view. Its inputs are
-limited to starting an offline match and submitting controls in manual mode.
+public dialogue and room events. It is a privileged local view. The browser can
+start or restart offline matches and submit controls in manual mode. Restart
+replaces the session on the same server after the prior worker stops. Each
+session has its own run ID, recording and manual request slots.
 See the [demo guide](REALTIME_DEMO.md) for the launch commands.
 
 ## One turn

@@ -66,7 +66,13 @@ def _run(out, mode, settings, profile, spectate, latency='demo', run_id=None):
     session = Session(out, mode, settings, profile=profile, latency=latency, run_id=run_id)
     print(f'Recording: {out.resolve()}', flush=True)
     if spectate and mode != 'live':
-        serve(session)
+        def new_session():
+            destination = out.with_name(f'{out.name}-restart-{uuid4().hex[:8]}')
+            replacement = Session(destination, mode, settings, latency=latency)
+            print(f'Recording: {destination.resolve()}', flush=True)
+            return replacement
+
+        serve(session, new_session=new_session)
         return 0
     try:
         if mode == 'live':

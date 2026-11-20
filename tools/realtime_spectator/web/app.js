@@ -17,7 +17,8 @@ const announcementQueue = [];
 const cards = new Map();
 let token = null, runID = '', cursor = 0, mode = '', status = 'idle', phase = '', windowNumber = 0;
 let dialogueTotal = 0, currentGroup = null, speechGroup = '', connected = false, startedHere = false;
-let feedGeneration = 0, feedKey = '', imageURL = '', announcementTimer = 0, startPending = false;
+let feedGeneration = 0, feedKey = '', imageURL = '', announcementTimer = 0;
+let controlPending = '', restartAvailable = false;
 let recordingFailed = false;
 
 function make(tag, parent, text = '') {
@@ -92,11 +93,13 @@ function configure(data) {
 
 function startControl() {
   const start = byId('start');
-  start.disabled = !connected || startPending || status !== 'idle' || mode === 'live';
-  const label = startPending ? 'Starting…' : status === 'ended' ? 'Match ended' : status === 'running' ? 'Match running' :
-    mode === 'live' ? 'Waiting for launcher' : 'Start match';
+  const canStart = status === 'idle' && mode !== 'live';
+  const canRestart = status !== 'idle' && restartAvailable;
+  start.disabled = !connected || Boolean(controlPending) || !(canStart || canRestart);
+  const label = controlPending || (canRestart ? 'Restart Match' : canStart ? 'Start match' :
+    status === 'ended' ? 'Match ended' : status === 'running' ? 'Match running' : 'Waiting for launcher');
   if (start.firstChild.nodeValue !== label + ' ') start.firstChild.nodeValue = label + ' ';
-  start.querySelector('span').hidden = status !== 'idle' || mode === 'live' || startPending;
+  start.querySelector('span').hidden = !canStart || Boolean(controlPending);
 }
 
 function connection(state) {
@@ -387,18 +390,26 @@ function applyPage(page, replay) {
 byId('sensor-select').addEventListener('change', showFeed);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) scene.paint(true); });
 byId('start').addEventListener('click', async () => {
-  if (startPending || status !== 'idle' || !connected) return;
-  startPending = true; startControl();
+  if (byId('start').disabled) return;
+  const restarting = status !== 'idle';
+  controlPending = restarting ? 'Restarting…' : 'Starting…';
+  startControl();
   byId('start-feedback').hidden = true;
   try {
-    await post('/api/start', {});
+    await post(restarting ? '/api/restart' : '/api/start', restartAvailable ? {run_id: runID} : {});
+    if (restarting) {
+      // Reload the room on the same URL so old drafts and in-flight reads are discarded.
+      window.location.reload();
+      return;
+    }
     startedHere = true;
     if (status !== 'ended') status = 'running';
     byId('scene-heading').focus({preventScroll: true});
   } catch (error) {
     setText('start-feedback', error.message);
     byId('start-feedback').hidden = false;
-  } finally { startPending = false; startControl(); }
+  }
+  controlPending = ''; startControl();
 });
 
 let backoff = 90, reconnecting = false, boot = true, rebuilding = false;
@@ -408,11 +419,16 @@ async function poll() {
       const info = await (await request('/api/status')).json();
       if (typeof info.token !== 'string' || !info.token) throw new Error('Session unavailable.');
       token = info.token;
+      restartAvailable = info.restart_available === true;
       if (runID && info.run_id !== runID) { resetPage(); startedHere = false; }
       status = info.status || 'idle'; runID = info.run_id || '';
       configure(info);
     }
     const page = await (await request('/api/events?after=' + cursor)).json();
+    if (runID && typeof page.run_id === 'string' && page.run_id !== runID) {
+      window.location.reload();
+      return;
+    }
     rebuilding ||= Boolean(page.reset) || reconnecting || (boot && status !== 'idle' && !startedHere);
     applyPage(page, rebuilding);
     if (page.has_more) { backoff = 0; return; }
