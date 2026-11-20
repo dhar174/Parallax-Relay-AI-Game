@@ -3,8 +3,11 @@
 import argparse
 import base64
 import json
+from io import BytesIO
 from pathlib import Path
 import sys
+
+from PIL import Image, UnidentifiedImageError
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "site"))
@@ -31,6 +34,27 @@ def main():
             name: "data:image/png;base64," + base64.b64encode((artwork / (name + ".png")).read_bytes()).decode("ascii")
             for name in names
         }
+        # Sheets are optional. A malformed or incomplete set falls back to static art.
+        sheets = artwork / "animations" / "sheets"
+        data["animation_sheets"] = {}
+        for role in ("spectra", "pyra", "flux"):
+            for action, frames in (("idle", 4), ("walk", 6)):
+                path = sheets / f"{role}-{action}.png"
+                if path.is_file():
+                    content = path.read_bytes()
+                    try:
+                        with Image.open(BytesIO(content)) as image:
+                            valid = image.format == "PNG" and image.size == (256 * frames, 256)
+                            image.verify()
+                        if valid:
+                            with Image.open(BytesIO(content)) as image:
+                                image.load()
+                    except (OSError, ValueError, UnidentifiedImageError):
+                        valid = False
+                    if valid:
+                        data["animation_sheets"][f"{role}-{action}"] = (
+                            "data:image/png;base64," + base64.b64encode(content).decode("ascii")
+                        )
         encoded = json.dumps(data, ensure_ascii=True).replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
         template = Path(__file__).with_name("viewer.html").read_text(encoding="utf-8")
         if template.count("__REPLAY_DATA__") != 1:

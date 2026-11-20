@@ -1,0 +1,387 @@
+{
+  "format_version": 1,
+  "path_base": "Paths are relative to this manifest.",
+  "anchor_note": "Nominal bottom-center placement anchor in frame pixels; alpha bounds report actual visible extents and may vary.",
+  "animations": [
+    {
+      "role": "SPECTRA",
+      "action": "idle",
+      "sheet": "sheets/spectra-idle.png",
+      "frames": [
+        "frames/spectra-idle/01.png",
+        "frames/spectra-idle/02.png",
+        "frames/spectra-idle/03.png",
+        "frames/spectra-idle/04.png"
+      ],
+      "frame_size": [
+        256,
+        256
+      ],
+      "frame_count": 4,
+      "fps": 2,
+      "nominal_anchor": [
+        128,
+        239
+      ],
+      "alpha_bounds_xyxy_exclusive": [
+        [
+          66,
+          23,
+          190,
+          239
+        ],
+        [
+          67,
+          25,
+          189,
+          239
+        ],
+        [
+          67,
+          23,
+          189,
+          239
+        ],
+        [
+          66,
+          27,
+          189,
+          239
+        ]
+      ],
+      "raw_generated_output": "generated/spectra-idle-raw.png",
+      "generation_references": [
+        "../spectra-idle.png",
+        "references/spectra-idle-edit-canvas.png"
+      ],
+      "previews": [
+        "previews/spectra-idle.gif",
+        "previews/spectra-idle-contact.png"
+      ]
+    },
+    {
+      "role": "SPECTRA",
+      "action": "walk",
+      "sheet": "sheets/spectra-walk.png",
+      "frames": [
+        "frames/spectra-walk/01.png",
+        "frames/spectra-walk/02.png",
+        "frames/spectra-walk/03.png",
+        "frames/spectra-walk/04.png",
+        "frames/spectra-walk/05.png",
+        "frames/spectra-walk/06.png"
+      ],
+      "frame_size": [
+        256,
+        256
+      ],
+      "frame_count": 6,
+      "fps": 8,
+      "nominal_anchor": [
+        128,
+        239
+      ],
+      "alpha_bounds_xyxy_exclusive": [
+        [
+          65,
+          24,
+          190,
+          239
+        ],
+        [
+          65,
+          23,
+          191,
+          239
+        ],
+        [
+          66,
+          24,
+          189,
+          239
+        ],
+        [
+          71,
+          23,
+          185,
+          239
+        ],
+        [
+          72,
+          23,
+          184,
+          239
+        ],
+        [
+          72,
+          23,
+          184,
+          239
+        ]
+      ],
+      "raw_generated_output": "generated/spectra-walk-raw.png",
+      "generation_references": [
+        "../spectra-idle.png",
+        "references/spectra-walk-edit-canvas.png"
+      ],
+      "previews": [
+        "previews/spectra-walk.gif",
+        "previews/spectra-walk-contact.png"
+      ]
+    },
+    {
+      "role": "PYRA",
+      "action": "idle",
+      "sheet": "sheets/pyra-idle.png",
+      "frames": [
+        "frames/pyra-idle/01.png",
+        "frames/pyra-idle/02.png",
+        "frames/pyra-idle/03.png",
+        "frames/pyra-idle/04.png"
+      ],
+      "frame_size": [
+        256,
+        256
+      ],
+      "frame_count": 4,
+      "fps": 2,
+      "nominal_anchor": [
+        128,
+        239
+      ],
+      "alpha_bounds_xyxy_exclusive": [
+        [
+          49,
+          23,
+          206,
+          239
+        ],
+        [
+          47,
+          23,
+          208,
+          239
+        ],
+        [
+          47,
+          23,
+          208,
+          239
+        ],
+        [
+          47,
+          25,
+          208,
+          239
+        ]
+      ],
+      "raw_generated_output": "generated/pyra-idle-raw.png",
+      "generation_references": [
+        "../pyra-idle.png",
+        "references/pyra-idle-edit-canvas.png"
+      ],
+      "previews": [
+        "previews/pyra-idle.gif",
+        "previews/pyra-idle-contact.png"
+      ]
+    },
+    {
+      "role": "PYRA",
+      "action": "walk",
+      "sheet": "sheets/pyra-walk.png",
+      "frames": [
+        "frames/pyra-walk/01.png",
+        "frames/pyra-walk/02.png",
+        "frames/pyra-walk/03.png",
+        "frames/pyra-walk/04.png",
+        "frames/pyra-walk/05.png",
+        "frames/pyra-walk/06.png"
+      ],
+      "frame_size": [
+        256,
+        256
+      ],
+      "frame_count": 6,
+      "fps": 8,
+      "nominal_anchor": [
+        128,
+        239
+      ],
+      "alpha_bounds_xyxy_exclusive": [
+        [
+          56,
+          24,
+          200,
+          239
+        ],
+        [
+          54,
+          24,
+          202,
+          239
+        ],
+        [
+          57,
+          24,
+          198,
+          239
+        ],
+        [
+          50,
+          23,
+          205,
+          239
+        ],
+        [
+          55,
+          27,
+          200,
+          239
+        ],
+        [
+          54,
+          24,
+          202,
+          239
+        ]
+      ],
+      "raw_generated_output": "generated/pyra-walk-raw.png",
+      "generation_references": [
+        "../pyra-idle.png"
+      ],
+      "previews": [
+        "previews/pyra-walk.gif",
+        "previews/pyra-walk-contact.png"
+      ]
+    },
+    {
+      "role": "FLUX",
+      "action": "idle",
+      "sheet": "sheets/flux-idle.png",
+      "frames": [
+        "frames/flux-idle/01.png",
+        "frames/flux-idle/02.png",
+        "frames/flux-idle/03.png",
+        "frames/flux-idle/04.png"
+      ],
+      "frame_size": [
+        256,
+        256
+      ],
+      "frame_count": 4,
+      "fps": 2,
+      "nominal_anchor": [
+        128,
+        239
+      ],
+      "alpha_bounds_xyxy_exclusive": [
+        [
+          72,
+          24,
+          185,
+          239
+        ],
+        [
+          71,
+          23,
+          184,
+          238
+        ],
+        [
+          71,
+          20,
+          186,
+          238
+        ],
+        [
+          71,
+          25,
+          184,
+          238
+        ]
+      ],
+      "raw_generated_output": "generated/flux-idle-raw.png",
+      "generation_references": [
+        "../flux-idle.png"
+      ],
+      "previews": [
+        "previews/flux-idle.gif",
+        "previews/flux-idle-contact.png"
+      ],
+      "normalized_master_reference": "references/flux-idle-normalized-master.png",
+      "normalization": "RGBA; scale 210/1073; resize full master to rounded dimensions using LANCZOS; alpha-composite at (round(128 - 589.5 * scale), round(236 - 1147 * scale)) on a transparent 256x256 canvas.",
+      "alpha_cleanup": "Removed only 8-connected nonzero-alpha components with maximum alpha 1; retained all other RGBA pixels. FLUX idle frame 01 is unchanged."
+    },
+    {
+      "role": "FLUX",
+      "action": "walk",
+      "sheet": "sheets/flux-walk.png",
+      "frames": [
+        "frames/flux-walk/01.png",
+        "frames/flux-walk/02.png",
+        "frames/flux-walk/03.png",
+        "frames/flux-walk/04.png",
+        "frames/flux-walk/05.png",
+        "frames/flux-walk/06.png"
+      ],
+      "frame_size": [
+        256,
+        256
+      ],
+      "frame_count": 6,
+      "fps": 8,
+      "nominal_anchor": [
+        128,
+        239
+      ],
+      "alpha_bounds_xyxy_exclusive": [
+        [
+          71,
+          24,
+          184,
+          239
+        ],
+        [
+          71,
+          24,
+          184,
+          240
+        ],
+        [
+          71,
+          24,
+          185,
+          241
+        ],
+        [
+          67,
+          24,
+          190,
+          239
+        ],
+        [
+          72,
+          27,
+          185,
+          241
+        ],
+        [
+          71,
+          26,
+          186,
+          239
+        ]
+      ],
+      "raw_generated_output": "generated/flux-walk-raw.png",
+      "generation_references": [
+        "references/flux-walk-selected-flux-master.png",
+        "references/flux-walk-selected-pyra-motion-guide.png"
+      ],
+      "previews": [
+        "previews/flux-walk.gif",
+        "previews/flux-walk-contact.png"
+      ],
+      "alpha_cleanup": "Removed only 8-connected nonzero-alpha components with maximum alpha 1; retained all other RGBA pixels. FLUX idle frame 01 is unchanged."
+    }
+  ]
+}

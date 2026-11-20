@@ -48,6 +48,16 @@ For Split Span recordings with a usable room definition and matching world
 snapshots, the spectator feed shows a light illustrated board reconstructed from
 recorded state. When those inputs are unavailable, it displays the recorded
 spectator PNG. Role feeds continue to display their recorded sensor images.
+When all six optional animation sheets are present, Next animates eligible
+adjacent, complete Split Span checkpoints using recorded positions and results.
+Previous, seeking, incomplete data, and reduced-motion preferences use immediate
+checkpoints. Missing or invalid sheets leave the illustrated board static. The
+sheets are embedded in the standalone export and require no network connection.
+When paths overlap, a temporary role strip shows each robot separately with its
+recorded start and end tiles while the stage remains grounded in the room. Use
+Enlarge board for a horizontally scrollable close-up, including
+in expanded view; focus the board and use the arrow keys to pan, or return to the
+overview with the same button.
 
 ## Focused frontend verification
 

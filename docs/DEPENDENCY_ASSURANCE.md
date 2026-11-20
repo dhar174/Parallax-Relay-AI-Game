@@ -52,6 +52,16 @@ counts as separate vulnerabilities. Complete IDs, aliases, affected ranges,
 dates and source references are in the evidence JSON; advisory projections omit
 long descriptions, while the saved scanner outputs retain their original fields.
 
+### CI artifact action update - November 19, 2026 UTC
+
+The offline workflow later updated upload-artifact from v4.6.2 to the pinned
+v6.0.0 commit `b7c566a772e6b6bfb58ed0dc250532a479d7789f`. The November 16
+audit and license evidence below pertains to v4.6.2; it is not a new audit
+or license review of v6. The [upstream release](https://github.com/actions/upload-artifact/releases/tag/v6.0.0)
+states that v6 uses Node 24 and requires Actions Runner 2.327.1 or newer.
+The workflow uses GitHub-hosted runners; successful execution of this updated
+pin requires verification in a new hosted run.
+
 ## Pillow remediation and applicability
 
 Live [PyPI release metadata](https://pypi.org/pypi/Pillow/json) had no patched
