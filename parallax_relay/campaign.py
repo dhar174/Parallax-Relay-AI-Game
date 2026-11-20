@@ -12,6 +12,7 @@ from decimal import Decimal
 import json
 import os
 import re
+import shutil
 from pathlib import Path
 import sys
 from time import monotonic
@@ -32,6 +33,7 @@ from .money import total as money_total, difference, json_fields, amount
 from .campaign_validation import validate_frozen, utc, equal_money
 from .state import initial_world
 from .rooms import get_room, rooms, catalog_identity
+from .exploratory import is_exploratory, profile_analysis
 
 
 class CampaignError(ValueError):
@@ -57,8 +59,23 @@ def atomic_json(path: Path, value) -> None:
 
 def read_json(path: Path):
     try:
-        return json.loads(path.read_text(encoding='utf-8'),
-                          parse_constant=lambda _: (_ for _ in ()).throw(ValueError()))
+        duplicates = []
+        exploratory_seen = False
+        def object_pairs(pairs):
+            nonlocal exploratory_seen
+            value = {}
+            for key,item in pairs:
+                if key == 'protocol_version' and type(item) is int and item == 3:
+                    exploratory_seen = True
+                if key in value:duplicates.append(key)
+                value[key] = item
+            return value
+        value = json.loads(path.read_text(encoding='utf-8'), object_pairs_hook=object_pairs,
+                           parse_constant=lambda _: (_ for _ in ()).throw(ValueError()))
+        if duplicates and (exploratory_seen or is_exploratory(value) or
+                isinstance(value,dict) and is_exploratory(value.get('spec'))):
+            raise ValueError()
+        return value
     except (OSError, ValueError, RecursionError):
         raise CampaignError('Missing or invalid campaign JSON') from None
 
@@ -68,10 +85,10 @@ def frozen_inputs(spec: CampaignSpec) -> dict:
             'catalog': catalog_identity(),
             'inputs': {room.id: {name: input_identities(initial_world(room.id).snapshot(),
                        trial_settings(spec, {'room':room.id,'condition': name, 'team': 'models' if spec.mode == 'live' else 'wait'}))
-                       for name in spec.conditions} for room in rooms() if spec.protocol_version==2 or room.id=='split_span'},
+                       for name in spec.conditions} for room in rooms() if spec.protocol_version in (2,3) or room.id=='split_span'},
             'provider_contracts': {p.provider: provider_contract(p.provider) for p in spec.roster},
             'sampling': 'provider_default', 'known_model_revisions': None,
-            'analysis': {'version': 2, 'bootstrap_resamples': 10000, 'seed': 0,
+            'analysis': profile_analysis() if is_exploratory(spec) else {'version': 2, 'bootstrap_resamples': 10000, 'seed': 0,
                          'percentile': 'Hyndman-Fan-7', 'prng': 'random.Random',
                          'concurrency': 1, 'primary_contrast': ['full', 'disabled']}}
 
@@ -84,8 +101,10 @@ def validate_pilot_transition(pilot: CampaignSpec, confirmation: CampaignSpec, b
         value['roster']=sorted(value['roster'],key=lambda p:(p['provider'],p['model']))
         value['policies']=sorted(value['policies']);value['conditions']=sorted(value['conditions'])
         return value
-    if (pilot.stage!='pilot' or confirmation.stage!='confirmatory' or pilot.protocol_version!=2 or
-        confirmation.protocol_version!=2 or common(pilot)!=common(confirmation) or before!=after):
+    transition=(pilot.protocol_version,confirmation.protocol_version,confirmation.stage)
+    if (pilot.stage!='pilot' or transition not in ((2,2,'confirmatory'),(3,3,'validation')) or
+        canonical_hash(common(pilot))!=canonical_hash(common(confirmation)) or
+        canonical_hash(before)!=canonical_hash(after)):
         raise CampaignError('Changed frozen inputs, settings or design require a new development pilot')
 
 
@@ -96,16 +115,27 @@ def register(value: dict, out: Path, *, pilot: Path | None = None) -> dict:
                                       frozen['environment']['value']['status'] != 'complete'):
         raise CampaignError('Protocol cohorts require clean source and complete environment identity')
     pilot_record = None
-    if spec.stage == 'confirmatory':
+    if spec.stage in ('confirmatory','validation'):
+        label='Validation' if spec.stage=='validation' else 'Confirmation'
         if pilot is None:
-            raise CampaignError('Confirmation requires a completed pilot registration')
+            raise CampaignError(label+' requires a completed pilot registration')
         from .campaign_analysis import analyze
         pilot_data = read_registration(pilot)
         if pilot_data['schema_version']!=2:raise CampaignError('Confirmation requires a fresh registration and current pilot')
         pilot_report = analyze(pilot)
         if pilot_data['spec']['stage'] != 'pilot' or not pilot_report['cohort_eligible']:
             raise CampaignError('Confirmation requires a completed pilot registration')
-        if spec.protocol_version==2:
+        if is_exploratory(spec):
+            rows=pilot_report.get('trials',[])
+            if (pilot_report.get('completion_status')!='complete' or
+                pilot_report.get('anomalies')!=[] or len(rows)!=len(pilot_data['schedule']) or
+                canonical_hash(pilot_report.get('analysis_source'))!=canonical_hash(pilot_data['frozen']['source']) or
+                any(row.get('cleanup_status')!='ok' or
+                    row.get('stop_reason') not in ('victory','defeat','turn_limit') or
+                    row.get('recording_stop_reason')!=row.get('stop_reason') or
+                    row.get('execution_stop_reason')!=row.get('stop_reason') for row in rows)):
+                raise CampaignError('Validation requires a complete nonbinding exploratory pilot')
+        if spec.protocol_version in (2,3):
             validate_pilot_transition(CampaignSpec.model_validate(pilot_data['spec']),spec,pilot_data['frozen'],frozen)
         elif (pilot_data['spec']['mode'] != spec.mode or pilot_data['spec']['rooms'] != spec.rooms or
                 sorted(pilot_data['spec']['roster'],key=lambda p:(p['provider'],p['model'])) !=
@@ -116,7 +146,7 @@ def register(value: dict, out: Path, *, pilot: Path | None = None) -> dict:
                         'changed_frozen_sections': [k for k in frozen if frozen[k] != pilot_data['frozen'][k]],
                         'match_settings_changed': spec.match.model_dump() != pilot_data['spec']['match']}
     elif pilot is not None:
-        raise CampaignError('Only confirmation can reference a pilot')
+        raise CampaignError('Only confirmation or validation can reference a pilot')
     data = {'schema_version': 2, 'experiment_id': str(uuid4()), 'created_at': now(),
             'spec': spec.model_dump(mode='json'), 'frozen': frozen, 'pilot': pilot_record,
             'schedule': schedule(spec)}
@@ -151,14 +181,14 @@ def validate_registration(data: dict) -> dict:
         if data['schema_version']==2 and data['spec'].get('schema_version')!=2:raise ValueError()
         validate_frozen(data['frozen'],spec,version=data['schema_version'])
         pilot=data['pilot']
-        if spec.stage=='confirmatory':
+        if spec.stage in ('confirmatory','validation'):
             if (not isinstance(pilot,dict) or not isinstance(pilot.get('registration_sha256'),str) or
                 not re.fullmatch(r'[0-9a-f]{64}',pilot['registration_sha256']) or
                 type(pilot.get('match_settings_changed')) is not bool or
                 not isinstance(pilot.get('changed_frozen_sections'),list) or
                 any(key not in data['frozen'] for key in pilot['changed_frozen_sections'])):
                 raise ValueError()
-            if spec.protocol_version==2 and (pilot['match_settings_changed'] or pilot['changed_frozen_sections']):raise ValueError()
+            if spec.protocol_version in (2,3) and (pilot['match_settings_changed'] or pilot['changed_frozen_sections']):raise ValueError()
         elif pilot is not None:raise ValueError()
         actual, expected = data['schedule'], schedule(spec,legacy=data['schema_version']==1)
         if not isinstance(actual, list) or len(actual) != len(expected):
@@ -177,8 +207,9 @@ def validate_registration(data: dict) -> dict:
             if trial['block_id'] in blocks and blocks[trial['block_id']] != group:
                 raise ValueError()
             blocks[trial['block_id']] = group
-            if {k: v for k, v in trial.items() if k not in ('trial_id', 'block_id')} != {
-                    k: v for k, v in template.items() if k not in ('trial_id', 'block_id')}:
+            payload={k:v for k,v in trial.items() if k not in ('trial_id','block_id')}
+            wanted={k:v for k,v in template.items() if k not in ('trial_id','block_id')}
+            if (canonical_hash(payload)!=canonical_hash(wanted) if is_exploratory(spec) else payload!=wanted):
                 raise ValueError()
         if len(blocks) != len(set(blocks.values())):
             raise ValueError()
@@ -277,9 +308,17 @@ async def execute_trial(root: Path, registration: dict, spec: CampaignSpec, tria
     return evidence
 
 
-async def run_campaign(root: Path, *, offline: bool = False, live: bool = False,
-                       environ: dict | None = None) -> None:
-    registration = read_registration(root)
+def _available_disk_bytes(root: Path) -> int:
+    """Check ledger storage and an existing recording destination/mount."""
+    free = shutil.disk_usage(root).free
+    trials = root/'trials'
+    if trials.exists() or trials.is_symlink():
+        free = min(free,shutil.disk_usage(trials).free)
+    return free
+
+
+def _execution_preflight(root: Path, registration: dict, *, offline: bool, live: bool):
+    """Check execution identity and capacity before any credential handling."""
     if registration['schema_version']!=2:
         raise CampaignError('Historical campaigns require a fresh registration for current execution')
     spec = CampaignSpec.model_validate(registration['spec'])
@@ -289,6 +328,15 @@ async def run_campaign(root: Path, *, offline: bool = False, live: bool = False,
     matches = current == registration['frozen']
     if (spec.stage != 'diagnostic' or spec.protocol_version==2) and not matches:
         raise CampaignError('Frozen source/environment/inputs changed; register a new cohort')
+    if is_exploratory(spec) and _available_disk_bytes(root) < 5*1024**3:
+        raise CampaignError('Exploratory execution requires at least 5 GiB free disk before launch')
+    return spec, matches
+
+
+async def run_campaign(root: Path, *, offline: bool = False, live: bool = False,
+                       environ: dict | None = None) -> None:
+    registration = read_registration(root)
+    spec, matches = _execution_preflight(root,registration,offline=offline,live=live)
     selected_env=dict(os.environ if environ is None else environ)
     if live:
         for player in spec.roster:
@@ -333,6 +381,9 @@ async def run_campaign(root: Path, *, offline: bool = False, live: bool = False,
             for trial, (max_calls, max_dollars) in zip(trials, exposure):
                 if last_launch is not None:
                     await asyncio.sleep(max(0, spec.min_trial_interval_seconds - (monotonic() - last_launch)))
+                if is_exploratory(spec) and _available_disk_bytes(root) < 2*1024**3:
+                    stop = 'low_disk_space'
+                    break
                 checked=frozen_inputs(spec) if spec.stage!='diagnostic' or spec.protocol_version==2 else None
                 if checked is not None and checked != registration['frozen']:
                     stop = 'frozen_input_drift'
@@ -422,6 +473,8 @@ def main(argv: list[str] | None = None) -> int:
         elif args.command == 'run':
             registered=read_registration(args.campaign)
             if registered['schema_version']!=2:raise CampaignError('Historical campaigns require a fresh registration for current execution')
+            if is_exploratory(registered['spec']):
+                _execution_preflight(args.campaign,registered,offline=args.offline,live=args.live)
             env = dict(os.environ)
             if args.env_file is not None:
                 if not args.live:

@@ -21,6 +21,7 @@ from .protocol import ROLES
 from .campaign_validation import validate_summary, BUDGET_COUNTS, BUDGET_MONEY, utc, cross_artifacts
 from .policies import policy_identity
 from .money import amount, total as money_total, difference, json_fields
+from .exploratory import is_exploratory, PROFILE_ID
 from uuid import UUID
 
 TRIAL_STOPS = frozenset({'victory', 'defeat', 'turn_limit', 'call_budget', 'spend_budget',
@@ -284,6 +285,14 @@ def _summary(rows: list[dict]) -> dict:
                      'cost_is_estimate_not_billing_guarantee': True})}
 
 
+def _descriptive_summary(rows: list[dict], *, unknown_as_null: bool = False) -> dict:
+    summary = _summary(rows)
+    summary['operational_success'].pop('wilson_95')
+    if unknown_as_null and summary['operational_success']['unknown']:
+        summary['operational_success']['rate'] = None
+    return summary
+
+
 def analyze(root: Path) -> dict:
     registration = read_registration(root)
     spec = CampaignSpec.model_validate(registration['spec'])
@@ -328,7 +337,8 @@ def analyze(root: Path) -> dict:
                             row.get('registration_sha256') != registration['sha256']):
                         raise ValueError()
                     if event == 'campaign_stopped' and row.get('reason') not in (TRIAL_STOPS | {
-                            'completed', 'frozen_input_drift', 'accounting_overrun', 'campaign_call_budget', 'campaign_spend_budget'}):
+                            'completed', 'frozen_input_drift', 'accounting_overrun', 'campaign_call_budget', 'campaign_spend_budget'} |
+                            ({'low_disk_space'} if is_exploratory(spec) else set())):
                         raise ValueError()
                     if event == 'trial_launched':
                         if row['trial_id'] in launched:
@@ -473,7 +483,8 @@ def analyze(root: Path) -> dict:
     for row in rows:
         cells[(row['room'], row['team'], row['assignment_id'], row['condition'])].append(row)
     cell_reports = [{'room': key[0], 'team': key[1], 'assignment_id': key[2], 'condition': key[3],
-                     'deterministic_control': key[1] in ('scripted', 'wait'), **_summary(group)}
+                     'deterministic_control': key[1] in ('scripted', 'wait'),
+                     **(_descriptive_summary(group,unknown_as_null=True) if is_exploratory(spec) else _summary(group))}
                     for key, group in sorted(cells.items())]
     arm_groups = defaultdict(list)
     for cell in cell_reports:
@@ -519,9 +530,7 @@ def analyze(root: Path) -> dict:
             if 'room' in row:row.update(labels(row['room']))
     descriptive={}
     def descriptive_summary(group):
-        summary=_summary(group)
-        summary['operational_success'].pop('wilson_95')
-        return summary
+        return _descriptive_summary(group,unknown_as_null=is_exploratory(spec))
     for dimension in ('family','split'):
         groups=defaultdict(list)
         for row in rows:groups[row[dimension]].append(row)
@@ -532,7 +541,7 @@ def analyze(root: Path) -> dict:
               'registration': registration, 'completion_status': 'complete' if complete else 'incomplete',
               'cohort_eligible': eligible,
               'confirmatory_eligible': bool(spec.stage == 'confirmatory' and inference_eligible),
-              'counts': counts, 'overall': (descriptive_summary(rows) if len({row['room'] for row in rows})>1 else _summary(rows)), 'cells': cell_reports,
+              'counts': counts, 'overall': (descriptive_summary(rows) if is_exploratory(spec) or len({row['room'] for row in rows})>1 else _summary(rows)), 'cells': cell_reports,
               'equal_weight_arm_summaries': equal_weight_arms,
               'overall_interpretation': 'Descriptive accounting across the full schedule; comparisons use room/team/assignment cells and registered equal weights.',
               'contrasts': contrasts, 'trials': rows, 'attempts': attempt_rows,**descriptive,
@@ -567,6 +576,27 @@ def analyze(root: Path) -> dict:
                               'Unsigned files and fingerprints establish consistency, not authenticity.']}
     if not inference_eligible:
         report['limitations'].append('Incomplete or ineligible cohort: report descriptive rates/bounds without confirmatory inference.')
+    if is_exploratory(spec):
+        report.update(analysis_version=3, profile_id=PROFILE_ID,
+                      evidence_class='exploratory', analysis_method='descriptive_per_room',
+                      confirmatory_eligible=False)
+        paired = defaultdict(dict)
+        for cell in cell_reports:
+            if cell['condition'] in ('full','disabled'):
+                paired[(cell['room'],cell['team'])][cell['condition']] = cell
+        report['descriptive_contrasts'] = []
+        for (room,team), arms in sorted(paired.items()):
+            full,disabled = (arms[arm]['operational_success'] for arm in ('full','disabled'))
+            report['descriptive_contrasts'].append({
+                'room':room,'team':team,**labels(room),'contrast':'full-minus-disabled',
+                'full':{'counts':arms['full']['counts'],'operational_success':full},
+                'disabled':{'counts':arms['disabled']['counts'],'operational_success':disabled},
+                'observed_difference': (full['rate']-disabled['rate']
+                    if full['rate'] is not None and disabled['rate'] is not None else None),
+                'all_planned_bounds':[full['all_planned_bounds'][0]-disabled['all_planned_bounds'][1],
+                                      full['all_planned_bounds'][1]-disabled['all_planned_bounds'][0]],
+                'interpretation':'Descriptive finite-schedule difference; bounds reflect missing outcomes, not confidence intervals.'})
+        report['limitations'].append('One assignment per room and one repetition per arm: no within-room role rotation, statistical significance, or confirmatory inference.')
     report['attempt_metrics']['usage_counter_origins'] = dict(Counter(
         key+'/'+entry['state'] for c in attempt_rows for key, entry in (c.get('usage') or {}).get('source_usage', {}).items()))
     return report

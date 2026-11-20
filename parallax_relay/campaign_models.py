@@ -8,9 +8,23 @@ from pydantic import Field, model_validator
 
 from .conditions import CONDITIONS, ConditionName
 from .config import MatchSettings, Rates, Settings
+from .exploratory import GEMINI_ROLE_BY_ROOM, is_exploratory, profile_spec
 from .protocol import ROLES
 from .provenance import canonical_hash
 from .rooms import get_room,rooms as catalog_rooms,catalog_identity,room_hash
+
+
+def _same_profile_types(value, expected):
+    """Reject Python-only coercions such as tuples serialized as JSON arrays."""
+    if type(value) is not type(expected):
+        return False
+    if type(value) is dict:
+        return (value.keys() == expected.keys() and
+                all(_same_profile_types(value[key], expected[key]) for key in expected))
+    if type(value) is list:
+        return (len(value) == len(expected) and
+                all(_same_profile_types(a, b) for a, b in zip(value, expected)))
+    return True
 
 
 class CampaignModel(Settings):
@@ -22,8 +36,8 @@ class CampaignModel(Settings):
 
 class CampaignSpec(Settings):
     schema_version: Literal[2] = 2
-    protocol_version: Literal[1,2] = 2
-    stage: Literal['diagnostic', 'pilot', 'confirmatory'] = 'diagnostic'
+    protocol_version: Literal[1,2,3] = 2
+    stage: Literal['diagnostic', 'pilot', 'confirmatory', 'validation'] = 'diagnostic'
     mode: Literal['offline', 'live'] = 'offline'
     policies: list[Literal['scripted', 'wait', 'uniform']] = Field(default_factory=lambda: ['scripted', 'wait', 'uniform'])
     roster: list[CampaignModel] = Field(default_factory=list)
@@ -50,6 +64,16 @@ class CampaignSpec(Settings):
                 raise ValueError('Legacy specifications require protocol 1')
             value.update(schema_version=2,protocol_version=1)
         if type(value.get('protocol_version',2)) is not int:raise ValueError('Invalid protocol version')
+        if is_exploratory(value):
+            # Compare unnormalized canonical JSON so coercions such as strings,
+            # booleans, or omitted settings cannot alter the approved profile.
+            try:
+                expected = profile_spec(value.get('stage'))
+                matches = (_same_profile_types(value, expected) and
+                           canonical_hash(value) == canonical_hash(expected))
+            except (TypeError, ValueError):
+                matches = False
+            if not matches:raise ValueError('Exploratory profile must match the approved specification')
         if 'rooms' not in value:
             value['rooms']=(['split_span'] if value.get('protocol_version',2)==1 else
                 [r.id for r in catalog_rooms(split='held_out' if value.get('stage')=='confirmatory' else 'development')])
@@ -57,6 +81,8 @@ class CampaignSpec(Settings):
 
     @model_validator(mode='after')
     def coherent_design(self):
+        if self.stage == 'validation' and self.protocol_version != 3:
+            raise ValueError('Validation requires exploratory protocol 3')
         for values in (self.policies, self.rooms, self.conditions):
             if len(set(values)) != len(values):
                 raise ValueError('Duplicate campaign cells')
@@ -90,7 +116,7 @@ class CampaignSpec(Settings):
                 raise ValueError('Protocol cohorts require the prescribed baseline policies')
             if set(self.conditions) != set(CONDITIONS):
                 raise ValueError('Protocol campaigns require all five arms')
-            expected = 5 if self.stage == 'pilot' else 30
+            expected = 1 if self.protocol_version == 3 else (5 if self.stage == 'pilot' else 30)
             if self.repetitions not in (None, expected):
                 raise ValueError('Protocol repetition count is fixed')
         if bool(self.rerun_of) != bool(self.rerun_reason):
@@ -109,7 +135,7 @@ class CampaignSpec(Settings):
 
     @property
     def repeats(self) -> int:
-        return self.repetitions or {'diagnostic': 1, 'pilot': 5, 'confirmatory': 30}[self.stage]
+        return self.repetitions or {'diagnostic': 1, 'pilot': 5, 'confirmatory': 30, 'validation': 1}[self.stage]
 
 
 def assignments(spec: CampaignSpec) -> list[dict]:
@@ -131,7 +157,10 @@ def schedule(spec: CampaignSpec, *, legacy: bool=False) -> list[dict]:
     result = []
     for room in spec.rooms:
         for repetition in range(spec.repeats):
-            block_groups = [g for g in groups if g['team'] in ('models', 'uniform') or repetition == 0]
+            block_groups = [g for g in groups if
+                            (g['team'] in ('models', 'uniform') or repetition == 0) and
+                            (not is_exploratory(spec) or g['team'] != 'models' or
+                             g['players'][GEMINI_ROLE_BY_ROOM[room]]['provider'] == 'gemini')]
             rng.shuffle(block_groups)
             for group in block_groups:
                 block_id = str(uuid4())

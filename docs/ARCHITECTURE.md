@@ -167,7 +167,8 @@ See [campaigns](CAMPAIGNS.md) for the one-shot ownership and recovery limits.
 ## Room execution boundary
 
 Single-match CLI/programmatic runs accept development rooms. Held-out runs require
-a `RoomExecutionPermit` bound to a validated protocol-2 confirmation/trial and the
+a `RoomExecutionPermit` bound to a validated protocol-2 confirmation or protocol-3
+exploratory validation trial and the
 current frozen catalog/inputs. Campaign checks precede client/output construction
 and repeat before each launch. Pure engine/certificate APIs remain trusted host
 functions. See [rooms](ROOMS.md) and [campaigns](CAMPAIGNS.md).

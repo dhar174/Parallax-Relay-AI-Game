@@ -1,4 +1,4 @@
-"""Offline Phase-2 candidate specs and conservative LOCAL reservation worksheet.
+"""Offline campaign candidate specs and conservative LOCAL reservation assessments.
 
 This command cannot register campaigns, construct provider agents, read credentials,
 or execute trials. Its synthetic request envelopes are never player inputs.
@@ -20,7 +20,7 @@ from parallax_relay.budget import Budget
 from parallax_relay.campaign import frozen_inputs
 from parallax_relay.campaign_models import CampaignSpec, assignments, schedule, trial_exposure
 from parallax_relay.conditions import CONDITIONS
-from parallax_relay.config import MatchSettings, Rates
+from parallax_relay.config import GameConfig, MatchSettings, Rates
 from parallax_relay.prompts import SYSTEM_RULES
 from parallax_relay.protocol import (AgentRequest, ChatMessage, Observation, ROLES,
     MAX_MESSAGE_CHARS, MAX_NOTES_CHARS, MAX_REPLY_CHARS, response_schema)
@@ -45,7 +45,10 @@ def read_json(path):
                 raise ValueError('Duplicate JSON object key')
             result[key] = value
         return result
-    return json.loads(path.read_text(encoding='utf-8'), object_pairs_hook=unique_object)
+    def finite_constant(_):
+        raise ValueError('Nonfinite JSON number')
+    return json.loads(path.read_text(encoding='utf-8'), object_pairs_hook=unique_object,
+                      parse_constant=finite_constant)
 
 
 def load_inputs():
@@ -172,7 +175,7 @@ def worksheet(spec, *, openai_input_rate=None):
         'cost_is_estimate_not_billing_guarantee': True, 'phase_quotes': rows}
 
 
-def build_bundle():
+def _build_standard_bundle():
     sources, profile, roster = load_inputs()
     specs, stages = {}, {}
     for stage, turns, repetitions in (('qualification', 2, 1), ('pilot', 12, 5), ('confirmatory', 12, 30)):
@@ -246,20 +249,146 @@ def build_bundle():
     return specs, receipt
 
 
-def write_bundle(out):
-    specs, receipt = build_bundle()
+def _exploratory_inputs():
+    """Check nominal source inputs separately from the profile's safety rates."""
+    sources, smoke, roster = load_inputs()
+    if (type(smoke['schema_version']) is not int or smoke['schema_version'] != 1 or
+            date.fromisoformat(smoke['verified_date']) > date.today()):
+        raise ValueError('Invalid smoke profile verification record')
+    GameConfig.model_validate(smoke['config'], strict=True)
+    common = {'communication_rounds': 2, 'max_attempts': 2,
+        'timeout_seconds': 60.0, 'max_output_tokens': 4096, 'history_turns': 4,
+        'retry_delay_seconds': 0.5, 'max_consecutive_failures': 3, 'image_token_reserve': 8192}
+    if canonical_hash({k: smoke['config']['match'].get(k) for k in common}) != canonical_hash(common):
+        raise ValueError('Smoke profile differs from approved typed common limits')
+    approved = [dict(provider=provider, model=model, api_key_env=key, pricing=pricing)
+        for provider, model, key, pricing in (
+            ('openai', 'gpt-6-luna', 'OPENAI_API_KEY', {'input_per_million': 0.1, 'output_per_million': 0.5}),
+            ('openai', 'gpt-6-luna', 'OPENAI_API_KEY', {'input_per_million': 0.1, 'output_per_million': 0.5}),
+            ('gemini', 'gemini-3.5-flash-lite', 'GEMINI_API_KEY', {'input_per_million': 0.3, 'output_per_million': 2.5}))]
+    if (canonical_hash(roster) != canonical_hash(approved) or
+            canonical_hash(sources['models']['openai/gpt-6-luna']['cache_write_input_per_million']) != canonical_hash(0.125)):
+        raise ValueError('Exploratory source rates or credential binding names changed')
+    return sources, smoke
+
+
+def _envelope_summary(sheet):
+    # Retain the quantified evidence without duplicating thousands of synthetic
+    # phase rows in a candidate receipt. These are bounds, not expected invoices.
+    return {key: value for key, value in sheet.items() if key != 'phase_quotes'}
+
+
+def _build_exploratory_bundle():
+    from parallax_relay.exploratory import PROFILE_ID, GEMINI_ROLE_BY_ROOM, profile_spec, profile_analysis
+    sources, smoke = _exploratory_inputs()
+    specs, stages, frozen_stages = {}, {}, []
+    pilot_spec = None
+    for stage, counts in (('pilot', (60, 15, 45, 10368, 2592, 3.75)),
+                          ('validation', (120, 30, 90, 20736, 5184, 7.5))):
+        spec = CampaignSpec.model_validate(profile_spec(stage), strict=True)
+        value = spec.model_dump(mode='json')
+        trials = schedule(spec)
+        paid = [trial for trial in trials if trial['team'] == 'models']
+        calls = sum(trial_exposure(spec, trial)[0] for trial in trials)
+        paid_calls = sum(trial_exposure(spec, trial)[0] for trial in paid)
+        cap = sum((Decimal(str(trial_exposure(spec, trial)[1])) for trial in paid), Decimal(0))
+        if ((len(trials), len(paid), len(trials) - len(paid), calls, paid_calls, float(cap)) != counts or
+                cap != Decimal(str(spec.campaign_max_estimated_cost_usd)) or
+                spec.match.max_estimated_cost_usd != 0.25):
+            raise ValueError('Exploratory schedule or guard arithmetic differs from approved limits')
+        frozen = frozen_inputs(spec)
+        if (set(frozen['inputs']) != {room.id for room in rooms()} or
+                canonical_hash(frozen['analysis']) != canonical_hash(profile_analysis())):
+            raise ValueError('Exploratory frozen inputs must cover all rooms and descriptive analysis')
+        frozen_stages.append(frozen)
+        specs[stage + '.json'] = value
+        stages[stage] = {'spec_file': stage + '.json', 'spec_sha256': canonical_hash(value),
+            'frozen_inputs_sha256': canonical_hash(frozen), 'trials': len(trials),
+            'model_trials': len(paid), 'baseline_trials': len(trials) - len(paid),
+            'assignments_per_room': 1, 'max_calls': calls, 'max_provider_attempts': paid_calls,
+            'match_estimate_guard_usd': 0.25, 'campaign_estimate_guard_usd': float(cap),
+            'baseline_provider_cost_usd': 0.0}
+        if stage == 'pilot':
+            pilot_spec = spec
+    if canonical_hash(frozen_stages[0]) != canonical_hash(frozen_stages[1]):
+        raise ValueError('Pilot and validation must freeze identical source/environment/inputs')
+    frozen = frozen_stages[0]
+    conservative = _envelope_summary(worksheet(pilot_spec))
+    nominal = _envelope_summary(worksheet(pilot_spec, openai_input_rate=0.1))
+    price_inputs = {'nominal_openai_input_per_million': 0.1,
+        'safety_openai_input_per_million': 0.125, 'openai_output_per_million': 0.5,
+        'gemini_input_per_million': 0.3, 'gemini_output_per_million': 2.5,
+        'runtime_rate_basis': 'All OpenAI input priced at the default 30-minute cache-write rate; Gemini/output rates unchanged.',
+        'actual_cache_activity': 'unknown', 'source_record_uses_nominal_rates': True,
+        'runtime_uses_safety_rates': True}
+    receipt = {'schema_version': 1, 'kind': 'offline_preparation_candidate',
+        'profile_id': PROFILE_ID, 'evidence_class': 'exploratory', 'confirmatory_eligible': False,
+        'spending_authorized': False, 'registration_created': False,
+        'credential_resolution_performed': False, 'provider_clients_constructed': False,
+        'sources': sources, 'source_record_sha256': canonical_hash(sources),
+        'smoke_profile_sha256': canonical_hash(smoke), 'price_inputs': price_inputs,
+        'price_inputs_sha256': canonical_hash(price_inputs),
+        'source': frozen['source'], 'source_sha256': canonical_hash(frozen['source']),
+        'environment': frozen['environment'], 'environment_sha256': frozen['environment']['sha256'],
+        'catalog_sha256': frozen['catalog']['sha256'], 'frozen_inputs_sha256': canonical_hash(frozen),
+        'analysis': profile_analysis(), 'gemini_role_by_room': dict(GEMINI_ROLE_BY_ROOM),
+        'stages': stages,
+        'limits': {'match_guard_usd': 0.25, 'full_five_arm_model_block_guard_usd': 1.25,
+            'new_campaign_guards_usd': 11.25, 'prior_q_allowance_usd': 0.25,
+            'combined_local_guard_allowance_usd': 11.5, 'user_combined_budget_usd': 20.0,
+            'cost_is_estimate_not_billing_guarantee': True},
+        'guard_feasibility': {'match_guard_usd': 0.25,
+            'conservative_envelope': conservative, 'nominal_rate_comparison': nominal,
+            'binding_possible': conservative['retained_quote_bound_usd'] > 0.25,
+            'full_match_completion_demonstrated': False, 'pilot_cap_assessment_required': True,
+            'binding_pilot_guard_blocks_validation': True,
+            'interpretation': 'The fixed .25 local match guard can bind. Synthetic worst-case envelopes do not establish completion. Pilot must assess feasibility without increasing guards or automatically continuing.'},
+        'pricing_limitations': [
+            'Local guards and token quotes are estimates, never provider invoice ceilings or expected invoice claims.',
+            'Safety rates cover the stated all-input-cache-write scenario; actual caching, provider usage, quota and backend revisions remain unknown.'],
+        'superseded_large_proposal': {'status': 'superseded_for_this_profile',
+            'qualification_spec_generated': False, 'formal_confirmatory_spec_generated': False,
+            'historical_configs_changed': False},
+        'operational_planning': {'status': 'not_started', 'time_projection': 'not_started',
+            'storage_projection': 'not_started', 'provider_account_quota': 'unverified',
+            'disk_free_check': 'not_started', 'required_initial_disk_gib': 5,
+            'stop_new_trials_below_disk_gib': 2, 'launch_checkpoint': 'not_started',
+            'heartbeat': 'not_started'},
+        'remaining_gates': [
+            'Freeze and review clean source and complete environment; obtain separate exact pilot spending approval.',
+            'Assess pilot feasibility under the fixed .25 match and 3.75 campaign guards; binding guards prevent validation.',
+            'Only a complete eligible matching pilot permits validation registration and a separate validation spending decision.',
+            'Prior Q evidence is never pooled; this exploratory study cannot close original confirmation acceptance.']}
+    return specs, receipt
+
+
+def build_bundle(profile=None):
+    if profile is None:
+        return _build_standard_bundle()
+    if profile != 'exploratory-under20-v1':
+        raise ValueError('Unknown preparation profile')
+    return _build_exploratory_bundle()
+
+
+def write_bundle(out, profile=None):
+    specs, receipt = build_bundle() if profile is None else build_bundle(profile=profile)
     out.mkdir(parents=True, exist_ok=False)
     for filename, data in {**specs, 'receipt.json': receipt}.items():
         path = out / filename
         path.write_text(json.dumps(data, indent=2, allow_nan=False) + '\n', encoding='utf-8')
         if canonical_hash(read_json(path)) != canonical_hash(data):
             raise ValueError('Candidate write/readback mismatch')
-    check_bundle(out, require_clean=False)
+    if profile is None:
+        check_bundle(out, require_clean=False)
+    else:
+        check_bundle(out, require_clean=False, profile=profile)
     return receipt
 
 
-def check_bundle(bundle, require_clean=False):
-    specs, expected = build_bundle()
+def check_bundle(bundle, require_clean=False, profile=None):
+    specs, expected = build_bundle() if profile is None else build_bundle(profile=profile)
+    if profile is not None and {path.name for path in bundle.iterdir()} != {*specs, 'receipt.json'}:
+        raise ValueError('Exploratory bundle contains unexpected or missing files')
     receipt = read_json(bundle / 'receipt.json')
     if canonical_hash(receipt) != canonical_hash(expected):
         raise ValueError('Receipt differs from current source/environment/inputs or worksheet')
@@ -284,15 +413,24 @@ def main(argv=None):
     check = sub.add_parser('check')
     check.add_argument('--bundle', type=Path, required=True)
     check.add_argument('--require-clean', action='store_true')
+    for command in (prepare, check):
+        command.add_argument('--profile', choices=['exploratory-under20-v1'])
     args = parser.parse_args(argv)
     try:
-        receipt = write_bundle(args.out) if args.command == 'prepare' else check_bundle(args.bundle, args.require_clean)
-        print(json.dumps({'kind': receipt['kind'], 'spending_authorized': False,
+        receipt = (write_bundle(args.out, profile=args.profile) if args.command == 'prepare' else
+                   check_bundle(args.bundle, args.require_clean, profile=args.profile))
+        summary = {'kind': receipt['kind'], 'spending_authorized': False,
             'source': receipt['source'], 'receipt_sha256': canonical_hash(receipt),
-            'guards_usd': {stage: row['campaign_estimate_guard_usd'] for stage, row in receipt['stages'].items()},
-            'nominal_configured_rate_comparison_usd': {
+            'guards_usd': {stage: row['campaign_estimate_guard_usd'] for stage, row in receipt['stages'].items()}}
+        if args.profile is None:
+            summary['nominal_configured_rate_comparison_usd'] = {
                 stage: row['nominal_configured_rate_scenario']['campaign_guard_usd']
-                for stage, row in receipt['stages'].items()}}))
+                for stage, row in receipt['stages'].items()}
+        else:
+            summary.update(profile_id=receipt['profile_id'], evidence_class=receipt['evidence_class'],
+                           combined_local_guard_allowance_usd=receipt['limits']['combined_local_guard_allowance_usd'],
+                           pilot_cap_assessment_required=receipt['guard_feasibility']['pilot_cap_assessment_required'])
+        print(json.dumps(summary))
         return 0
     except (OSError, ValueError, KeyError, TypeError):
         print('Preparation failed: existing destination, invalid/drifted inputs, receipt, or worksheet; inspect offline.', file=sys.stderr)

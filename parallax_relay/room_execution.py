@@ -31,7 +31,8 @@ class RoomExecutionPermit:
         # entry without repeating the launch's Git/package/input scan.
         checked=json.loads(self.checked_inputs_json)
         spec=CampaignSpec.model_validate(registration['spec'])
-        if (registration.get('schema_version')!=2 or spec.protocol_version!=2 or spec.stage!='confirmatory' or
+        if (registration.get('schema_version')!=2 or
+            (spec.protocol_version,spec.stage) not in ((2,'confirmatory'),(3,'validation')) or
             not isinstance(registration.get('pilot'),dict) or not registration['pilot'].get('registration_sha256') or
             registration.get('sha256')!=canonical_hash({k:v for k,v in registration.items() if k!='sha256'}) or
             trial not in registration['schedule'] or trial['room']!=room_id or
@@ -41,4 +42,4 @@ class RoomExecutionPermit:
             registration['frozen']['source']['status']!='clean' or
             registration['frozen']['environment']['value']['status']!='complete' or
             registration['frozen']!=checked):
-            raise ValueError('A held-out room requires a matching registered confirmatory campaign')
+            raise ValueError('A held-out room requires a matching registered confirmatory or validation campaign')

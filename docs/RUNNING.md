@@ -410,7 +410,8 @@ new live campaigns require separate explicit authorization and bounded limits.
 `python -m parallax_relay.play --list-rooms` lists all nine IDs with family/split
 metadata without credentials. Select a development room with `--room dev_01` or
 `[match] room_id = "dev_01"`; the default remains `split_span`. Held-out execution
-requires a protocol-2 registered confirmation through the [campaign CLI](CAMPAIGNS.md).
+requires a registered protocol-2 confirmation or matching protocol-3 exploratory
+validation through the [campaign CLI](CAMPAIGNS.md).
 Single-match `--mock`, `--live` and `--check` reject held-out selection before output
 or credential loading. The workbench selector lists development rooms only.
 New records use native/provenance/request version 3 and embed the actual room
