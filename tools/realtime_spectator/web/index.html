@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#faf5eb">
+  <link rel="icon" href="/favicon.ico">
+  <link rel="stylesheet" href="/style.css">
+  <title>Parallax Relay · Live spectator</title>
+</head>
+<body>
+  <a class="skip" href="#scene-heading">Skip to the room</a>
+  <a class="skip" href="#dialogue-heading">Skip to public dialogue</a>
+  <header class="masthead">
+    <div class="identity"><span class="relay-mark" aria-hidden="true"><i></i><i></i><i></i></span><h1>Parallax Relay</h1><span class="mast-divider"></span><span class="view-name">Live spectator</span></div>
+    <span id="connection" class="connection" role="status">Connecting</span>
+  </header>
+  <main>
+    <section class="room" aria-labelledby="scene-heading">
+      <div class="room-head">
+        <div><p id="source" class="source">Connecting to local match</p><h2 id="scene-heading" tabindex="-1">The Split Span</h2></div>
+        <button id="start" type="button" class="primary" disabled>Start match <span aria-hidden="true">▶</span></button>
+      </div>
+      <p id="start-feedback" class="feedback" role="status" hidden></p>
+      <div class="scene-panel">
+        <div class="scene-tools">
+          <label class="feed-picker"><span class="visually-hidden">Choose view</span>
+            <select id="sensor-select" aria-label="Choose view">
+              <option value="SPECTATOR">Spectator view</option><option value="SPECTRA">SPECTRA · Optical feed</option><option value="PYRA">PYRA · Thermal feed</option><option value="FLUX">FLUX · Circuit feed</option>
+            </select>
+          </label>
+          <div class="scene-actions"><a href="#dialogue-heading" class="jump-link">Dialogue <span aria-hidden="true">↓</span></a><button id="zoom" type="button" aria-pressed="false">Enlarge room</button></div>
+        </div>
+        <div id="stage-scroll" class="stage-scroll" tabindex="0" aria-label="Room overview">
+          <div id="stage" class="stage" role="group" aria-label="Illustrated spectator room" aria-describedby="scene-description">
+            <canvas id="scenery" aria-hidden="true"></canvas>
+            <div id="actors" aria-hidden="true"></div>
+            <div id="bubbles" aria-hidden="true"></div>
+            <span id="await-scene">Waiting for the first world sample</span>
+          </div>
+        </div>
+        <p id="scene-description" class="visually-hidden">The room has not sent a world sample yet.</p>
+        <div id="sensor-view" hidden>
+          <img id="sensor-image" alt="" hidden>
+          <p id="sensor-caption">Waiting for an observation.</p>
+        </div>
+        <section id="mobile-dialogue" aria-label="Latest public speech">
+          <div><strong>Latest public speech</strong><a href="#dialogue-heading">Full transcript ↓</a></div>
+          <p id="latest-speech">Waiting for the first public message.</p>
+        </section>
+        <div class="readout" aria-label="Match status">
+          <div><span class="label">Phase</span><strong id="phase">Ready to start</strong></div>
+          <div><span class="label">Window</span><strong id="window">—</strong></div>
+          <div><span class="label">Sim tick</span><strong id="tick">—</strong></div>
+          <div><span class="label">Bridge</span><strong id="bridge">—</strong></div>
+          <div><span class="label">Exit</span><strong id="exit-state">—</strong></div>
+        </div>
+      </div>
+      <details id="room-guide"><summary>Room layout and robot positions</summary>
+        <dl><dt>Terrain</dt><dd id="terrain-description"></dd>
+        <dt>Landmarks</dt><dd>Motor at column 4, shard at 9, energy cell at 10, exit at 12.</dd>
+        <dt>Team checkpoint</dt><dd id="goal-description"></dd>
+        <dt>Robot positions</dt><dd><ul id="room-positions"><li>Waiting for the first world sample.</li></ul></dd></dl>
+      </details>
+      <p id="result" class="result" role="status" hidden></p>
+    </section>
+    <section class="team-section" aria-labelledby="team-heading">
+      <div class="section-head"><h2 id="team-heading">Relay team</h2><span id="team-caption">Awaiting the match</span></div>
+      <div id="team" class="team"></div>
+      <details id="released-plans" hidden><summary>Released plans</summary><ul></ul></details>
+    </section>
+    <section id="manual" aria-labelledby="manual-heading" hidden>
+      <div class="section-head"><h2 id="manual-heading">Manual controls</h2><span id="limits"></span></div>
+      <p class="manual-help">Build a sequence for each robot. All three sequences start on the same simulation tick.</p>
+      <div id="editors" class="editors"></div>
+    </section>
+    <div class="journal-grid">
+      <section aria-labelledby="dialogue-heading"><div class="section-head"><h2 id="dialogue-heading" tabindex="-1">Public dialogue</h2><span id="dialogue-count"></span></div>
+        <p id="dialogue-empty" class="empty">Released speech will appear here.</p><div id="transcript" class="journal"></div>
+        <p id="announcements" class="visually-hidden" aria-live="polite" aria-atomic="true"></p>
+      </section>
+      <section aria-labelledby="events-heading"><div class="section-head"><h2 id="events-heading">Room events</h2></div>
+        <p id="events-empty" class="empty">Waiting for a change in the room.</p><ol id="consequences" class="journal"></ol>
+      </section>
+    </div>
+    <footer><span id="run-id">Local session</span><span>Journal event <b id="journal-seq">—</b></span></footer>
+  </main>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

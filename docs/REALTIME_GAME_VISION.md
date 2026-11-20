@@ -1,11 +1,9 @@
 # Real-time game vision
 
-**Status: confirmed game direction; implementation to be designed.** This plan
-describes the intended game and next-stage exploration. It does not describe
-implemented mechanics, choose an engine or provider, or authorize live spending.
-The existing turn-based prototype and its evaluation infrastructure remain the
-current, usable baseline; see the
-[README](../README.md), [architecture](ARCHITECTURE.md), and [roadmap](../ROADMAP.md).
+The [real-time engine plan](REALTIME_ENGINE_PLAN.md) scopes a local development
+demo for the confirmed game direction. The [README](../README.md) describes the
+runnable paths. The turn-based prototype and its evaluation infrastructure remain
+the reproducible baseline. Any paid invocation requires separate approval.
 
 ## Intended experience
 
@@ -15,7 +13,8 @@ FLUX explore spaces, use their distinct capabilities and observations, and
 cooperate to overcome obstacles.
 The world should have real physics: robots can move and jump, and jumping,
 landing, collisions, and environmental interactions matter to navigation and
-puzzle solving. The specific physics rules and implementation remain to be designed.
+puzzle solving. The engine plan specifies trial physics rules for one development
+room.
 
 Preserve the approved light visual direction and the three recognizable little
 robot characters as the basis for future graphics. The artwork still needs touch-ups;
@@ -30,22 +29,26 @@ turn private objectives, notes, or role-specific observations into shared data
 unless a role actually discloses them.
 
 The desired rhythm is fairly quick play, with brief thinking and discussion pauses
-followed by real-time action. Whether the simulation pauses during those intervals
-or coordination waits for all robots remains open. Model requests take time, so
-the game must account for decision latency. That constraint does not itself decide
-whether the game is turn-based or whether the world runs or pauses while a model
-is thinking. The intended destination remains
-a real-time experience; its relationship to model decision timing needs deliberate
-design and testing.
+followed by real-time action. Every accepted command sequence in a window starts
+on the same authoritative simulation tick. Replies can arrive at different wall
+times. After the host closes admission and resolves every role's slot, it installs
+the accepted programs and any neutral fallbacks together on the next simulation
+tick. Until then, submitted controls stay sealed.
+
+Whether physics freezes during discussion remains a playtest choice. The trial
+modes freeze physics or continue neutral physics with gravity and collisions.
+Both use one frozen sample per role for the window and one shared start tick.
+Evaluate how each mode affects the rhythm when model replies arrive at different
+times.
 
 ## Baseline and boundaries
 
-Today the Python engine resolves discrete turns after phased communication and
+The turn-based Python engine resolves discrete turns after phased communication and
 sealed commitments. Its nine curated rooms, role-specific PNG/HUD observations,
 offline fixtures, recordings, controls, and campaign infrastructure support the
-existing prototype and its evaluation. They do not implement platformer physics,
-real-time movement, discussion bubbles, or speech. Scripted successes and the
-bounded live smoke are not evidence of full-game model cooperation.
+turn-based prototype and its evaluation. Scripted fixtures verify host behavior.
+The bounded live smoke measured provider request completion on a single baseline
+turn. Full-game model cooperation remains unevaluated.
 
 Preserve the current prototype and its historical evidence as a reproducible
 baseline while exploring the new game. The present player contract uses each
@@ -58,15 +61,15 @@ communication, or replay design must account for these boundaries.
 
 ## Proposed next-stage exploration
 
-These are areas for separately scoped designs and prototypes, not delivered
-milestones or a committed order:
+The engine plan scopes the first development demo. These exploration areas also
+cover future rooms, presentation, and evaluation.
 
 1. Define a small playable space and demonstrate movement, jumping, landing,
    collision, and a cooperative physical puzzle with offline controls. Establish
    observable success and failure cases for physics and interaction.
 2. Explore how model decisions connect to movement and communication, including
-   responsiveness under delayed, missing, invalid, or stale replies. Compare timing
-   options before selecting a coordination contract.
+   responsiveness under delayed, missing, invalid, or stale replies. Compare clock
+   modes and action budgets while preserving the shared start tick.
 3. Design role-specific observations and public communication for the new world,
    preserving the current image-based interface until a separate decision changes
    it. If model-facing sensor images change later, compare old and new versions in
@@ -86,19 +89,15 @@ milestones or a committed order:
 
 ## Decisions still open
 
-- Does the simulation continue, pause, or use another approach while a model
-  request is pending? How does the choice affect fairness, responsiveness, and
-  the experience of real-time play?
-- When are observations sampled and decisions requested? How are different
-  response times, synchronization, retries, timeouts, and stale replies handled?
-- How long does a selected action persist, and what happens when a robot has no
-  fresh action? How do simultaneous actions and physical interactions resolve?
-- What are the physics rules, world representation, rendering technology, and
-  execution architecture? Which parts of the existing engine can be reused?
+- Which discussion clock mode best serves fairness, responsiveness, and the
+  experience of real-time play?
+- Which window lengths, action budgets, and timeouts work across measured model
+  delays and development scenarios?
+- Which trial physics and interaction rules should carry over to future rooms?
 - How do bubbles and eventual speech represent public messages, handle timing and
   accessibility, and avoid exposing private information? What recordings are needed?
 - How should real-time experiments be evaluated and compared while preserving the
   existing turn-based controls and the development/held-out distinction?
 
-These questions need design and evidence; no specific game engine, voice service,
-provider latency, or release date is selected here.
+The engine plan selects trial implementation settings. Voice production, measured
+real-time provider latency, and a release date remain open.

@@ -23,6 +23,29 @@ remains independent of the provider adapters.
 
 All module names above are relative to `parallax_relay/`.
 
+## Real-time development room
+
+The `parallax_relay.realtime` package owns a separate fixed-step development
+room. Its Python physics solver applies inputs, handles contacts and recovery,
+and evaluates completion. The host paces the default 60 Hz simulation and owns
+the window clock. At each window it samples all three role observations at one
+tick, coordinates the phases and installs the sealed team programs on one shared
+start tick. The default discussion clock freezes physics. The offline
+comparison clock advances neutral physics while keeping the sample fixed and
+submitted plans sealed. The renderer displays committed poses and events.
+Browser frame timing cannot affect physics.
+
+The real-time observation projection reuses the baseline PNG renderer. It gives
+each player its own horizontal schematic and a versioned physics HUD. The
+provider adapters use the selected request contract for instructions and output
+shape. Local manual input goes through the real-time validator and scheduler.
+
+The loopback spectator reads committed events through a cursor API and fetches
+role feed PNGs by sampled window. It renders the scene in Canvas and DOM, with
+public dialogue and room events. It is a privileged local view. Its inputs are
+limited to starting an offline match and submitting controls in manual mode.
+See the [demo guide](REALTIME_DEMO.md) for the launch commands.
+
 ## One turn
 
 ```mermaid

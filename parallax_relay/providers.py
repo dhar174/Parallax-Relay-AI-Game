@@ -33,6 +33,14 @@ def provider_contract(provider: str) -> dict | None:
             'version_header': ANTHROPIC_API_VERSION if provider == 'anthropic' else None}
 
 
+def request_contract(request: AgentRequest) -> tuple[str, dict]:
+    """Select the host request's instructions and reply schema for wire and budget."""
+    override = getattr(request, 'wire_contract', None)
+    if override is None:
+        return SYSTEM_RULES, response_schema(request.phase)
+    return override()
+
+
 class ProviderError(RuntimeError):
     def __init__(self, code: str, retryable: bool, status_code: int | None = None, retry_after: float = 0):
         self.code = code if isinstance(code, str) and re.fullmatch(r'[a-z_]{1,48}', code) else 'provider_error'
@@ -185,12 +193,13 @@ class HTTPAgent:
 
     def _wire_request(self, request: AgentRequest) -> tuple[str, dict, dict]:
         png = base64.b64encode(request.observation.image_png).decode('ascii') if request.include_image else ''
-        text, schema = request.prompt_text(), response_schema(request.phase)
+        instructions, schema = request_contract(request)
+        text = request.prompt_text()
         headers = {'content-type': 'application/json'}
         if self.provider == 'openai':
             headers['authorization'] = 'Bearer ' + self._key
             body = {
-                'model': self.model, 'instructions': SYSTEM_RULES, 'store': False,
+                'model': self.model, 'instructions': instructions, 'store': False,
                 'max_output_tokens': request.max_output_tokens,
                 'input': [{'role': 'user', 'content': [
                     {'type': 'input_image', 'image_url': 'data:image/png;base64,' + png, 'detail': 'high'},
@@ -202,7 +211,7 @@ class HTTPAgent:
         elif self.provider == 'anthropic':
             headers.update({'x-api-key': self._key, 'anthropic-version': ANTHROPIC_API_VERSION})
             body = {
-                'model': self.model, 'system': SYSTEM_RULES, 'max_tokens': request.max_output_tokens,
+                'model': self.model, 'system': instructions, 'max_tokens': request.max_output_tokens,
                 'messages': [{'role': 'user', 'content': [
                     {'type': 'image', 'source': {'type': 'base64', 'media_type': 'image/png', 'data': png}},
                     {'type': 'text', 'text': text},
@@ -212,7 +221,7 @@ class HTTPAgent:
         else:
             headers['x-goog-api-key'] = self._key  # Never in a query-string URL/log.
             body = {
-                'systemInstruction': {'parts': [{'text': SYSTEM_RULES}]},
+                'systemInstruction': {'parts': [{'text': instructions}]},
                 'contents': [{'role': 'user', 'parts': [
                     {'inlineData': {'mimeType': 'image/png', 'data': png}}, {'text': text},
                 ]}],

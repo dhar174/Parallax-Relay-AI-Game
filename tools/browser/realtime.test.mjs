@@ -1,0 +1,233 @@
+import assert from 'node:assert/strict';
+import { spawn } from 'node:child_process';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { after, before, test } from 'node:test';
+import { root, python, results } from './helpers.mjs';
+
+process.env.PLAYWRIGHT_BROWSERS_PATH = '0';
+const { chromium } = await import('playwright');
+const output = join(results, 'realtime');
+let browser;
+before(async () => { await mkdir(output, {recursive: true}); browser = await chromium.launch({headless: true}); });
+after(async () => { if (browser) await browser.close(); });
+
+async function server(t, mode) {
+  const child = spawn(python, ['-m', 'parallax_relay.realtime', '--offline', mode, '--spectate'],
+    {cwd: root, stdio: ['ignore', 'pipe', 'pipe']});
+  let stdout = '', stderr = '';
+  child.stdout.on('data', chunk => { stdout += chunk; });
+  child.stderr.on('data', chunk => { stderr += chunk; });
+  t.after(async () => {
+    await Promise.all(browser.contexts().map(context => context.close()));
+    if (child.exitCode === null && child.signalCode === null) {
+      child.kill();
+      await new Promise(resolve => child.once('exit', resolve));
+    }
+    assert.equal(stderr, '', `Server stderr: ${stderr}`);
+  });
+  return await new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(Error(`Server startup timeout: ${stdout}\n${stderr}`)), 20000);
+    child.once('error', error => {clearTimeout(timer); reject(error);});
+    child.once('exit', code => {clearTimeout(timer); reject(Error(`Server exited ${code}: ${stdout}\n${stderr}`));});
+    child.stdout.on('data', () => {
+      const match = stdout.match(/http:\/\/127\.0\.0\.1:\d+\//);
+      if (match) {clearTimeout(timer); resolve(match[0]);}
+    });
+  });
+}
+
+async function pageFor(t, origin, viewport, reducedMotion = 'no-preference') {
+  const context = await browser.newContext({viewport, reducedMotion, serviceWorkers: 'block'});
+  const errors = [], external = [];
+  await context.route('**/*', route => {
+    if (new URL(route.request().url()).origin === new URL(origin).origin) return route.continue();
+    external.push(route.request().url()); return route.abort();
+  });
+  const page = await context.newPage();
+  page.setDefaultTimeout(10000);
+  page.on('pageerror', error => errors.push(String(error)));
+  page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
+  page.on('requestfailed', request => errors.push(`${request.url()}: ${request.failure()?.errorText}`));
+  page.on('response', response => {if (response.status() >= 400) errors.push(`${response.url()}: ${response.status()}`);});
+  t.after(async () => { await context.close(); assert.deepEqual(external, []); assert.deepEqual(errors, []); });
+  await page.goto(origin);
+  return page;
+}
+
+async function screenshot(page, name) {
+  const size = await page.evaluate(() => ({viewport: innerWidth, document: document.documentElement.scrollWidth}));
+  assert.ok(size.document <= size.viewport + 1, `Horizontal overflow: ${JSON.stringify(size)}`);
+  const proof = {'manual-0-ready':'discussion-ready', 'reactive-airborne':'jump', 'reactive-complete':'extraction', 'mobile':'mobile', 'manual-0-result':'failed-contact'}[name];
+  if (proof && (!process.env.PROOF_FAILURE_ONLY || proof === 'failed-contact')) {
+    const directory = join(root, 'runs/visual-proof');
+    await mkdir(directory, {recursive:true});
+    await page.screenshot({path:join(directory, `${proof}.png`)});
+    const metadata = await page.evaluate(() => Object.fromEntries(['run-id','journal-seq','window','tick','phase'].map(id => [id, document.getElementById(id)?.textContent])));
+    await writeFile(join(directory, `${proof}.json`), JSON.stringify(metadata, null, 2));
+  }
+  await page.screenshot({path: join(output, `${name}.png`), fullPage: true});
+  const receipt = await page.evaluate(() => Object.fromEntries(['run-id','journal-seq','window','tick','phase'].map(id => [id, document.getElementById(id)?.textContent])));
+  await writeFile(join(output, `${name}.json`), JSON.stringify(receipt, null, 2));
+}
+
+test('reactive spectator waits for Start and runs multiple real windows', {timeout: 90000}, async t => {
+  const origin = await server(t, 'reactive');
+  const page = await pageFor(t, origin, {width: 1280, height: 800});
+  await page.locator('#connection').filter({hasText: /connected/i}).waitFor();
+  await page.locator('#start').waitFor();
+  const initial = await page.locator('#tick').textContent();
+  await page.waitForTimeout(500);
+  assert.equal(await page.locator('#tick').textContent(), initial, 'No simulation before Start');
+  await screenshot(page, 'reactive-before-start');
+  await page.locator('#start').click();
+  await page.waitForFunction(() => Number(document.querySelector('#window').textContent.match(/\d+/)?.[0] || 0) >= 2, null, {timeout: 60000});
+  assert.ok(await page.locator('#transcript [data-seq]').count() > 0, 'Public dialogue is visible');
+  assert.ok(await page.locator('#consequences [data-seq]').count() > 0, 'Real consequences are visible');
+  await screenshot(page, 'reactive-window-2');
+  await page.locator('[data-robot][data-authoritative-pose=ascent], [data-robot][data-authoritative-pose=descent]').first().waitFor({state:'attached', timeout:30000});
+  await screenshot(page, 'reactive-airborne');
+  await page.locator('#sensor-select').selectOption('SPECTRA');
+  await page.locator('#sensor-image:visible').waitFor();
+  await page.locator('#sensor-image').evaluate(image => image.decode());
+  assert.ok(await page.locator('#sensor-image').evaluate(image => image.naturalWidth > 0));
+  await page.locator('#result:visible').waitFor({timeout: 30000});
+  const journal = await events(page);
+  assert.ok(journal.some(event => event.kind === 'consequence' && event.event_kind === 'completed'), 'Actual team checkpoint');
+  await page.locator('#sensor-select').selectOption('SPECTATOR');
+  await screenshot(page, 'reactive-complete');
+  const beforeReload = await page.locator('#transcript [data-seq]').evaluateAll(nodes => nodes.map(node => node.dataset.seq));
+  await page.reload();
+  await page.waitForFunction(count => document.querySelectorAll('#transcript [data-seq]').length >= count, beforeReload.length);
+  const afterReload = await page.locator('#transcript [data-seq]').evaluateAll(nodes => nodes.map(node => node.dataset.seq));
+  assert.deepEqual(afterReload, beforeReload, 'Reload restores each published message once');
+});
+
+for (const [name, viewport, reduced] of [
+  ['mobile', {width: 390, height: 844}, 'no-preference'],
+  ['narrow-reduced', {width: 320, height: 844}, 'reduce'],
+]) {
+  test(`spectator reflows: ${name}`, {timeout: 45000}, async t => {
+    const origin = await server(t, 'reactive');
+    const page = await pageFor(t, origin, viewport, reduced);
+    await page.locator('#connection').filter({hasText: /connected/i}).waitFor();
+    await page.locator('#start').focus();
+    assert.equal(await page.locator('#start').evaluate(el => el === document.activeElement), true);
+    await page.keyboard.press('Enter');
+    await page.locator('#transcript [data-seq]').first().waitFor();
+    await screenshot(page, name);
+  });
+}
+
+async function events(page) {
+  return page.evaluate(async () => {
+    const status = await (await fetch('/api/status')).json();
+    const all = []; let cursor = 0, batch;
+    do {
+      const response = await fetch('/api/events?after=' + cursor, {headers: {'X-Relay-Token': status.token}});
+      if (!response.ok) throw Error('Event journal HTTP ' + response.status);
+      batch = await response.json(); all.push(...batch.events); cursor = batch.cursor;
+    } while (batch.has_more);
+    return all;
+  });
+}
+
+async function configure(editor, commands) {
+  while (await editor.locator('[data-kind]').count() > 1) await editor.locator('[data-remove]').last().click();
+  for (let index = 0; index < commands.length; index++) {
+    if (index) await editor.locator('[data-add]').click();
+    const command = commands[index];
+    await editor.locator('[data-kind]').nth(index).selectOption(command.kind);
+    if (command.direction != null) await editor.locator('[data-direction]').nth(index).selectOption(String(command.direction));
+    if (command.ticks != null) await editor.locator('[data-ticks]').nth(index).fill(String(command.ticks));
+    if (command.jump != null) await editor.locator('[data-jump]').nth(index).fill(String(command.jump));
+  }
+}
+
+for (const jump of [0, 24]) {
+  test(`manual controlled jump offset ${jump}`, {timeout: 90000}, async t => {
+    const origin = await server(t, 'manual');
+    const page = await pageFor(t, origin, {width: 1280, height: 800});
+    await page.locator('#connection').filter({hasText: /^Connected$/}).waitFor();
+    await page.locator('#start').click();
+    const editor = role => page.locator(`[data-editor="${role}"]`);
+    for (const role of ['SPECTRA', 'PYRA', 'FLUX']) await editor(role).locator('[data-submit]:enabled').waitFor();
+    await configure(editor('SPECTRA'), [{kind:'RUN', direction:1, ticks:48}]);
+    await configure(editor('PYRA'), [{kind:'VENT'}, {kind:'RUN', direction:1, ticks:32}]);
+    await configure(editor('FLUX'), [{kind:'REROUTE'}, {kind:'RUN', direction:1, ticks:48}]);
+    const tickBefore = await page.locator('#tick').textContent();
+    const positionsBefore = await page.locator('[data-robot]').evaluateAll(nodes => nodes.map(n => [n.dataset.robot, n.dataset.x, n.dataset.y]));
+    await editor('SPECTRA').locator('[data-submit]').focus();
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(300);
+    await editor('FLUX').locator('[data-submit]').click();
+    await page.waitForTimeout(500);
+    assert.equal(await page.locator('#tick').textContent(), tickBefore, 'No early tick before third role');
+    assert.deepEqual(await page.locator('[data-robot]').evaluateAll(nodes => nodes.map(n => [n.dataset.robot, n.dataset.x, n.dataset.y])), positionsBefore, 'No early motion');
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await screenshot(page, `manual-${jump}-ready`);
+    await editor('PYRA').locator('[data-submit]').click();
+    await page.waitForFunction(() => Number(document.querySelector('#window').textContent.match(/\d+/)?.[0] || 0) >= 2, null, {timeout:30000});
+    for (const role of ['SPECTRA', 'PYRA', 'FLUX']) await editor(role).locator('[data-submit]:enabled').waitFor();
+    await configure(editor('SPECTRA'), [{kind:'RUN', direction:1, ticks:60, jump}]);
+    await configure(editor('PYRA'), [{kind:'WAIT', ticks:1}]);
+    await configure(editor('FLUX'), [{kind:'WAIT', ticks:1}]);
+    if (jump === 0) {
+      await editor('SPECTRA').locator('[data-jump]').fill('60');
+      await editor('SPECTRA').locator('[data-submit]').click();
+      assert.match(await editor('SPECTRA').locator('[data-feedback]').textContent(), /jump offset/i);
+      await editor('SPECTRA').locator('[data-jump]').fill('0');
+    }
+    for (const role of ['SPECTRA', 'PYRA', 'FLUX']) await editor(role).locator('[data-submit]').click();
+    await page.waitForFunction(() => Number(document.querySelector('#tick').textContent.match(/\d+/)?.[0] || 0) >= 240, null, {timeout:30000});
+    const journal = await events(page);
+    const starts = journal.filter(e => e.kind === 'window_started');
+    assert.ok(starts.length >= 2);
+    for (const start of starts.slice(0,2)) assert.deepEqual(Object.values(start.starts), [start.tick, start.tick, start.tick]);
+    const contacts = journal.filter(e => e.kind === 'consequence' && e.role === 'SPECTRA' && e.window === 2);
+    assert.ok(contacts.some(e => e.event_kind === 'takeoff'));
+    assert.ok(contacts.some(e => e.event_kind === (jump === 0 ? 'side_contact' : 'landing')));
+    if (jump === 24) assert.ok(contacts.some(e => e.event_kind === 'landing' && e.y === 128), JSON.stringify(contacts));
+    else assert.ok(contacts.some(e => e.event_kind === 'side_contact'), JSON.stringify(contacts));
+    assert.ok(journal.some(e => e.kind === 'consequence' && e.event_kind === 'rerouted'));
+    assert.ok(journal.some(e => e.kind === 'dialogue'));
+    if (jump === 0) await page.locator('#consequences').scrollIntoViewIfNeeded();
+    await screenshot(page, `manual-${jump}-result`);
+  });
+}
+
+
+
+
+test('baseline launcher waits for Start and publishes a real fixture resolution', {timeout:60000}, async t => {
+  const origin = await server(t, 'baseline');
+  const page = await pageFor(t, origin, {width:1280, height:800});
+  await page.locator('#connection').filter({hasText: /^Connected$/}).waitFor();
+  const before = await events(page);
+  await page.waitForTimeout(500);
+  assert.equal((await events(page)).filter(event => event.kind === 'window_started').length, 0);
+  assert.ok(before.every(event => event.tick === 0));
+  await page.locator('#start').click();
+  await page.waitForFunction(() => document.querySelectorAll('#transcript [data-seq]').length > 0, null, {timeout:30000});
+  await page.locator('#consequences [data-seq]').first().waitFor({timeout:30000});
+  await screenshot(page, 'baseline-live');
+});
+
+
+test('hostile public speech stays inert text', {timeout:45000}, async t => {
+  const origin = await server(t, 'reactive');
+  const page = await pageFor(t, origin, {width:1280, height:800});
+  const hostile = '<img src=x onerror="window.__speechExecuted=1">';
+  await page.route('**/api/events?after=*', async route => {
+    const response = await route.fetch();
+    const body = await response.json();
+    for (const event of body.events) if (event.kind === 'dialogue' && event.role === 'SPECTRA') event.text = hostile;
+    await route.fulfill({response, json:body});
+  });
+  await page.locator('#connection').filter({hasText: /^Connected$/}).waitFor();
+  await page.locator('#start').click();
+  await page.locator('#transcript [data-role="SPECTRA"] p').filter({hasText:hostile}).first().waitFor();
+  assert.equal(await page.locator('#transcript img').count(), 0);
+  assert.equal(await page.evaluate(() => window.__speechExecuted), undefined);
+  await page.unrouteAll({behavior:'wait'});
+});

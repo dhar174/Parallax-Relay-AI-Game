@@ -1,0 +1,10 @@
+{
+  "name": "dev-bridge-live-v1",
+  "prices_verified_date": "2026-11-20",
+  "settings": {},
+  "players": {
+    "SPECTRA": {"provider": "openai", "model": "gpt-6-luna", "api_key_env": "OPENAI_API_KEY", "pricing": {"input_per_million": 0.1, "output_per_million": 0.5}, "model_url": "https://developers.openai.com/api/docs/models/gpt-6-luna.md", "pricing_url": "https://developers.openai.com/api/docs/pricing.md"},
+    "PYRA": {"provider": "openai", "model": "gpt-6-luna", "api_key_env": "OPENAI_API_KEY", "pricing": {"input_per_million": 0.1, "output_per_million": 0.5}, "model_url": "https://developers.openai.com/api/docs/models/gpt-6-luna.md", "pricing_url": "https://developers.openai.com/api/docs/pricing.md"},
+    "FLUX": {"provider": "gemini", "model": "gemini-3.5-flash-lite", "api_key_env": "GEMINI_API_KEY", "pricing": {"input_per_million": 0.3, "output_per_million": 2.5}, "model_url": "https://aistudio.google.com/docs/models/gemini-3.5-flash-lite", "pricing_url": "https://aistudio.google.com/docs/pricing#gemini-3.5-flash-lite"}
+  }
+}

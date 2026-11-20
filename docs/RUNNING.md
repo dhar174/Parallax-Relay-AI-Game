@@ -11,6 +11,19 @@ the configured CI matrix from actual verification evidence. Run
 `python scripts/check_mock_runs.py` to assert both scripted victories using
 temporary output directories; it returns 1 on a failed CLI or unexpected result.
 
+## Real-time development demo
+
+Use the [real-time demo guide](REALTIME_DEMO.md) for the loopback spectator,
+manual and reactive controls, and record verification. To inspect the proposed
+paid run configuration locally, use:
+
+```bash
+python -m parallax_relay.realtime --profile dev-bridge-live-v1 --check
+```
+
+The check requires no credentials and makes no provider requests. A paid run
+requires separate explicit authorization for the roster and effective limits.
+
 ## Offline modes
 
 ```bash

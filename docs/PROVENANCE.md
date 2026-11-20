@@ -5,6 +5,46 @@ records retain their compatible field structure; room snapshots carry room ID/ve
 and canonical per-controller/bridge/cell state. Provenance is spectator information:
 it includes room/objective identities and never belongs in a player request.
 
+## Real-time development records
+
+The real-time launcher writes a versioned local journal with its own run ID and
+monotonic event sequence. `events.jsonl` contains the spectator projection,
+including dialogue, phase transitions and committed simulation samples.
+`feeds/` contains the PNGs sampled for each role and window.
+`private.jsonl` holds the effective settings, room and contract identities,
+host-assigned input sources, and private role and accounting records.
+`simulation.jsonl` holds the accepted schedule and state hashes for deterministic
+replay. `result.json` reports the final stop reason and completion state.
+
+Run `python -m parallax_relay.realtime --verify-record PATH` with the physics run
+directory. The verifier replays consecutive ticks from the initial world and
+checks reconstructed state hashes and the finish marker. Incomplete or
+mismatched simulation records fail verification. A coherent finished recording
+can represent a gameplay failure or an operational stop. Check the outcome and
+stop reason in the recording.
+
+Version 2 binds each physics and private journal row to the run UUID in the
+manifest. The verifier checks the UUID on the terminal result when present.
+It reports `identity_status=bound` for matching v2 records. The first development
+format can still replay its physics, with `identity_status=unknown`. A dirty
+source marker identifies the checkout revision only. A clean local commit
+provides a reproducible source revision for a later demonstration.
+
+Each private `attempt_started` durably records its host-issued ID and quote
+before dispatch. A corresponding private `attempt` settles it. When the
+supervised launcher is interrupted or hits its wall deadline, the parent
+writes a sibling `*.supervision-<run-id>.json` receipt. It reports the last
+contiguous journaled tick and outstanding quotes from its own run. Partial
+records can leave the total unknown. A complete replay performs the physics
+verification separately. An output failure can leave a completed gameplay
+checkpoint with a final lifecycle stop of `local_error`.
+
+Keep complete recordings and role feeds local. The browser's spectator journal
+and player requests use their respective projections. See
+[real-time demo and recording verification](REALTIME_DEMO.md).
+
+The remaining sections apply to the turn-based manifest and replay format.
+
 ## Identity and effective configuration
 
 | Field | Meaning |

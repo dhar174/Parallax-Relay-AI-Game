@@ -146,15 +146,17 @@ set and evidence; incompatible objectives require an explicit scoring design.
 in merged PRs #43/#44, with [current verification and limits](docs/verification/2026-11-17-reviewed-stack-and-q.md).
 This completes Phase 1 of the
 [completion plan](docs/superpowers/plans/2026-11-16-four-phase-completion.md).
-Parent #12's acceptance criteria are satisfied. The real-time game is the intended
-next direction; its mechanics and implementation are not delivered by this milestone.
-Other optional expansion below remains deferred.
+Parent #12's acceptance criteria are satisfied. The
+[real-time engine plan](docs/REALTIME_ENGINE_PLAN.md) scopes a separate local demo
+with one development room, shared command start ticks, and a loopback spectator.
+See the [demo guide](docs/REALTIME_DEMO.md) for the runnable paths.
 
 Preserve replay accessibility and unfinished-run inspection with reproducible
-browser regressions. The [real-time game vision](docs/REALTIME_GAME_VISION.md)
-includes a live spectator experience; its implementation needs a separately scoped
-proposal. Additional roles including ECHO and deployment remain optional, and
-likewise require proposals addressing reproducibility and information boundaries.
+browser regressions. Future work in the
+[real-time game vision](docs/REALTIME_GAME_VISION.md) includes playtesting the
+discussion clock, additional rooms, speech, and a separate evaluation design.
+Additional roles including ECHO and deployment remain proposals that need to
+address reproducibility and information boundaries.
 
 **Completion gate for starting a proposal:** describe the intended user, concrete
 problem, maintenance cost, security boundary changes, and success criteria. The
