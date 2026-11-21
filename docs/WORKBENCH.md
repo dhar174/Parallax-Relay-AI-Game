@@ -2,6 +2,11 @@
 
 The [private workbench](https://parallax-relay-lab.dhar174.chatgpt.site) is the browser interface for development-room experiments. Build it from the same checkout as the engine so that its configuration form, offline runner and replay viewer track repository changes. There are three active roles in Milestone 2. See [the player protocol](PROTOCOL.md) and [the running guide](RUNNING.md) for the game and CLI contracts.
 
+The workbench and its mock companion use the turn-based CLI and native replay
+format. Launch the [real-time demo](REALTIME_DEMO.md) for the loopback physics
+spectator, sampled role feeds, and manual sequence editor. Its local journal is
+read by the real-time verifier.
+
 ## Build and run locally
 
 Activate the repository's Python environment using [the dependency setup](../CONTRIBUTING.md#environment). From the repository root, run:

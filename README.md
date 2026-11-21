@@ -1,16 +1,19 @@
 # Parallax Relay
 
-Parallax Relay's intended direction is a real-time cooperative platformer,
-adventure, and puzzle game for three independent multimodal AI players. The current prototype is
-turn-based: each robot sees a different sensor image, exchanges public messages,
-and commits one action without seeing its teammates' current actions. A
-deterministic Python engine resolves the turn. The game direction and its open
-design questions are described in the [real-time game vision](docs/REALTIME_GAME_VISION.md).
+Parallax Relay is developing into a real-time cooperative platformer, adventure,
+and puzzle game for three independent multimodal AI players. The local physics
+demo gives SPECTRA, PYRA, and FLUX one development room to cross together. Each
+robot runs its accepted command sequence from the same simulation tick. See the
+[real-time demo](docs/REALTIME_DEMO.md) and [game vision](docs/REALTIME_GAME_VISION.md).
 
-**Status:** Milestone 2 is a coordination prototype with a verified one-turn live
-smoke: two independent `gpt-6-luna` agents and `gemini-3.5-flash-lite` completed
-all nine requests on their first attempts. It stopped normally at the one-turn
-limit; no full-game victory or benchmark result is established. Anthropic remains
+The turn-based baseline runs nine curated rooms through its own match driver.
+Each robot sees a different sensor image, exchanges public messages, and commits
+one action under a sealed barrier. A deterministic Python engine resolves the turn.
+
+In the verified turn-based live smoke, two independent `gpt-6-luna` agents and
+`gemini-3.5-flash-lite` completed all nine requests on their first attempts.
+The run ended normally at the one-turn limit. Full-game victory and benchmark
+performance remain unevaluated. Anthropic remains
 implemented and tested offline, but live-unverified. See the
 [successful retry and scope decision](docs/VERIFICATION.md#provider-acceptance-and-scope-decision--november-15-2026).
 The bundled victories use scripted players that already know the solution; they
@@ -62,7 +65,20 @@ For a ready-made replay, download or clone the repository and open
 [`example_run/index.html`](example_run/index.html) locally, keeping its PNGs beside
 it. GitHub's file view displays source rather than running the viewer.
 
-## How the current prototype works
+## Watch the local physics demo
+
+With the environment active, launch the reactive controller and open the printed
+loopback URL in your browser. Select **Start match** to watch the robots discuss,
+power the bridge, jump onto the far bank, and attempt extraction.
+
+```bash
+python -m parallax_relay.realtime --offline reactive --spectate
+```
+
+The [real-time walkthrough](docs/REALTIME_DEMO.md) covers manual commands, the
+failed jump exercise, the paced baseline and local recording verification.
+
+## How the turn-based baseline works
 
 The default room, **The Split Span**, is a single horizontal lane. The
 [room catalog](docs/ROOMS.md) also includes crossing variants, retrieval/return
@@ -85,9 +101,11 @@ It must not be used as a participant's context.
 ## Experiment workbench
 
 Use the [private workbench](https://parallax-relay-lab.dhar174.chatgpt.site) to
-configure a match and inspect native replay records. The local companion runs
-the scripted fixture through the Python CLI. See the [workbench guide](docs/WORKBENCH.md)
-for setup, the engine contract map and the Site release process.
+configure a turn-based match and inspect its native replay records. The local
+companion runs the scripted fixture through the Python CLI. See the
+[workbench guide](docs/WORKBENCH.md) for setup, the engine contract map and the Site
+release process. The physics demo has its own loopback spectator and recording
+verifier.
 
 ## Run real models
 
@@ -121,11 +139,12 @@ requests. Diagnostic fixtures do not establish model ability or benchmark result
 
 ## Current limits and direction
 
-This release has nine curated rooms, three active roles and compatible objectives.
-Three development rooms support tuning; six held-out rooms require registered
-confirmation. Host certificates establish solvability; the original fixed script
-remains a Split Span memorization control. It has no platformer physics, procedural rooms, playable
-ECHO role, live dashboard, or validated benchmark results.
+The turn-based catalog has nine curated rooms. Three development rooms support
+tuning and six held-out rooms require registered confirmation. Host certificates
+establish solvability, and the original fixed script serves as a Split Span
+memorization control. The real-time demo runs in a separate development room.
+Speech synthesis, further physics rooms, and evaluation of real-time model
+cooperation remain future work.
 
 The [roadmap](ROADMAP.md) records the existing reliability and evaluation work and
 the intended real-time direction. The [verification record](docs/VERIFICATION.md)
@@ -139,7 +158,9 @@ separates original milestone evidence from subsequent checks.
 | [Workbench guide](docs/WORKBENCH.md) | Browser configuration, native imports, and local companion |
 | [Running guide](docs/RUNNING.md) | Configuration, limits, troubleshooting, and replay files |
 | [Architecture](docs/ARCHITECTURE.md) | Modules, data flow, and extension boundaries |
-| [Real-time game vision](docs/REALTIME_GAME_VISION.md) | Intended player experience, next-stage exploration, and open decisions |
+| [Real-time game vision](docs/REALTIME_GAME_VISION.md) | Intended player experience and open decisions |
+| [Real-time engine plan](docs/REALTIME_ENGINE_PLAN.md) | Approved local demo scope and acceptance criteria |
+| [Real-time demo](docs/REALTIME_DEMO.md) | Local launch, manual walkthrough, recording and live proposal |
 | [Protocol](docs/PROTOCOL.md) | Player inputs, reply contracts, phases, and outcomes |
 | [Run provenance](docs/PROVENANCE.md) | Source, effective configuration, identities, timing, and compatibility |
 | [Campaign guide](docs/CAMPAIGNS.md) | Registration, offline trials, budgets and JSON/CSV analysis |

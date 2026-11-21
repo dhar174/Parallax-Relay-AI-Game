@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import asdict, dataclass, field, replace
+from functools import partial
 import json
 from time import perf_counter
 from typing import Callable, Mapping
@@ -83,7 +84,7 @@ class Outcome:
 
 
 async def _ask(agent: Agent, request: AgentRequest, ticket: Ticket, settings: MatchSettings,
-               calls: list[dict], recorder) -> Outcome:
+               calls: list[dict], recorder, phase_event=None) -> Outcome:
     outcome = Outcome(None, 'no_response')
     current = request
     try:
@@ -130,7 +131,8 @@ async def _ask(agent: Agent, request: AgentRequest, ticket: Ticket, settings: Ma
             calls.append(record)
             if recorder: recorder.call(record)
             if parsed is not None:
-                return Outcome(parsed)
+                outcome = Outcome(parsed)
+                break
             outcome = Outcome(None, error, fatal)
             if not retryable or attempt == settings.max_attempts:
                 break
@@ -141,18 +143,25 @@ async def _ask(agent: Agent, request: AgentRequest, ticket: Ticket, settings: Ma
                 'incomplete', 'invalid_json_schema', 'stale_turn', 'response_size'
             } else '')
             await asyncio.sleep(max(settings.retry_delay_seconds * (2 ** (attempt - 1)), retry_after))
+        if phase_event is not None and request.phase == 'commit':
+            phase_event({'kind': 'ready', 'turn': request.turn, 'phase': request.phase,
+                         'role': request.role, 'disposition': 'ready' if outcome.parsed is not None else 'fallback'})
         return outcome
     finally:
         ticket.release()
 
 
 async def _phase(agents: Mapping[str, Agent], requests: dict[str, AgentRequest], budget: Budget,
-                 settings: MatchSettings, calls: list[dict], recorder) -> dict[str, Outcome]:
+                 settings: MatchSettings, calls: list[dict], recorder, phase_event=None) -> dict[str, Outcome]:
     tickets = budget.reserve_phase(requests)
     tasks = []
     try:
+        if phase_event is not None:
+            first = requests[ROLES[0]]
+            phase_event({'kind': 'phase_open', 'turn': first.turn, 'phase': first.phase})
         for role in ROLES:
-            tasks.append(asyncio.create_task(_ask(agents[role],requests[role],tickets[role],settings,calls,recorder)))
+            tasks.append(asyncio.create_task(_ask(
+                agents[role], requests[role], tickets[role], settings, calls, recorder, phase_event)))
         outcomes = await asyncio.gather(*tasks)
     except BaseException:
         for task in tasks:
@@ -169,12 +178,17 @@ async def _phase(agents: Mapping[str, Agent], requests: dict[str, AgentRequest],
 
 async def run_match(agents: Mapping[str, Agent], settings: MatchSettings | None = None, *,
                     rates: dict[str, Rates | None] | None = None, recorder=None,
-                    progress: Callable[[dict], None] | None = None, room_permit=None) -> MatchResult:
+                    progress: Callable[[dict], None] | None = None, room_permit=None,
+                    phase_event: Callable[[dict], None] | None = None) -> MatchResult:
     """Run one fresh room. The caller owns/cleans up provider clients.
 
     Fatal provider failures and budget stops leave the world at the last fully
     resolved turn. Interrupted runs are not scored as defeats. Histories are
     bounded and local to a role; providers never receive a WorldState.
+
+    An optional spectator callback observes phase admission and content-free
+    commit dispositions. Completed public speech and resolved turns use the
+    existing recorder callbacks. Player requests and native records stay independent.
     """
     if set(agents) != set(ROLES):
         raise ValueError('This slice requires exactly SPECTRA, PYRA and FLUX')
@@ -202,6 +216,7 @@ async def run_match(agents: Mapping[str, Agent], settings: MatchSettings | None 
     primary = None
     phases = []
     output = _OutputSink(recorder)
+    notify = partial(output.emit, 'phase_event', phase_event) if phase_event is not None else None
     recorder = output if recorder is not None else None
     try:
         if isinstance(output.recorder, Recorder):
@@ -222,7 +237,7 @@ async def run_match(agents: Mapping[str, Agent], settings: MatchSettings | None 
                     include_image=condition.include_image, condition=condition.name,
                 ) for r in ROLES}
                 try:
-                    outcomes = await _phase(agents, requests, budget, settings, calls, recorder)
+                    outcomes = await _phase(agents, requests, budget, settings, calls, recorder, notify)
                 except BudgetExceeded as exc:
                     stop, abort = exc.reason, True
                     break

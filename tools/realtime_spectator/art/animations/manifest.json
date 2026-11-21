@@ -1,0 +1,808 @@
+{
+  "format_version": 1,
+  "frame_coordinates": "Pixel-edge coordinates use the untrimmed frame's top-left as the origin.",
+  "facing_note": "Three-quarter right-facing. Mirror only the artwork around its nominal anchor.",
+  "boot_measurement": "Exclusive lower boot edge at alpha >=128 minus nominal anchor y. Takeoff and landing list contact alignment; flight has null contacts.",
+  "jump_triggers": {
+    "takeoff": "accepted jump impulse",
+    "ascent": "positive up velocity",
+    "descent": "apex or downward velocity",
+    "landing": "new support contact"
+  },
+  "animations": [
+    {
+      "role": "SPECTRA",
+      "action": "idle",
+      "sheet": "sheets/spectra-idle.png",
+      "frames": [
+        "frames/spectra-idle/01.png",
+        "frames/spectra-idle/02.png",
+        "frames/spectra-idle/03.png",
+        "frames/spectra-idle/04.png"
+      ],
+      "frame_size": [
+        256,
+        256
+      ],
+      "frame_count": 4,
+      "facing": "right",
+      "nominal_anchor": [
+        128,
+        239
+      ],
+      "poses": [
+        "idle_1",
+        "idle_2",
+        "idle_3",
+        "idle_4"
+      ],
+      "selection": "loop",
+      "alpha_bounds_xyxy_exclusive": [
+        [
+          66,
+          23,
+          190,
+          239
+        ],
+        [
+          67,
+          25,
+          189,
+          239
+        ],
+        [
+          67,
+          23,
+          189,
+          239
+        ],
+        [
+          66,
+          27,
+          189,
+          239
+        ]
+      ],
+      "lowest_boot_offsets_px": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "contact_offsets_px": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "source": "sources/spectra-idle-raw.png",
+      "source_sha256": "d5b218185ac1d5b6578bcb04fffb58ab1f77403c0a3db01bd45c4a05e7cc069a",
+      "references": [
+        "../spectra-idle.png",
+        "references/spectra-idle-edit-canvas.png"
+      ],
+      "provenance": "PR 52, 017870ff1dc942473a23d14106160bbc16d11cc1. Original RGBA poses and sheets.",
+      "preview": "previews/spectra-idle.gif",
+      "fps": 2
+    },
+    {
+      "role": "SPECTRA",
+      "action": "walk",
+      "sheet": "sheets/spectra-walk.png",
+      "frames": [
+        "frames/spectra-walk/01.png",
+        "frames/spectra-walk/02.png",
+        "frames/spectra-walk/03.png",
+        "frames/spectra-walk/04.png",
+        "frames/spectra-walk/05.png",
+        "frames/spectra-walk/06.png"
+      ],
+      "frame_size": [
+        256,
+        256
+      ],
+      "frame_count": 6,
+      "facing": "right",
+      "nominal_anchor": [
+        128,
+        239
+      ],
+      "poses": [
+        "near_contact",
+        "near_support",
+        "far_approach",
+        "far_contact",
+        "far_support",
+        "near_approach"
+      ],
+      "selection": "loop",
+      "alpha_bounds_xyxy_exclusive": [
+        [
+          59,
+          23,
+          195,
+          239
+        ],
+        [
+          63,
+          24,
+          192,
+          239
+        ],
+        [
+          68,
+          23,
+          190,
+          240
+        ],
+        [
+          71,
+          23,
+          190,
+          241
+        ],
+        [
+          68,
+          24,
+          190,
+          241
+        ],
+        [
+          62,
+          23,
+          193,
+          242
+        ]
+      ],
+      "lowest_boot_offsets_px": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "contact_offsets_px": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "source": "frames/spectra-idle/01.png",
+      "source_sha256": "d9385e55089db8f2ea20f8204b06ac47ca503c2ff0d197d80aef270a40338537",
+      "references": [
+        "../spectra-idle.png",
+        "references/spectra-walk-pr52.png",
+        "sources/spectra-walk-raw.png",
+        "sources/spectra-walk-alternate-edit.png"
+      ],
+      "provenance": "Articulated hand and leg masks from the original neutral #52 SPECTRA pose, matched to the #51 master. Two ImageGen references preserve the rejected same-leg edits.",
+      "preview": "previews/spectra-walk.gif",
+      "fps": 8,
+      "rig": "spectra-walk-rig.json"
+    },
+    {
+      "role": "SPECTRA",
+      "action": "jump",
+      "sheet": "sheets/spectra-jump.png",
+      "frames": [
+        "frames/spectra-jump/01.png",
+        "frames/spectra-jump/02.png",
+        "frames/spectra-jump/03.png",
+        "frames/spectra-jump/04.png"
+      ],
+      "frame_size": [
+        256,
+        256
+      ],
+      "frame_count": 4,
+      "facing": "right",
+      "nominal_anchor": [
+        128,
+        239
+      ],
+      "poses": [
+        "takeoff",
+        "ascent",
+        "descent",
+        "landing"
+      ],
+      "selection": "physics",
+      "alpha_bounds_xyxy_exclusive": [
+        [
+          65,
+          10,
+          208,
+          242
+        ],
+        [
+          59,
+          8,
+          207,
+          217
+        ],
+        [
+          32,
+          16,
+          201,
+          235
+        ],
+        [
+          51,
+          51,
+          202,
+          242
+        ]
+      ],
+      "lowest_boot_offsets_px": [
+        0,
+        -24,
+        -7,
+        0
+      ],
+      "contact_offsets_px": [
+        0,
+        null,
+        null,
+        0
+      ],
+      "source": "sources/spectra-jump-raw.png",
+      "source_sha256": "833aa7282e86179c50b761bed8c1d6ddbfb46a792f6945676874d0050e99ea03",
+      "references": [
+        "../spectra-idle.png",
+        "sources/spectra-lift.png"
+      ],
+      "provenance": "Built-in ImageGen edit from the role master, 2026-11-20. See generation-prompts.md.",
+      "preview": "previews/spectra-jump.gif",
+      "frame_sources": [
+        "sources/spectra-lift.png",
+        "sources/spectra-lift.png",
+        "sources/spectra-jump-raw.png",
+        "sources/spectra-jump-raw.png"
+      ],
+      "raw_source_sha256": {
+        "sources/spectra-jump-raw.png": "833aa7282e86179c50b761bed8c1d6ddbfb46a792f6945676874d0050e99ea03",
+        "sources/spectra-lift.png": "6b659b276a85206d00305a52704aabc596c38395210e72bdb869bc68f15a26fb"
+      }
+    },
+    {
+      "role": "PYRA",
+      "action": "idle",
+      "sheet": "sheets/pyra-idle.png",
+      "frames": [
+        "frames/pyra-idle/01.png",
+        "frames/pyra-idle/02.png",
+        "frames/pyra-idle/03.png",
+        "frames/pyra-idle/04.png"
+      ],
+      "frame_size": [
+        256,
+        256
+      ],
+      "frame_count": 4,
+      "facing": "right",
+      "nominal_anchor": [
+        128,
+        239
+      ],
+      "poses": [
+        "idle_1",
+        "idle_2",
+        "idle_3",
+        "idle_4"
+      ],
+      "selection": "loop",
+      "alpha_bounds_xyxy_exclusive": [
+        [
+          49,
+          23,
+          206,
+          239
+        ],
+        [
+          47,
+          23,
+          208,
+          239
+        ],
+        [
+          47,
+          23,
+          208,
+          239
+        ],
+        [
+          47,
+          25,
+          208,
+          239
+        ]
+      ],
+      "lowest_boot_offsets_px": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "contact_offsets_px": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "source": "sources/pyra-idle-raw.png",
+      "source_sha256": "dce2b02daaa78a340daff3fa3730a0d668f98ff4c49bc338475f6835e39fcce1",
+      "references": [
+        "../pyra-idle.png",
+        "references/pyra-idle-edit-canvas.png"
+      ],
+      "provenance": "PR 52, 017870ff1dc942473a23d14106160bbc16d11cc1. Original RGBA poses and sheets.",
+      "preview": "previews/pyra-idle.gif",
+      "fps": 2
+    },
+    {
+      "role": "PYRA",
+      "action": "walk",
+      "sheet": "sheets/pyra-walk.png",
+      "frames": [
+        "frames/pyra-walk/01.png",
+        "frames/pyra-walk/02.png",
+        "frames/pyra-walk/03.png",
+        "frames/pyra-walk/04.png",
+        "frames/pyra-walk/05.png",
+        "frames/pyra-walk/06.png"
+      ],
+      "frame_size": [
+        256,
+        256
+      ],
+      "frame_count": 6,
+      "facing": "right",
+      "nominal_anchor": [
+        128,
+        239
+      ],
+      "poses": [
+        "near_contact",
+        "near_support",
+        "far_approach",
+        "far_contact",
+        "far_support",
+        "near_approach"
+      ],
+      "selection": "loop",
+      "alpha_bounds_xyxy_exclusive": [
+        [
+          56,
+          19,
+          209,
+          242
+        ],
+        [
+          54,
+          19,
+          212,
+          242
+        ],
+        [
+          56,
+          20,
+          207,
+          243
+        ],
+        [
+          46,
+          19,
+          212,
+          243
+        ],
+        [
+          55,
+          20,
+          212,
+          243
+        ],
+        [
+          52,
+          19,
+          212,
+          243
+        ]
+      ],
+      "lowest_boot_offsets_px": [
+        -1,
+        0,
+        1,
+        1,
+        1,
+        1
+      ],
+      "contact_offsets_px": [
+        -1,
+        0,
+        1,
+        1,
+        1,
+        1
+      ],
+      "source": "sources/pyra-walk-hands.png",
+      "source_sha256": "42a62724fcc03985e5b57de1aeeb0581592ae915e6904dc90618c3cf146362f8",
+      "references": [
+        "../pyra-idle.png",
+        "references/pyra-walk-pr52.png",
+        "sources/pyra-walk-raw.png"
+      ],
+      "provenance": "Built-in ImageGen hand edit from the #52 six-frame walk and #51 neutral master. Original contact order and walk references are archived.",
+      "preview": "previews/pyra-walk.gif",
+      "fps": 8,
+      "frame_sources": [
+        "sources/pyra-walk-hands.png",
+        "sources/pyra-walk-hands.png",
+        "sources/pyra-walk-hands.png",
+        "sources/pyra-walk-hands.png",
+        "sources/pyra-walk-hands.png",
+        "sources/pyra-walk-hands.png"
+      ],
+      "raw_source_sha256": {
+        "sources/pyra-walk-hands.png": "42a62724fcc03985e5b57de1aeeb0581592ae915e6904dc90618c3cf146362f8"
+      }
+    },
+    {
+      "role": "PYRA",
+      "action": "jump",
+      "sheet": "sheets/pyra-jump.png",
+      "frames": [
+        "frames/pyra-jump/01.png",
+        "frames/pyra-jump/02.png",
+        "frames/pyra-jump/03.png",
+        "frames/pyra-jump/04.png"
+      ],
+      "frame_size": [
+        256,
+        256
+      ],
+      "frame_count": 4,
+      "facing": "right",
+      "nominal_anchor": [
+        128,
+        239
+      ],
+      "poses": [
+        "takeoff",
+        "ascent",
+        "descent",
+        "landing"
+      ],
+      "selection": "physics",
+      "alpha_bounds_xyxy_exclusive": [
+        [
+          52,
+          6,
+          207,
+          242
+        ],
+        [
+          39,
+          7,
+          224,
+          218
+        ],
+        [
+          27,
+          7,
+          214,
+          235
+        ],
+        [
+          41,
+          46,
+          203,
+          242
+        ]
+      ],
+      "lowest_boot_offsets_px": [
+        0,
+        -23,
+        -7,
+        0
+      ],
+      "contact_offsets_px": [
+        0,
+        null,
+        null,
+        0
+      ],
+      "source": "sources/pyra-jump-raw.png",
+      "source_sha256": "39166ed5160ead533efb62a6930c89f72d32ec5028c84daaa3362fe02e9ec74c",
+      "references": [
+        "../pyra-idle.png",
+        "sources/pyra-lift.png",
+        "sources/pyra-tuck.png"
+      ],
+      "provenance": "Built-in ImageGen edit from the role master, 2026-11-20. See generation-prompts.md.",
+      "preview": "previews/pyra-jump.gif",
+      "frame_sources": [
+        "sources/pyra-lift.png",
+        "sources/pyra-tuck.png",
+        "sources/pyra-jump-raw.png",
+        "sources/pyra-jump-raw.png"
+      ],
+      "raw_source_sha256": {
+        "sources/pyra-jump-raw.png": "39166ed5160ead533efb62a6930c89f72d32ec5028c84daaa3362fe02e9ec74c",
+        "sources/pyra-lift.png": "7e3769f00e2d5d508c261953ea15a2ca21eebb94b66e377a75f39ce586d3bec0",
+        "sources/pyra-tuck.png": "e27c6e265dbcde52313fbc8b36ee5b41fcfb1b925d090381ebc0741051f918ab"
+      }
+    },
+    {
+      "role": "FLUX",
+      "action": "idle",
+      "sheet": "sheets/flux-idle.png",
+      "frames": [
+        "frames/flux-idle/01.png",
+        "frames/flux-idle/02.png",
+        "frames/flux-idle/03.png",
+        "frames/flux-idle/04.png"
+      ],
+      "frame_size": [
+        256,
+        256
+      ],
+      "frame_count": 4,
+      "facing": "right",
+      "nominal_anchor": [
+        128,
+        239
+      ],
+      "poses": [
+        "idle_1",
+        "idle_2",
+        "idle_3",
+        "idle_4"
+      ],
+      "selection": "loop",
+      "alpha_bounds_xyxy_exclusive": [
+        [
+          72,
+          24,
+          185,
+          239
+        ],
+        [
+          71,
+          23,
+          184,
+          238
+        ],
+        [
+          71,
+          20,
+          186,
+          238
+        ],
+        [
+          71,
+          25,
+          184,
+          238
+        ]
+      ],
+      "lowest_boot_offsets_px": [
+        -3,
+        -3,
+        -3,
+        -3
+      ],
+      "contact_offsets_px": [
+        -3,
+        -3,
+        -3,
+        -3
+      ],
+      "source": "sources/flux-idle-raw.png",
+      "source_sha256": "49154bf0f991f9178242ba4227da754933ac828a186e29fdd5bad1a2229fe717",
+      "references": [
+        "../flux-idle.png",
+        "references/flux-idle-normalized-master.png"
+      ],
+      "provenance": "PR 52, 017870ff1dc942473a23d14106160bbc16d11cc1. Original RGBA poses and sheets.",
+      "preview": "previews/flux-idle.gif",
+      "fps": 2
+    },
+    {
+      "role": "FLUX",
+      "action": "walk",
+      "sheet": "sheets/flux-walk.png",
+      "frames": [
+        "frames/flux-walk/01.png",
+        "frames/flux-walk/02.png",
+        "frames/flux-walk/03.png",
+        "frames/flux-walk/04.png",
+        "frames/flux-walk/05.png",
+        "frames/flux-walk/06.png"
+      ],
+      "frame_size": [
+        256,
+        256
+      ],
+      "frame_count": 6,
+      "facing": "right",
+      "nominal_anchor": [
+        128,
+        239
+      ],
+      "poses": [
+        "near_contact",
+        "near_support",
+        "far_approach",
+        "far_contact",
+        "far_support",
+        "near_approach"
+      ],
+      "selection": "loop",
+      "alpha_bounds_xyxy_exclusive": [
+        [
+          72,
+          26,
+          184,
+          242
+        ],
+        [
+          73,
+          26,
+          188,
+          243
+        ],
+        [
+          72,
+          25,
+          184,
+          242
+        ],
+        [
+          67,
+          25,
+          191,
+          242
+        ],
+        [
+          72,
+          28,
+          185,
+          242
+        ],
+        [
+          70,
+          28,
+          188,
+          243
+        ]
+      ],
+      "lowest_boot_offsets_px": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "contact_offsets_px": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "source": "sources/flux-walk-hands.png",
+      "source_sha256": "6a578091545983d7dbe5d4843c6a5d8a6a0eee485b80f3ce01e91c2310ebd9ab",
+      "references": [
+        "../flux-idle.png",
+        "references/flux-walk-pr52.png",
+        "sources/flux-walk-raw.png"
+      ],
+      "provenance": "Built-in ImageGen hand edit from the #52 six-frame walk and #51 neutral master. Original contact order and walk references are archived.",
+      "preview": "previews/flux-walk.gif",
+      "fps": 8,
+      "frame_sources": [
+        "sources/flux-walk-hands.png",
+        "sources/flux-walk-hands.png",
+        "sources/flux-walk-hands.png",
+        "sources/flux-walk-hands.png",
+        "sources/flux-walk-hands.png",
+        "sources/flux-walk-hands.png"
+      ],
+      "raw_source_sha256": {
+        "sources/flux-walk-hands.png": "6a578091545983d7dbe5d4843c6a5d8a6a0eee485b80f3ce01e91c2310ebd9ab"
+      }
+    },
+    {
+      "role": "FLUX",
+      "action": "jump",
+      "sheet": "sheets/flux-jump.png",
+      "frames": [
+        "frames/flux-jump/01.png",
+        "frames/flux-jump/02.png",
+        "frames/flux-jump/03.png",
+        "frames/flux-jump/04.png"
+      ],
+      "frame_size": [
+        256,
+        256
+      ],
+      "frame_count": 4,
+      "facing": "right",
+      "nominal_anchor": [
+        128,
+        239
+      ],
+      "poses": [
+        "takeoff",
+        "ascent",
+        "descent",
+        "landing"
+      ],
+      "selection": "physics",
+      "alpha_bounds_xyxy_exclusive": [
+        [
+          76,
+          10,
+          194,
+          242
+        ],
+        [
+          53,
+          13,
+          211,
+          218
+        ],
+        [
+          51,
+          9,
+          202,
+          234
+        ],
+        [
+          57,
+          41,
+          193,
+          242
+        ]
+      ],
+      "lowest_boot_offsets_px": [
+        0,
+        -23,
+        -8,
+        0
+      ],
+      "contact_offsets_px": [
+        0,
+        null,
+        null,
+        0
+      ],
+      "source": "sources/flux-jump-raw.png",
+      "source_sha256": "9b687b2e50284f93e774d6097123ead52c803e3803a5176a7316c0ab40824562",
+      "references": [
+        "../flux-idle.png",
+        "sources/flux-lift.png",
+        "sources/flux-jump-pincer-edit.png",
+        "sources/flux-tuck.png"
+      ],
+      "provenance": "Built-in ImageGen edit from the role master, 2026-11-20. See generation-prompts.md.",
+      "preview": "previews/flux-jump.gif",
+      "frame_sources": [
+        "sources/flux-lift.png",
+        "sources/flux-tuck.png",
+        "sources/flux-jump-pincer-edit.png",
+        "sources/flux-jump-pincer-edit.png"
+      ],
+      "raw_source_sha256": {
+        "sources/flux-jump-pincer-edit.png": "d3a937f90a401a2eb73dabde170d13b1d4ed7fd823a2b8f16f4ce1349480e6d5",
+        "sources/flux-lift.png": "24f204c16c8795414eef96d7c019979dfe47f1adf630d7def1ac7adbf4489b33",
+        "sources/flux-tuck.png": "df23da06f36500437d0d4f22769a87694b2e84053aa9cd74fb59741f35f21abf"
+      }
+    }
+  ]
+}

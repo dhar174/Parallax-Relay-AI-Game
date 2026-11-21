@@ -1,0 +1,444 @@
+{
+  "format_version": 1,
+  "note": "Raw top-left coordinates in pixels. Source anchors map to (128,239). Air frames offset the boots above the virtual foot pivot; landing preserves the real crouch.",
+  "clips": {
+    "spectra-idle": {
+      "raw": "sources/spectra-idle-raw.png",
+      "references": [
+        "../spectra-idle.png",
+        "references/spectra-idle-edit-canvas.png"
+      ],
+      "provenance": "PR 52, 017870ff1dc942473a23d14106160bbc16d11cc1. Original RGBA poses and sheets."
+    },
+    "pyra-idle": {
+      "raw": "sources/pyra-idle-raw.png",
+      "references": [
+        "../pyra-idle.png",
+        "references/pyra-idle-edit-canvas.png"
+      ],
+      "provenance": "PR 52, 017870ff1dc942473a23d14106160bbc16d11cc1. Original RGBA poses and sheets."
+    },
+    "flux-idle": {
+      "raw": "sources/flux-idle-raw.png",
+      "references": [
+        "../flux-idle.png",
+        "references/flux-idle-normalized-master.png"
+      ],
+      "provenance": "PR 52, 017870ff1dc942473a23d14106160bbc16d11cc1. Original RGBA poses and sheets."
+    },
+    "pyra-walk": {
+      "raw": "sources/pyra-walk-hands.png",
+      "references": [
+        "../pyra-idle.png",
+        "references/pyra-walk-pr52.png",
+        "sources/pyra-walk-raw.png"
+      ],
+      "provenance": "Built-in ImageGen hand edit from the #52 six-frame walk and #51 neutral master. Original contact order and walk references are archived.",
+      "registration": [
+        {
+          "bounds": [
+            64,
+            169,
+            307,
+            511
+          ],
+          "source_anchor": [
+            178.5,
+            495
+          ],
+          "scale": 0.7
+        },
+        {
+          "bounds": [
+            425,
+            169,
+            669,
+            511
+          ],
+          "source_anchor": [
+            539.5,
+            495
+          ],
+          "scale": 0.7
+        },
+        {
+          "bounds": [
+            788,
+            169,
+            1026,
+            510
+          ],
+          "source_anchor": [
+            902.5,
+            494
+          ],
+          "scale": 0.7
+        },
+        {
+          "bounds": [
+            1137,
+            169,
+            1396,
+            510
+          ],
+          "source_anchor": [
+            1264.0,
+            494
+          ],
+          "scale": 0.7
+        },
+        {
+          "bounds": [
+            1511,
+            169,
+            1755,
+            510
+          ],
+          "source_anchor": [
+            1625.5,
+            494
+          ],
+          "scale": 0.7
+        },
+        {
+          "bounds": [
+            1870,
+            169,
+            2121,
+            510
+          ],
+          "source_anchor": [
+            1988.0,
+            494
+          ],
+          "scale": 0.7
+        }
+      ]
+    },
+    "flux-walk": {
+      "raw": "sources/flux-walk-hands.png",
+      "references": [
+        "../flux-idle.png",
+        "references/flux-walk-pr52.png",
+        "sources/flux-walk-raw.png"
+      ],
+      "provenance": "Built-in ImageGen hand edit from the #52 six-frame walk and #51 neutral master. Original contact order and walk references are archived.",
+      "registration": [
+        {
+          "bounds": [
+            90,
+            157,
+            271,
+            486
+          ],
+          "source_anchor": [
+            180.0,
+            470
+          ],
+          "scale": 0.706
+        },
+        {
+          "bounds": [
+            451,
+            157,
+            638,
+            486
+          ],
+          "source_anchor": [
+            541.5,
+            470
+          ],
+          "scale": 0.706
+        },
+        {
+          "bounds": [
+            814,
+            157,
+            995,
+            487
+          ],
+          "source_anchor": [
+            904.0,
+            471
+          ],
+          "scale": 0.706
+        },
+        {
+          "bounds": [
+            1169,
+            157,
+            1368,
+            487
+          ],
+          "source_anchor": [
+            1266.5,
+            471
+          ],
+          "scale": 0.706
+        },
+        {
+          "bounds": [
+            1539,
+            160,
+            1722,
+            487
+          ],
+          "source_anchor": [
+            1630.0,
+            471
+          ],
+          "scale": 0.706
+        },
+        {
+          "bounds": [
+            1897,
+            160,
+            2089,
+            487
+          ],
+          "source_anchor": [
+            1992.5,
+            471
+          ],
+          "scale": 0.706
+        }
+      ]
+    },
+    "spectra-walk": {
+      "raw": "frames/spectra-idle/01.png",
+      "rig": "spectra-walk-rig.json",
+      "references": [
+        "../spectra-idle.png",
+        "references/spectra-walk-pr52.png",
+        "sources/spectra-walk-raw.png",
+        "sources/spectra-walk-alternate-edit.png"
+      ],
+      "provenance": "Articulated hand and leg masks from the original neutral #52 SPECTRA pose, matched to the #51 master. Two ImageGen references preserve the rejected same-leg edits."
+    },
+    "spectra-jump": {
+      "raw": "sources/spectra-jump-raw.png",
+      "references": [
+        "../spectra-idle.png",
+        "sources/spectra-lift.png"
+      ],
+      "provenance": "Built-in ImageGen edit from the role master, 2026-11-20. See generation-prompts.md.",
+      "registration": [
+        {
+          "bounds": [
+            270,
+            12,
+            780,
+            871
+          ],
+          "source_anchor": [
+            496,
+            846
+          ],
+          "scale": 0.302,
+          "source": "sources/spectra-lift.png",
+          "leg_registration": [
+            564,
+            0.8
+          ],
+          "edge_threshold": 20
+        },
+        {
+          "bounds": [
+            964,
+            10,
+            1496,
+            792
+          ],
+          "source_anchor": [
+            1216,
+            856
+          ],
+          "scale": 0.303,
+          "source": "sources/spectra-lift.png",
+          "leg_registration": [
+            549,
+            0.8
+          ],
+          "edge_threshold": 20
+        },
+        {
+          "bounds": [
+            1098,
+            47,
+            1578,
+            658
+          ],
+          "source_anchor": [
+            1371,
+            655
+          ],
+          "scale": 0.375
+        },
+        {
+          "bounds": [
+            1670,
+            152,
+            2103,
+            689
+          ],
+          "source_anchor": [
+            1888,
+            667
+          ],
+          "scale": 0.375
+        }
+      ]
+    },
+    "pyra-jump": {
+      "raw": "sources/pyra-jump-raw.png",
+      "references": [
+        "../pyra-idle.png",
+        "sources/pyra-lift.png",
+        "sources/pyra-tuck.png"
+      ],
+      "provenance": "Built-in ImageGen edit from the role master, 2026-11-20. See generation-prompts.md.",
+      "registration": [
+        {
+          "bounds": [
+            150,
+            56,
+            936,
+            1373
+          ],
+          "source_anchor": [
+            534,
+            1343
+          ],
+          "scale": 0.205,
+          "source": "sources/pyra-lift.png",
+          "leg_registration": [
+            965,
+            0.64
+          ],
+          "edge_threshold": 4
+        },
+        {
+          "bounds": [
+            68,
+            39,
+            1016,
+            1255
+          ],
+          "source_anchor": [
+            525,
+            1408
+          ],
+          "scale": 0.2,
+          "source": "sources/pyra-tuck.png",
+          "leg_registration": [
+            810,
+            0.67
+          ]
+        },
+        {
+          "bounds": [
+            1089,
+            36,
+            1608,
+            660
+          ],
+          "source_anchor": [
+            1368,
+            657
+          ],
+          "scale": 0.381
+        },
+        {
+          "bounds": [
+            1656,
+            130,
+            2114,
+            671
+          ],
+          "source_anchor": [
+            1899,
+            650
+          ],
+          "scale": 0.381
+        }
+      ]
+    },
+    "flux-jump": {
+      "raw": "sources/flux-jump-raw.png",
+      "references": [
+        "../flux-idle.png",
+        "sources/flux-lift.png",
+        "sources/flux-jump-pincer-edit.png",
+        "sources/flux-tuck.png"
+      ],
+      "provenance": "Built-in ImageGen edit from the role master, 2026-11-20. See generation-prompts.md.",
+      "registration": [
+        {
+          "bounds": [
+            218,
+            23,
+            879,
+            1336
+          ],
+          "source_anchor": [
+            515,
+            1306
+          ],
+          "scale": 0.19,
+          "source": "sources/flux-lift.png",
+          "leg_registration": [
+            960,
+            0.84
+          ],
+          "edge_threshold": 4
+        },
+        {
+          "bounds": [
+            115,
+            33,
+            1025,
+            1244
+          ],
+          "source_anchor": [
+            548,
+            1369
+          ],
+          "scale": 0.178,
+          "source": "sources/flux-tuck.png",
+          "leg_registration": [
+            886,
+            0.89
+          ]
+        },
+        {
+          "bounds": [
+            1111,
+            3,
+            1610,
+            674
+          ],
+          "source_anchor": [
+            1374,
+            665
+          ],
+          "scale": 0.359,
+          "source": "sources/flux-jump-pincer-edit.png"
+        },
+        {
+          "bounds": [
+            1665,
+            90,
+            2128,
+            686
+          ],
+          "source_anchor": [
+            1901,
+            661
+          ],
+          "scale": 0.359,
+          "source": "sources/flux-jump-pincer-edit.png"
+        }
+      ]
+    }
+  }
+}

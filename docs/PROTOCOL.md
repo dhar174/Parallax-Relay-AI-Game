@@ -1,5 +1,35 @@
 # Player protocol and trust boundary
 
+## Real-time development contract
+
+The fixed-step room uses a separate request contract. Each role receives its
+sampled PNG and physics HUD from the same window-opening tick. The role uses the
+PNG to read horizontal landmarks and its HUD to read elevations, motion and
+support. The image's TURN label names the sampled window. Later phases receive
+released public dialogue and the role's own context. The HUD gives each robot
+bounded feedback on its own recent consequences, such as falls and blocked
+jumps. Private notes, hidden sensor facts, sealed plans and spectator readiness
+are outside the shared player context. Speech intentionally published by a role
+becomes public.
+
+Broadcast and negotiate carry public messages. Commit carries commands and
+private notes. Every reply echoes the request ID and window assigned by the
+host. The command objects use the keys `kind`, `direction`, `ticks`, and
+`jump_at`. Unused parameters are null. A `RUN` may include one jump at a
+zero-based offset within that command. Programs run sequentially, with neutral
+input for unused ticks.
+
+A phase admits valid replies until its monotonic deadline. At the deadline,
+missing speech becomes silence and an unfilled commit slot becomes a neutral
+program. Programs that fail validation leave the role without an accepted plan.
+Commands that fail in the world, such as jumping without ground support, consume
+their scheduled slot. At release all three programs, including any fallback,
+begin at offset zero on the same tick. The host reserves the possible attempts
+for every role before starting a phase and accounts for each started attempt.
+
+See the [engine plan](REALTIME_ENGINE_PLAN.md) for the trial command set, costs
+and timing examples. The sections below describe the turn-based baseline.
+
 ## Observations
 
 `observe(world, role)` produces an immutable `Observation` with role, zero-based

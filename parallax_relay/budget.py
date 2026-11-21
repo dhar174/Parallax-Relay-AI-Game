@@ -8,8 +8,8 @@ from __future__ import annotations
 from decimal import Decimal, localcontext
 import json
 from .config import MatchSettings, Rates
-from .protocol import AgentRequest, Usage, ROLES, response_schema
-from .prompts import SYSTEM_RULES
+from .protocol import AgentRequest, Usage, ROLES
+from .providers import request_contract
 from .money import total as money_total, difference, product, json_fields
 
 
@@ -54,7 +54,8 @@ class Budget:
         for role, request in requests.items():
             # Byte count rather than the usual chars/4 heuristic deliberately
             # overestimates text. Image reserve remains model-dependent.
-            text = SYSTEM_RULES + request.prompt_text() + json.dumps(response_schema(request.phase))
+            instructions, schema = request_contract(request)
+            text = instructions + request.prompt_text() + json.dumps(schema)
             tokens = len(text.encode('utf-8')) + (self.settings.image_token_reserve if request.include_image else 0) + 2048
             rates = self.rates.get(role)
             quotes[role] = _price(Usage(tokens, request.max_output_tokens), rates) if rates else Decimal(0)

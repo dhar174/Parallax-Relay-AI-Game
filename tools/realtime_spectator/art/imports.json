@@ -1,0 +1,311 @@
+{
+  "repo": "https://github.com/dhar174/Parallax-Relay-AI-Game",
+  "imports": [
+    {
+      "local": "animations/frames/flux-idle/01.png",
+      "source_path": "tools/spectator/artwork/light-review/animations/frames/flux-idle/01.png",
+      "commit": "017870ff1dc942473a23d14106160bbc16d11cc1",
+      "git_blob": "e8bacb6eb1ce8d0e07e24474f776328809c075e1"
+    },
+    {
+      "local": "animations/frames/flux-idle/02.png",
+      "source_path": "tools/spectator/artwork/light-review/animations/frames/flux-idle/02.png",
+      "commit": "017870ff1dc942473a23d14106160bbc16d11cc1",
+      "git_blob": "4038af52301ad7654789ad7cc6124fa80d274285"
+    },
+    {
+      "local": "animations/frames/flux-idle/03.png",
+      "source_path": "tools/spectator/artwork/light-review/animations/frames/flux-idle/03.png",
+      "commit": "017870ff1dc942473a23d14106160bbc16d11cc1",
+      "git_blob": "d926586a51e89360c9cf6ca866f1fd098eecdbf2"
+    },
+    {
+      "local": "animations/frames/flux-idle/04.png",
+      "source_path": "tools/spectator/artwork/light-review/animations/frames/flux-idle/04.png",
+      "commit": "017870ff1dc942473a23d14106160bbc16d11cc1",
+      "git_blob": "ba0b6add42d2cb3d1ced3d107901352e509083cf"
+    },
+    {
+      "local": "animations/references/original-frames/flux-walk/01.png",
+      "source_path": "tools/spectator/artwork/light-review/animations/frames/flux-walk/01.png",
+      "commit": "017870ff1dc942473a23d14106160bbc16d11cc1",
+      "git_blob": "09af5a871c4454f74c3b70f7a4fabab858551aec"
+    },
+    {
+      "local": "animations/references/original-frames/flux-walk/02.png",
+      "source_path": "tools/spectator/artwork/light-review/animations/frames/flux-walk/02.png",
+      "commit": "017870ff1dc942473a23d14106160bbc16d11cc1",
+      "git_blob": "b736c58670ba47c7036a6a2cd85ddb6288530a6a"
+    },
+    {
+      "local": "animations/references/original-frames/flux-walk/03.png",
+      "source_path": "tools/spectator/artwork/light-review/animations/frames/flux-walk/03.png",
+      "commit": "017870ff1dc942473a23d14106160bbc16d11cc1",
+      "git_blob": "ae772702778cd9a54dee31ac0db836fd5a9592e3"
+    },
+    {
+      "local": "animations/references/original-frames/flux-walk/04.png",
+      "source_path": "tools/spectator/artwork/light-review/animations/frames/flux-walk/04.png",
+      "commit": "017870ff1dc942473a23d14106160bbc16d11cc1",
+      "git_blob": "12c4d7f890a3b8eb8b864998bd7b6e67e3bc8fa9"
+    },
+    {
+      "local": "animations/references/original-frames/flux-walk/05.png",
+      "source_path": "tools/spectator/artwork/light-review/animations/frames/flux-walk/05.png",
+      "commit": "017870ff1dc942473a23d14106160bbc16d11cc1",
+      "git_blob": "999d7f17523c20eaacc03b3095d139728be4b201"
+    },
+    {
+      "local": "animations/references/original-frames/flux-walk/06.png",
+      "source_path": "tools/spectator/artwork/light-review/animations/frames/flux-walk/06.png",
+      "commit": "017870ff1dc942473a23d14106160bbc16d11cc1",
+      "git_blob": "da55f44e2374ec361b07aef0d2b1685fc341c36b"
+    },
+    {
+      "local": "animations/frames/pyra-idle/01.png",
+      "source_path": "tools/spectator/artwork/light-review/animations/frames/pyra-idle/01.png",
+      "commit": "017870ff1dc942473a23d14106160bbc16d11cc1",
+      "git_blob": "9390719fe1dfb9aec2a529f5175c5cba9700a257"
+    },
+    {
+      "local": "animations/frames/pyra-idle/02.png",
+      "source_path": "tools/spectator/artwork/light-review/animations/frames/pyra-idle/02.png",
+      "commit": "017870ff1dc942473a23d14106160bbc16d11cc1",
+      "git_blob": "e184c3a034636049b3b59e099d3bfd94cfb62ac7"
+    },
+    {
+      "local": "animations/frames/pyra-idle/03.png",
+      "source_path": "tools/spectator/artwork/light-review/animations/frames/pyra-idle/03.png",
+      "commit": "017870ff1dc942473a23d14106160bbc16d11cc1",
+      "git_blob": "264453f368c590f3f335e017333177ccbbf9d163"
+    },
+    {
+      "local": "animations/frames/pyra-idle/04.png",
+      "source_path": "tools/spectator/artwork/light-review/animations/frames/pyra-idle/04.png",
+      "commit": "017870ff1dc942473a23d14106160bbc16d11cc1",
+      "git_blob": "35675c88f160a827d9cadc347cffd621eb29c795"
+    },
+    {
+      "local": "animations/references/original-frames/pyra-walk/01.png",
+      "source_path": "tools/spectator/artwork/light-review/animations/frames/pyra-walk/01.png",
+      "commit": "017870ff1dc942473a23d14106160bbc16d11cc1",
+      "git_blob": "b5a7fb7f491b6b17ad1e021eedcaeafc829cae74"
+    },
+    {
+      "local": "animations/references/original-frames/pyra-walk/02.png",
+      "source_path": "tools/spectator/artwork/light-review/animations/frames/pyra-walk/02.png",
+      "commit": "017870ff1dc942473a23d14106160bbc16d11cc1",
+      "git_blob": "ee15316693ea97e9a801529072d0697d3caa51fe"
+    },
+    {
+      "local": "animations/references/original-frames/pyra-walk/03.png",
+      "source_path": "tools/spectator/artwork/light-review/animations/frames/pyra-walk/03.png",
+      "commit": "017870ff1dc942473a23d14106160bbc16d11cc1",
+      "git_blob": "c8ede300b12c79535714a0312ff7b4ec8b6bc456"
+    },
+    {
+      "local": "animations/references/original-frames/pyra-walk/04.png",
+      "source_path": "tools/spectator/artwork/light-review/animations/frames/pyra-walk/04.png",
+      "commit": "017870ff1dc942473a23d14106160bbc16d11cc1",
+      "git_blob": "1e3a7de5e80cd839b4b29c0ca9804988cac4eccd"
+    },
+    {
+      "local": "animations/references/original-frames/pyra-walk/05.png",
+      "source_path": "tools/spectator/artwork/light-review/animations/frames/pyra-walk/05.png",
+      "commit": "017870ff1dc942473a23d14106160bbc16d11cc1",
+      "git_blob": "a0a666cc432d6dc8cc43e5fbb27991dbda61c613"
+    },
+    {
+      "local": "animations/references/original-frames/pyra-walk/06.png",
+      "source_path": "tools/spectator/artwork/light-review/animations/frames/pyra-walk/06.png",
+      "commit": "017870ff1dc942473a23d14106160bbc16d11cc1",
+      "git_blob": "63fffbccdfdb5757c76701f3a97c2920cb52d822"
+    },
+    {
+      "local": "animations/frames/spectra-idle/01.png",
+      "source_path": "tools/spectator/artwork/light-review/animations/frames/spectra-idle/01.png",
+      "commit": "017870ff1dc942473a23d14106160bbc16d11cc1",
+      "git_blob": "0a9c09706a9f644762bf9d6574a42fcfad74e996"
+    },
+    {
+      "local": "animations/frames/spectra-idle/02.png",
+      "source_path": "tools/spectator/artwork/light-review/animations/frames/spectra-idle/02.png",
+      "commit": "017870ff1dc942473a23d14106160bbc16d11cc1",
+      "git_blob": "839429f4cadd9c94f5e9baa91d7d20611eaa472d"
+    },
+    {
+      "local": "animations/frames/spectra-idle/03.png",
+      "source_path": "tools/spectator/artwork/light-review/animations/frames/spectra-idle/03.png",
+      "commit": "017870ff1dc942473a23d14106160bbc16d11cc1",
+      "git_blob": "91956f409e706872f4c1446ea8192647112db774"
+    },
+    {
+      "local": "animations/frames/spectra-idle/04.png",
+      "source_path": "tools/spectator/artwork/light-review/animations/frames/spectra-idle/04.png",
+      "commit": "017870ff1dc942473a23d14106160bbc16d11cc1",
+      "git_blob": "4b5f1db4aa773c01c68f5237452f005cefea13da"
+    },
+    {
+      "local": "animations/references/flux-idle-normalized-master.png",
+      "source_path": "tools/spectator/artwork/light-review/animations/references/flux-idle-normalized-master.png",
+      "commit": "017870ff1dc942473a23d14106160bbc16d11cc1",
+      "git_blob": "e8bacb6eb1ce8d0e07e24474f776328809c075e1"
+    },
+    {
+      "local": "animations/references/flux-walk-selected-pyra-motion-guide.png",
+      "source_path": "tools/spectator/artwork/light-review/animations/references/flux-walk-selected-pyra-motion-guide.png",
+      "commit": "017870ff1dc942473a23d14106160bbc16d11cc1",
+      "git_blob": "9d2fe43eb177afc2dc05daebc1df3411a7eb719d"
+    },
+    {
+      "local": "animations/references/light-direction.png",
+      "source_path": "tools/spectator/artwork/light-review/spectator-art-direction.png",
+      "commit": "b2d4f250ff150f23a39ada1a780effd1b644b69a",
+      "git_blob": "9f996b770986c0507414de02fc1e1c7219b70e9b"
+    },
+    {
+      "local": "animations/references/pyra-idle-edit-canvas.png",
+      "source_path": "tools/spectator/artwork/light-review/animations/references/pyra-idle-edit-canvas.png",
+      "commit": "017870ff1dc942473a23d14106160bbc16d11cc1",
+      "git_blob": "f39b07178861c40f8c011eb3a915202285cec849"
+    },
+    {
+      "local": "animations/references/spectra-idle-edit-canvas.png",
+      "source_path": "tools/spectator/artwork/light-review/animations/references/spectra-idle-edit-canvas.png",
+      "commit": "017870ff1dc942473a23d14106160bbc16d11cc1",
+      "git_blob": "421a2fb6ec4c829bac24cbe35938e9afdb78f352"
+    },
+    {
+      "local": "animations/references/spectra-walk-pr52.png",
+      "source_path": "tools/spectator/artwork/light-review/animations/sheets/spectra-walk.png",
+      "commit": "017870ff1dc942473a23d14106160bbc16d11cc1",
+      "git_blob": "27b84407f49db4324b1bb4bdc6d321263d82704b"
+    },
+    {
+      "local": "animations/sheets/flux-idle.png",
+      "source_path": "tools/spectator/artwork/light-review/animations/sheets/flux-idle.png",
+      "commit": "017870ff1dc942473a23d14106160bbc16d11cc1",
+      "git_blob": "78c6f75edb5260eb225392506c256b8fd92fc2e1"
+    },
+    {
+      "local": "animations/references/flux-walk-pr52.png",
+      "source_path": "tools/spectator/artwork/light-review/animations/sheets/flux-walk.png",
+      "commit": "017870ff1dc942473a23d14106160bbc16d11cc1",
+      "git_blob": "bf292b701736d6c8fbeabe7e9132251bc997a766"
+    },
+    {
+      "local": "animations/sheets/pyra-idle.png",
+      "source_path": "tools/spectator/artwork/light-review/animations/sheets/pyra-idle.png",
+      "commit": "017870ff1dc942473a23d14106160bbc16d11cc1",
+      "git_blob": "4f00ccbabefb7e3305da359bf7dd060d8d5b33e5"
+    },
+    {
+      "local": "animations/references/pyra-walk-pr52.png",
+      "source_path": "tools/spectator/artwork/light-review/animations/sheets/pyra-walk.png",
+      "commit": "017870ff1dc942473a23d14106160bbc16d11cc1",
+      "git_blob": "9d2fe43eb177afc2dc05daebc1df3411a7eb719d"
+    },
+    {
+      "local": "animations/sheets/spectra-idle.png",
+      "source_path": "tools/spectator/artwork/light-review/animations/sheets/spectra-idle.png",
+      "commit": "017870ff1dc942473a23d14106160bbc16d11cc1",
+      "git_blob": "36330d790d07d44e9e14e0058368720ace11cfde"
+    },
+    {
+      "local": "animations/sources/flux-idle-raw.png",
+      "source_path": "tools/spectator/artwork/light-review/animations/generated/flux-idle-raw.png",
+      "commit": "017870ff1dc942473a23d14106160bbc16d11cc1",
+      "git_blob": "675c1e7edd136e5c6866648deefe0464e4cd5677"
+    },
+    {
+      "local": "animations/sources/flux-walk-raw.png",
+      "source_path": "tools/spectator/artwork/light-review/animations/generated/flux-walk-raw.png",
+      "commit": "017870ff1dc942473a23d14106160bbc16d11cc1",
+      "git_blob": "c36ea47866513dba75e053401fade4f527b77f1c"
+    },
+    {
+      "local": "animations/sources/pyra-idle-raw.png",
+      "source_path": "tools/spectator/artwork/light-review/animations/generated/pyra-idle-raw.png",
+      "commit": "017870ff1dc942473a23d14106160bbc16d11cc1",
+      "git_blob": "ad91083dc7844fa56df821b52f171bebce330dbd"
+    },
+    {
+      "local": "animations/sources/pyra-walk-raw.png",
+      "source_path": "tools/spectator/artwork/light-review/animations/generated/pyra-walk-raw.png",
+      "commit": "017870ff1dc942473a23d14106160bbc16d11cc1",
+      "git_blob": "deba63174ade026467e1eee5aa501f5050e1acd1"
+    },
+    {
+      "local": "animations/sources/spectra-idle-raw.png",
+      "source_path": "tools/spectator/artwork/light-review/animations/generated/spectra-idle-raw.png",
+      "commit": "017870ff1dc942473a23d14106160bbc16d11cc1",
+      "git_blob": "45e734bb176e75091aa01be4253549ddb9ecac03"
+    },
+    {
+      "local": "bridge.png",
+      "source_path": "tools/spectator/artwork/light-review/bridge.png",
+      "commit": "b2d4f250ff150f23a39ada1a780effd1b644b69a",
+      "git_blob": "b829f3cbe43ee900d7791d7f183b3668d5dbd106"
+    },
+    {
+      "local": "energy-cell.png",
+      "source_path": "tools/spectator/artwork/light-review/energy-cell.png",
+      "commit": "b2d4f250ff150f23a39ada1a780effd1b644b69a",
+      "git_blob": "bd6e8db33f08f72bc54563c202bb20e3b82fb12f"
+    },
+    {
+      "local": "exit-closed.png",
+      "source_path": "tools/spectator/artwork/light-review/exit-closed.png",
+      "commit": "b2d4f250ff150f23a39ada1a780effd1b644b69a",
+      "git_blob": "737574afc3a117a7cc30c68551b9b133e1b76411"
+    },
+    {
+      "local": "exit-open.png",
+      "source_path": "tools/spectator/artwork/light-review/exit-open.png",
+      "commit": "b2d4f250ff150f23a39ada1a780effd1b644b69a",
+      "git_blob": "baae0d1dcb08071072d7cfb3457dba27e6856fec"
+    },
+    {
+      "local": "floor.png",
+      "source_path": "tools/spectator/artwork/light-review/floor.png",
+      "commit": "b2d4f250ff150f23a39ada1a780effd1b644b69a",
+      "git_blob": "858f6b1e3448ba928ac3f12cc66c65124d8bea25"
+    },
+    {
+      "local": "flux-idle.png",
+      "source_path": "tools/spectator/artwork/light-review/flux-idle.png",
+      "commit": "b2d4f250ff150f23a39ada1a780effd1b644b69a",
+      "git_blob": "dc54cf3add8644a48105c485863cae88101627a6"
+    },
+    {
+      "local": "memory-shard.png",
+      "source_path": "tools/spectator/artwork/light-review/memory-shard.png",
+      "commit": "b2d4f250ff150f23a39ada1a780effd1b644b69a",
+      "git_blob": "a0b313a7a5e96b5ad9d52e6295d853dbec8f8dd4"
+    },
+    {
+      "local": "motor-console.png",
+      "source_path": "tools/spectator/artwork/light-review/motor-console.png",
+      "commit": "b2d4f250ff150f23a39ada1a780effd1b644b69a",
+      "git_blob": "faa7b779d15b550266d5cff1b3566a049d15ab65"
+    },
+    {
+      "local": "pyra-idle.png",
+      "source_path": "tools/spectator/artwork/light-review/pyra-idle.png",
+      "commit": "b2d4f250ff150f23a39ada1a780effd1b644b69a",
+      "git_blob": "e15c1fcc3ae5b87cdf63c3e2f1f69854248abd3c"
+    },
+    {
+      "local": "room-background.png",
+      "source_path": "tools/spectator/artwork/light-review/room-background.png",
+      "commit": "b2d4f250ff150f23a39ada1a780effd1b644b69a",
+      "git_blob": "df989c64d1d5884f2a2d250768047da4f6812c40"
+    },
+    {
+      "local": "spectra-idle.png",
+      "source_path": "tools/spectator/artwork/light-review/spectra-idle.png",
+      "commit": "b2d4f250ff150f23a39ada1a780effd1b644b69a",
+      "git_blob": "59d711d6fb4a6b5a71883f8ee740fe63893fa235"
+    }
+  ]
+}
