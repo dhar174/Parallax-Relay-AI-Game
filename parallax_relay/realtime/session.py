@@ -5,6 +5,7 @@ import asyncio
 from collections import deque
 from contextlib import suppress
 import json
+import math
 from pathlib import Path
 from threading import Event, Lock, Thread
 import time
@@ -23,23 +24,27 @@ from .wire import contract_identity
 
 
 class Session:
-    def __init__(self, out: Path, mode, settings, *, profile=None, paced=True, latency='demo', run_id=None):
+    def __init__(self, out: Path, mode, settings, *, profile=None, paced=True, latency='demo', run_id=None,
+                 outer_deadline=None):
         if mode not in {'reactive', 'manual', 'baseline', 'test', 'live'}:
             raise ValueError('Unknown source')
         if (mode == 'live') != (profile is not None):
             raise ValueError('Live execution requires the named live profile')
         if profile is not None and settings != profile.settings:
             raise ValueError('Live settings must match the named profile')
+        if outer_deadline is not None and (mode != 'live' or not math.isfinite(outer_deadline)):
+            raise ValueError('Expected a finite live supervisor deadline')
         self.mode = mode
         self.settings = settings
         self.profile = profile
+        self._outer_deadline = outer_deadline
         if latency not in ('demo', 'historical') or (latency == 'historical' and mode != 'test'):
             raise ValueError('Measured latency replay requires the offline transport fixture')
         self.latency = latency
         self.paced = paced
         self.journal = Journal(out, run_id=run_id)
         self.world = initial_world()
-        self._durable_completed = False
+        self._durable_view = self.world.snapshot() if mode != 'baseline' else None
         self._start_lock = Lock()
         self._done = Event()
         self._closing = Event()
@@ -63,7 +68,7 @@ class Session:
                   sources={r: self._source(r) for r in ROLES},
                   tick_rate=settings.tick_rate, clock_mode=settings.clock_mode)
         if mode != 'baseline':
-            self.emit('state', world=self.world.snapshot())
+            self.emit('state', world=self._durable_view)
         self.journal.private('configuration', version=1, settings=settings.model_dump(), latency=latency,
                              room_version='split-span-turn-v1' if mode == 'baseline' else 'raised-span-physics-v1',
                              contract=None if mode == 'baseline' else contract_identity(),
@@ -99,9 +104,11 @@ class Session:
             self._controls.admitted(data['role'], data['window'], data['status'])
 
     def events(self, after):
+        recording_error = self._done.is_set() and self.result.get('recording_error')
         page = self.journal.events(after)
-        if self._done.is_set() and self.result.get('recording_error'):
+        if recording_error:
             page['recording_error'] = True
+            page['last_recorded_world'] = self._durable_view if self.mode != 'baseline' else self._latest_view
         return page
 
     def store_feed(self, role, window, png):
@@ -176,12 +183,16 @@ class Session:
     async def _run(self):
         self._started_at = time.monotonic()
         deadline = self._started_at + self.settings.wall_seconds
+        if self._outer_deadline is not None:
+            deadline = min(deadline, self._outer_deadline)
         with self._start_lock:
             self._loop, self._task = asyncio.get_running_loop(), asyncio.current_task()
         reason, completed = 'internal_error', False
         try:
             if self._closing.is_set():
                 raise asyncio.CancelledError
+            if self._started_at >= deadline:
+                raise CoordinationStop('time_limit')
             if self.mode == 'baseline':
                 from .baseline import run_baseline
                 reason, completed = await run_baseline(self, self.settings, paced=self.paced)
@@ -203,8 +214,9 @@ class Session:
                 pass
         finally:
             self._controls.close()
+            final_view = self._durable_view if self.mode != 'baseline' else self._latest_view
             if self.mode != 'baseline':
-                completed = self._durable_completed
+                completed = final_view['completed']
             self.result = {'run_id': self.journal.run_id, 'stop_reason': reason,
                            'completed': completed, 'tick': self.journal.tick,
                            'window': self.journal.window, 'mode': self.mode}
@@ -215,7 +227,7 @@ class Session:
                     self.journal.private('budget', summary=self._budget.summary())
                 self._write_result()
                 # Journal.emit attaches the identity after validating reserved fields.
-                self.emit('result', **{k: v for k, v in self.result.items() if k != 'run_id'})
+                self.emit('result', world=final_view, **{k: v for k, v in self.result.items() if k != 'run_id'})
             except (OSError, RuntimeError):
                 self.result.update(stop_reason='local_error', simulation_stop=reason, recording_error=True)
                 with suppress(OSError):
@@ -326,7 +338,7 @@ class Session:
     def _step(self, programs, offset, *, release=None, sample_tick=None):
         consequences = step(self.world, programs, offset)
         self.journal.record_tick(self.world, programs, offset)
-        self._durable_completed = self.world.completed
+        self._durable_view = self.world.snapshot()
         tick = self.world.tick
         if release is not None:
             self.emit('window_started', window=self.window, tick=tick, start_tick=tick,
@@ -334,7 +346,7 @@ class Session:
                       starts={r: tick for r in ROLES}, sources={r: self._source(r) for r in ROLES},
                       sample_tick=sample_tick, observation_age_ticks=tick - 1 - sample_tick)
         if release is not None or consequences or tick % 3 == 0:
-            self.emit('state', window=self.window, tick=tick, world=self.world.snapshot())
+            self.emit('state', window=self.window, tick=tick, world=self._durable_view)
         for consequence in consequences:
             if consequence.get('role') in self._feedback:
                 self._feedback[consequence['role']].append(consequence)

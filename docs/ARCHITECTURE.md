@@ -45,7 +45,9 @@ role feed PNGs by sampled window. It renders the scene in Canvas and DOM, with
 public dialogue and room events. It is a privileged local view. The browser can
 start or restart offline matches and submit controls in manual mode. Restart
 replaces the session on the same server after the prior worker stops. Each
-session has its own run ID, recording and manual request slots.
+session has its own run ID, recording and manual request slots. On a server
+that supports restart, start requests and sensor reads identify the intended
+run so requests from a prior match cannot affect the next one.
 See the [demo guide](REALTIME_DEMO.md) for the launch commands.
 
 ## One turn

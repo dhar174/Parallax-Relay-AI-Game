@@ -71,6 +71,34 @@ async function screenshot(page, name) {
   await writeFile(join(output, `${name}.json`), JSON.stringify(receipt, null, 2));
 }
 
+test('same-tick consequences retain the authoritative pose and show contact cues', {timeout: 45000}, async t => {
+  const origin = await server(t, 'manual');
+  const page = await pageFor(t, origin, {width: 1280, height: 800});
+  const result = await page.evaluate(async () => {
+    const {Scene} = await import('/scene.js');
+    const scene = new Scene();
+    const robot = {x: 768, y: 37, vx: 0, vy: 18, grounded: false, facing: 1, pose: 'ascent'};
+    const world = {tick: 2, robots: {SPECTRA: {...robot}, PYRA: {...robot}, FLUX: {...robot}}};
+    scene.setWorld(world);
+    // A blocked VENT was sampled before the tick's movement, although emitted after state.
+    scene.contact({role: 'PYRA', tick: 2, event_kind: 'blocked', x: 768, y: 19, vy: 19, pose: 'takeoff'});
+    const afterBlocked = {...scene.world.robots.PYRA};
+    const positionText = document.querySelector('#room-positions').textContent;
+    scene.contact({role: 'PYRA', tick: 2, event_kind: 'takeoff', x: 768, y: 37, pose: 'takeoff'});
+    const takeoff = scene.cues.get('PYRA')?.pose;
+    scene.contact({role: 'PYRA', tick: 2, event_kind: 'landing', x: 768, y: 0, pose: 'landing'});
+    const landing = scene.cues.get('PYRA')?.pose;
+    return {afterBlocked, positionText, takeoff, landing, finalPose: scene.world.robots.PYRA.pose};
+  });
+  assert.equal(result.afterBlocked.y, 37);
+  assert.equal(result.afterBlocked.vy, 18);
+  assert.equal(result.afterBlocked.pose, 'ascent');
+  assert.match(result.positionText, /PYRA at column 3\.0, height 0\.1 tiles, airborne, ascent/);
+  assert.equal(result.takeoff, 'takeoff');
+  assert.equal(result.landing, 'landing');
+  assert.equal(result.finalPose, 'ascent');
+});
+
 test('reactive spectator waits for Start and runs multiple real windows', {timeout: 90000}, async t => {
   const origin = await server(t, 'reactive');
   const page = await pageFor(t, origin, {width: 1280, height: 800});

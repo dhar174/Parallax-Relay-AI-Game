@@ -72,8 +72,12 @@ class SpectatorServer(ThreadingHTTPServer):
             session = self.session
             status = session.status()
             mode = status['mode']
-            if route in ('/api/start', '/api/restart') and data.get('run_id', status['run_id']) != status['run_id']:
-                return 409, {'error': 'The match has changed. Try again on the current match.'}
+            if route in ('/api/start', '/api/restart'):
+                if 'run_id' not in data:
+                    if route == '/api/restart' or self.new_session is not None:
+                        return 400, {'error': 'Expected the current match ID.'}
+                elif data['run_id'] != status['run_id']:
+                    return 409, {'error': 'The match has changed. Try again on the current match.'}
             if route == '/api/start':
                 if mode not in OFFLINE_MODES:
                     return 403, {'error': 'The browser can start only an offline session.'}
@@ -188,6 +192,14 @@ class SpectatorHandler(BaseHTTPRequestHandler):
             match = re.fullmatch(r'/api/feed/([A-Z]+)/([0-9]{1,16})', self.path)
             if match and match[1] in ROLES:
                 session = self.server.session
+                run_ids = self.headers.get_all('X-Relay-Run-ID', [])
+                if len(run_ids) != 1 or not run_ids[0]:
+                    if run_ids or self.server.new_session is not None:
+                        self._error(400, 'Expected the current match ID.')
+                        return
+                elif run_ids[0] != session.status()['run_id']:
+                    self._error(409, 'The match has changed. Try again on the current match.')
+                    return
                 png = session.feed(match[1], int(match[2]))
                 if png is not None:
                     describe = getattr(session, 'feed_description', None)

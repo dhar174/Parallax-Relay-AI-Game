@@ -136,7 +136,10 @@ export class Scene {
     } else if (['fell', 'respawn', 'underside_contact'].includes(event.event_kind)) {
       this.cues.delete(role);
     }
-    this.setWorld({...this.world, tick: event.tick, robots: {...this.world.robots, [role]: robot}});
+    // A same-tick state already reflects the entire tick; some events describe
+    // an earlier moment within it. Keep the authoritative pose while showing cues.
+    if (this.world.tick === event.tick) this.paint(true);
+    else this.setWorld({...this.world, tick: event.tick, robots: {...this.world.robots, [role]: robot}});
   }
 
   say(role, value, window, phase) {

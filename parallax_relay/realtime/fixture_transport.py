@@ -6,7 +6,7 @@ No credential lookup or network transport is used.
 """
 from __future__ import annotations
 
-import asyncio
+from asyncio import sleep
 import base64
 from dataclasses import replace
 import json
@@ -15,10 +15,10 @@ from pathlib import Path
 
 import httpx
 
-from ..protocol import Observation, ROLES
+from ..protocol import Observation, Phase, ROLES
 from ..providers import HTTPAgent
 from .players import ReactiveAgent
-from .wire import make_request
+from .wire import PHASES, make_request
 
 
 FIXTURE_ROSTER = {
@@ -28,26 +28,25 @@ FIXTURE_ROSTER = {
 }
 
 
-def historical_delays(scale: float = 1.0) -> tuple[tuple[float, ...], ...]:
-    """Return the sanitized November 15 samples in roster/phase order.
+def historical_delays(scale: float = 1.0) -> tuple[dict[Phase, float], ...]:
+    """Return the sanitized November 15 samples by phase in roster order.
 
     Scale is explicit so tests can replay the relative timing without a long wait.
-    The three samples for each role repeat for subsequent windows.
+    The same delay applies to each attempt in a role and phase.
     """
     if not math.isfinite(scale) or scale < 0:
         raise ValueError('scale must be finite and nonnegative')
     path = Path(__file__).resolve().parents[2] / 'docs' / 'verification' / '2026-11-15-slice7-live-retry-summary.json'
     rows = json.loads(path.read_text(encoding='utf-8'))['attempts']
-    phase_order = ('broadcast', 'negotiate', 'commit')
     result = []
     for role in ROLES:
-        samples = []
-        for phase in phase_order:
+        samples = {}
+        for phase in PHASES:
             matches = [row for row in rows if row['role'] == role and row['phase'] == phase and row['status'] == 'ok']
             if len(matches) != 1:
                 raise ValueError('historical trace is incomplete or ambiguous')
-            samples.append(float(matches[0]['latency_seconds']) * scale)
-        result.append(tuple(samples))
+            samples[phase] = float(matches[0]['latency_seconds']) * scale
+        result.append(samples)
     return tuple(result)
 
 
@@ -95,10 +94,13 @@ class _FixtureAgent(HTTPAgent):
         # Reject mismatched settings instead of silently inventing controller inputs.
         if json.loads(request.prompt_text()) != payload:
             raise ValueError('fixture request does not round-trip')
-        delay = self._delays[self._calls % len(self._delays)]
-        self._calls += 1
+        if isinstance(self._delays, dict):
+            delay = self._delays[request.phase]
+        else:
+            delay = self._delays[self._calls % len(self._delays)]
+            self._calls += 1
         if delay:
-            await asyncio.sleep(delay)
+            await sleep(delay)
         reply = await self._controller.respond(request)
         if self.provider == 'openai':
             response = {'status': 'completed', 'output': [{'type': 'message', 'status': 'completed',
@@ -113,16 +115,24 @@ class _FixtureAgent(HTTPAgent):
 def fixture_agents(settings, delays=(0.0, 0.0, 0.0)):
     """Build independent OpenAI/OpenAI/Gemini mock HTTP clients, in roster order.
 
-    Each delay may be a float or a nonempty cyclic sequence of per-call seconds.
+    Each delay schedule may be a number of seconds, a nonempty cyclic sequence
+    of per-call seconds, or a dictionary of seconds for every phase.
     The agents own and close their injected async clients.
     """
     if len(delays) != len(ROLES):
         raise ValueError('one delay per role is required')
     schedules = []
     for value in delays:
-        sequence = value if isinstance(value, (list, tuple)) else (value,)
-        if not sequence or any(type(v) not in (int, float) or not math.isfinite(v) or v < 0 for v in sequence):
+        if isinstance(value, dict):
+            if value.keys() != set(PHASES):
+                raise ValueError('fixture delay schedule must cover every phase')
+            schedule = value.copy()
+            seconds = schedule.values()
+        else:
+            schedule = tuple(value) if isinstance(value, (list, tuple)) else (value,)
+            seconds = schedule
+        if not seconds or any(type(v) not in (int, float) or not math.isfinite(v) or v < 0 for v in seconds):
             raise ValueError('fixture delays must be finite and nonnegative')
-        schedules.append(tuple(float(v) for v in sequence))
+        schedules.append(schedule)
     return {role: _FixtureAgent(role, *FIXTURE_ROSTER[role], settings, schedule)
             for role, schedule in zip(ROLES, schedules)}

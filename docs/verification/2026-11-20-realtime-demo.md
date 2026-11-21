@@ -136,3 +136,13 @@ present as local modifications. This single run demonstrates live provider
 integration and partial team progress on one development room. The published
 evidence consists of aggregate counts, timings and outcomes. Full journals,
 private role data and sensor images remain in the ignored local recording.
+
+## Draft review follow-up · November 20, 2026
+
+Three independent reviews covered gameplay and presentation, scheduling and
+run isolation, and the provider boundary and verification evidence. Focused
+regressions cover a blocked motor action leaving the same-tick pose intact,
+stale start and sensor requests after restart, a stop between ordinary pose
+samples, and a historical latency trace with negotiation skipped. The paid
+worker and its supervisor now use the same dispatch deadline. That change
+was checked with controlled clocks and local child processes.

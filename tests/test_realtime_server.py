@@ -244,17 +244,41 @@ class SpectatorTransportTests(unittest.TestCase):
                 responses = list(pool.map(lambda _: self.post('/api/restart', {'run_id': old_id}), range(2)))
             self.assertCountEqual([code for code, _, _ in responses], [200, 409])
             factory.assert_called_once_with()
-        self.assertFalse(self.session.worker.is_alive())
-        self.assertEqual(self.session.closes, 1)
-        new_id = json.loads(next(body for code, _, body in responses if code == 200))['run_id']
-        self.assertNotEqual(new_id, old_id)
-        status = json.loads(self.get('/api/status')[2])
-        self.assertEqual((status['run_id'], status['status'], status['token']), (new_id, 'idle', self.server.token))
-        journal = json.loads(self.get('/api/events?after=0')[2])
-        self.assertEqual((journal['run_id'], journal['events']), (new_id, []))
-        self.assertIn('Previous match', (self.journal.out / 'events.jsonl').read_text(encoding='utf-8'))
-        self.assertEqual(self.post('/api/start', {'run_id': old_id})[0], 409)
-        self.assertEqual(self.post('/api/start', {'run_id': new_id})[0], 200)
+            self.assertFalse(self.session.worker.is_alive())
+            self.assertEqual(self.session.closes, 1)
+            new_id = json.loads(next(body for code, _, body in responses if code == 200))['run_id']
+            self.assertNotEqual(new_id, old_id)
+            status = json.loads(self.get('/api/status')[2])
+            self.assertEqual((status['run_id'], status['status'], status['token']), (new_id, 'idle', self.server.token))
+            journal = json.loads(self.get('/api/events?after=0')[2])
+            self.assertEqual((journal['run_id'], journal['events']), (new_id, []))
+            self.assertIn('Previous match', (self.journal.out / 'events.jsonl').read_text(encoding='utf-8'))
+            self.assertEqual(self.post('/api/start', {'run_id': old_id})[0], 409)
+            self.assertEqual(self.post('/api/start', {})[0], 400)
+            self.assertEqual(self.post('/api/start', {'run_id': new_id})[0], 200)
+
+    def test_feed_requests_cannot_cross_a_restart(self):
+        path = '/api/feed/PYRA/1'
+        old = BytesIO()
+        Image.new('RGB', (4, 3), 'red').save(old, format='PNG')
+        self.journal.store_feed('PYRA', 1, old.getvalue())
+        current = BytesIO()
+        Image.new('RGB', (4, 3), 'blue').save(current, format='PNG')
+        replacement = SessionProbe(Journal(self.root / 'next'))
+        replacement.journal.store_feed('PYRA', 1, current.getvalue())
+        old_id = self.journal.run_id
+        old_headers = [*self.auth, ('X-Relay-Run-ID', old_id)]
+        new_headers = [*self.auth, ('X-Relay-Run-ID', replacement.journal.run_id)]
+        with patch.object(self.server, 'new_session', return_value=replacement):
+            self.assertEqual(self.post('/api/start', {'run_id': old_id})[0], 200)
+            code, _, body = self.exchange('GET', path, old_headers)
+            self.assertEqual((code, body), (200, old.getvalue()))
+            self.assertEqual(self.post('/api/restart', {'run_id': old_id})[0], 200)
+            self.assertEqual(self.exchange('GET', path, old_headers)[0], 409)
+            self.assertEqual(self.get(path)[0], 400)
+            self.assertEqual(self.exchange('GET', path, new_headers + new_headers[-1:])[0], 400)
+            code, _, body = self.exchange('GET', path, new_headers)
+            self.assertEqual((code, body), (200, current.getvalue()))
 
     def test_plan_shape_and_controller_admission_result(self):
         for invalid in ({}, [], manual_plan(extra='field'), manual_plan(role='ECHO'),

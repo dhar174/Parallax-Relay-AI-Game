@@ -43,6 +43,17 @@ class RealtimeSessionTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(session.status()['status'], 'idle')
             make_clients.assert_not_called()
 
+    async def test_live_session_obeys_supervisor_cutoff_before_opening_a_window(self):
+        profile = load_profile('dev-bridge-live-v1')
+        deadline = time.monotonic() - 1
+        session = await asyncio.to_thread(driver.Session, self.out, 'live', profile.settings,
+                                          profile=profile, outer_deadline=deadline)
+        with patch.object(driver, 'make_live_agents') as make_clients:
+            await session._run()
+        make_clients.assert_not_called()
+        self.assertEqual((session.result['stop_reason'], session.result['tick']), ('time_limit', 0))
+        self.assertFalse(any(e['kind'] == 'observation' for e in session.events(0)['events']))
+
     async def test_offline_transport_records_the_selected_adapter_for_each_role(self):
         settings = Settings.offline('test').model_copy(update={'max_windows': 1, 'window_ticks': 1})
         supplied_id = str(uuid4())
@@ -137,6 +148,25 @@ class RealtimeSessionTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(any(e['kind'] in ('observation', 'phase_open', 'window_started')
                              for e in session.events(0)['events']))
 
+    async def test_mid_window_stop_publishes_last_durable_pose_between_state_samples(self):
+        session = await asyncio.to_thread(self.session)
+        programs = dict.fromkeys(ROLES, [])
+        programs['SPECTRA'] = [{'kind': 'RUN', 'direction': 1, 'ticks': 2, 'jump_at': None}]
+
+        async def stop_after_two_ticks(_deadline):
+            session.window = 1
+            session._step(programs, 0, release=dict.fromkeys(ROLES, 'ok'), sample_tick=0)
+            session._step(programs, 1)
+            raise CoordinationStop('time_limit')
+
+        with patch.object(session, '_play_physics', side_effect=stop_after_two_ticks):
+            await session._run()
+        events = session.events(0)['events']
+        self.assertEqual([e['tick'] for e in events if e['kind'] == 'state'], [0, 1])
+        final = events[-1]
+        self.assertEqual((final['kind'], final['tick'], final['stop_reason']), ('result', 2, 'time_limit'))
+        self.assertEqual(final['world'], replay(self.out)['state'])
+
     async def test_continue_clock_recovers_multiple_due_ticks_after_one_delayed_wake(self):
         session = await asyncio.to_thread(self.session, clock_mode='continue')
         window = session.window = 1
@@ -219,7 +249,7 @@ class RealtimeSessionTests(unittest.IsolatedAsyncioTestCase):
             return emit(kind, **data)
 
         with patch.object(session.journal, 'emit', side_effect=fail_terminal_event):
-            await session._run()
+            await asyncio.to_thread(session._worker)
         self.assertEqual([r['stop_reason'] for r in first], ['checkpoint'])
         self.assertTrue(first[0]['completed'])
         self.assertTrue(session.result['completed'])
@@ -228,6 +258,9 @@ class RealtimeSessionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(json.loads(path.read_text(encoding='utf-8')), session.result)
         self.assertFalse(any(e['kind'] == 'result' for e in records(self.out / 'events.jsonl')))
         verified = replay(self.out)
+        page = session.events(0)
+        self.assertTrue(page['recording_error'])
+        self.assertEqual(page['last_recorded_world'], verified['state'])
         self.assertTrue(verified['state']['completed'])
         self.assertEqual((verified['reason'], verified['ticks'], verified['run_id']),
                          ('checkpoint', session.result['tick'], session.result['run_id']))
@@ -268,3 +301,5 @@ class RealtimeSessionTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(verified['state']['completed'], stored)
                 self.assertEqual(verified['ticks'], session.world.tick if stored else session.world.tick - 1)
                 self.assertEqual(verified['ticks'], session.result['tick'])
+                terminal = session.events(0)['events'][-1]
+                self.assertEqual(terminal['world'], verified['state'])

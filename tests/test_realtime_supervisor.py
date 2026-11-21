@@ -1,5 +1,5 @@
 """Outer stop and durable accounting regressions using only local workers."""
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
 from io import BytesIO, StringIO
 import json
 from pathlib import Path
@@ -50,6 +50,15 @@ class SupervisionTests(unittest.TestCase):
                                  timeout_seconds=.2, cleanup_seconds=.1, control_pipe=True)
         self.assertEqual((hard.status, hard.exit_code), ('wall_timeout', 124))
         self.assertNotEqual(hard.child_exit_code, 0)
+
+    def test_supervisor_waits_only_until_the_shared_deadline(self):
+        child = MagicMock()
+        child.wait.return_value = 0
+        with (patch('parallax_relay.realtime.supervise.subprocess.Popen', return_value=child),
+              patch('parallax_relay.realtime.supervise.time.monotonic', side_effect=[100.0, 101.5])):
+            result = supervise_command(['inert-worker'], outer_deadline=102.0)
+        child.wait.assert_called_once_with(timeout=0.5)
+        self.assertEqual(result, SupervisionResult('completed', 0, 0))
 
     def test_lost_parent_pipe_enforces_child_deadline_even_during_a_stuck_close(self):
         worker = (
@@ -159,6 +168,8 @@ class SupervisionTests(unittest.TestCase):
             out = Path(temp) / 'match'
             def inert_launcher(argv, **options):
                 self.assertTrue(options['control_pipe'])
+                self.assertEqual(options['outer_deadline'], 340.0)
+                self.assertEqual(float(argv[-3]), options['outer_deadline'])
                 self.assertEqual(argv[-2], str(out))
                 journal = Journal(out, run_id=argv[-1])
                 journal.record_initial(physics.initial_world())
@@ -166,10 +177,28 @@ class SupervisionTests(unittest.TestCase):
                 return SupervisionResult('interrupted', 130, -9)
 
             output = StringIO()
-            with patch.object(cli, 'supervise_command', side_effect=inert_launcher), redirect_stdout(output):
+            with (patch.object(cli, 'supervise_command', side_effect=inert_launcher),
+                  patch.object(cli, 'monotonic', return_value=100.0), redirect_stdout(output)):
                 code = cli.main(['--live', '--profile', 'dev-bridge-live-v1', '--out', str(out)])
             self.assertEqual(code, 130)
             published = json.loads(output.getvalue())
             self.assertEqual(published['supervision']['checkpoint']['last_journaled_tick'], 0)
             self.assertEqual(json.loads(Path(published['receipt_file']).read_bytes()), published['supervision'])
             self.assertNotIn('LOCAL_ONLY', output.getvalue())
+
+    def test_child_uses_shared_deadline_and_rejects_malformed_arguments(self):
+        run_id = str(uuid4())
+        argv = ['worker', 'dev-bridge-live-v1', '101.0', 'match', run_id]
+        with (patch.object(cli, 'monotonic', return_value=100.0),
+              patch.object(cli, '_run', return_value=0) as run):
+            with patch.object(sys, 'argv', argv):
+                self.assertEqual(cli._live_child(), 0)
+            self.assertEqual(run.call_args.kwargs, {'run_id': run_id, 'outer_deadline': 101.0})
+            run.reset_mock()
+            for text in ('nan', 'inf', 'invalid', '341.0'):
+                invalid = argv[:2] + [text] + argv[3:]
+                with self.subTest(text=text), patch.object(sys, 'argv', invalid), redirect_stderr(StringIO()):
+                    self.assertEqual(cli._live_child(), 2)
+            with patch.object(sys, 'argv', argv[:2]), redirect_stderr(StringIO()):
+                self.assertEqual(cli._live_child(), 2)
+            run.assert_not_called()

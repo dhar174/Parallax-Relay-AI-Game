@@ -5,10 +5,12 @@ import argparse
 from decimal import Decimal
 from datetime import datetime, timezone
 import json
+import math
 import os
 from pathlib import Path
 import sys
 from threading import Thread, Timer
+from time import monotonic
 from uuid import uuid4
 
 from pydantic import ValidationError
@@ -61,9 +63,10 @@ def _parent_control(session, cleanup_seconds):
     session.close()
 
 
-def _run(out, mode, settings, profile, spectate, latency='demo', run_id=None):
+def _run(out, mode, settings, profile, spectate, latency='demo', run_id=None, *, outer_deadline=None):
     from .session import Session
-    session = Session(out, mode, settings, profile=profile, latency=latency, run_id=run_id)
+    session = Session(out, mode, settings, profile=profile, latency=latency,
+                      run_id=run_id, outer_deadline=outer_deadline)
     print(f'Recording: {out.resolve()}', flush=True)
     if spectate and mode != 'live':
         def new_session():
@@ -103,8 +106,17 @@ def _run(out, mode, settings, profile, spectate, latency='demo', run_id=None):
 def _live_child():
     # The public CLI always supervises this invocation. Only validated fixed
     # profile settings are used; credentials stay in the provider environment.
-    profile = load_profile(sys.argv[1])
-    return _run(Path(sys.argv[2]), 'live', profile.settings, profile, True, run_id=sys.argv[3])
+    try:
+        profile_name, deadline_text, out, run_id = sys.argv[1:]
+        profile = load_profile(profile_name)
+        deadline = float(deadline_text)
+        if not math.isfinite(deadline) or deadline > monotonic() + profile.settings.wall_seconds:
+            raise ValueError('Invalid shared deadline')
+    except (ConfigError, ValueError):
+        print('Invalid supervised live worker configuration.', file=sys.stderr)
+        return 2
+    return _run(Path(out), 'live', profile.settings, profile, True, run_id=run_id,
+                outer_deadline=deadline)
 
 
 def main(argv=None):
@@ -152,10 +164,12 @@ def main(argv=None):
             if out.exists() or out.is_symlink():
                 raise FileExistsError('A live recording requires a fresh destination')
             run_id = str(uuid4())
+            deadline = monotonic() + profile.settings.wall_seconds
             command = [sys.executable, '-c', 'from parallax_relay.realtime.__main__ import _live_child; '
-                       'raise SystemExit(_live_child())', profile.name, str(out), run_id]
+                       'raise SystemExit(_live_child())', profile.name, str(deadline), str(out), run_id]
             outcome = supervise_command(command, timeout_seconds=profile.settings.wall_seconds,
-                                        cleanup_seconds=profile.settings.cleanup_seconds, control_pipe=True)
+                                        cleanup_seconds=profile.settings.cleanup_seconds, control_pipe=True,
+                                        outer_deadline=deadline)
             if outcome.status in ('interrupted', 'wall_timeout'):
                 receipt = interruption_receipt(out, run_id, outcome)
                 try:

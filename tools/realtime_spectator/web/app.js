@@ -160,7 +160,8 @@ async function showFeed() {
   const label = role + ' · ' + roleNames[role] + ' sensor · Window ' + sample.window + ' · Sampled at tick ' + sample.tick;
   setText('sensor-caption', 'Loading ' + label);
   try {
-    const response = await request('/api/feed/' + role + '/' + sample.window);
+    const response = await request('/api/feed/' + role + '/' + sample.window,
+      {headers: {'X-Relay-Run-ID': runID}});
     const description = response.headers.get('X-Relay-Sensor-Description');
     const blob = await response.blob();
     if (generation !== feedGeneration) return;
@@ -377,6 +378,7 @@ function applyPage(page, replay) {
   // A failed final write cannot append a result to its own journal.
   if (page.recording_error === true && !page.has_more && !recordingFailed) {
     recordingFailed = true; status = 'ended'; phase = 'ended';
+    updateWorld(page.last_recorded_world);
     scene.cues.clear(); scene.setConnected(false);
     manual.close(windowNumber, 'The recording failed.');
     setText('phase', 'Finished'); setText('team-caption', 'Match ended');

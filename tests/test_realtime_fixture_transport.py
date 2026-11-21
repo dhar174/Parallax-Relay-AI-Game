@@ -1,6 +1,6 @@
 import time
 import unittest
-from unittest.mock import patch
+from unittest.mock import call, patch
 
 import httpx
 
@@ -11,6 +11,7 @@ from parallax_relay.realtime.fixture_transport import fixture_agents, historical
 from parallax_relay.realtime.observations import observe
 from parallax_relay.realtime.physics import initial_world, step
 from parallax_relay.realtime.settings import Settings
+from parallax_relay.realtime.wire import make_request
 
 
 class FixtureTransportTests(unittest.IsolatedAsyncioTestCase):
@@ -61,10 +62,32 @@ class FixtureTransportTests(unittest.IsolatedAsyncioTestCase):
         delays = historical_delays(scale=0.01)
         self.assertEqual(len(delays), 3)
         self.assertTrue(all(len(role) == 3 for role in delays))
-        self.assertAlmostEqual(max(max(role) for role in delays), 0.161724)
+        self.assertAlmostEqual(max(max(role.values()) for role in delays), 0.161724)
         _, phases = await self.run_match(delays)
         self.assertEqual([phase['phase'] for phase in phases[:3]], ['broadcast', 'negotiate', 'commit'])
         self.assertTrue(all(phase['elapsed_seconds'] > 0 for phase in phases))
+
+    async def test_historical_delays_follow_phase_when_skipped_or_retried(self):
+        settings = Settings.offline('test')
+        delays = historical_delays()
+        slots = ((1, 'broadcast'), (1, 'commit'), (1, 'commit'), (2, 'broadcast'), (2, 'commit'))
+        world = initial_world()
+        for schedules, expected in (
+            (delays, [delays[0][phase] for _, phase in slots]),
+            (((1.0, 2.0, 3.0), 0.0, 0.0), [1.0, 2.0, 3.0, 1.0, 2.0]),
+        ):
+            agents = fixture_agents(settings, schedules)
+            try:
+                with patch('parallax_relay.realtime.fixture_transport.sleep') as delay:
+                    for attempt, (window, phase) in enumerate(slots):
+                        observation = observe(world, 'SPECTRA', window, settings)
+                        request = make_request(observation, phase, (), (), '', window, str(attempt), settings)
+                        reply = await agents['SPECTRA'].respond(request)
+                        self.assertEqual(reply.status, 'ok')
+                    self.assertEqual(delay.await_args_list, [call(seconds) for seconds in expected])
+            finally:
+                for agent in agents.values():
+                    await agent.close()
 
 
 if __name__ == '__main__':

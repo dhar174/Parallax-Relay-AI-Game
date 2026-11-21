@@ -155,12 +155,13 @@ authorized run. [OpenAI model and pricing](https://developers.openai.com/api/doc
 · [Google standard pricing](https://aistudio.google.com/docs/pricing#gemini-3.5-flash-lite)
 
 The initial latency target is at least 90% of attempts within 15 seconds.
-The historical-delay offline rehearsal met that threshold on 24 of 27 attempts
-(88.9%). It took roughly 23–25 seconds of wall time per discussion and action
-cycle. [Development-room timing trials](verification/2026-11-20-realtime-playtest.md)
+In the historical-delay offline rehearsal, 24 of 27 attempts finished within
+15 seconds (88.9%), below the 90% target. Each discussion and action cycle
+took roughly 23–25 seconds. [Development-room timing trials](verification/2026-11-20-realtime-playtest.md)
 
 Any provider invocation requires separate explicit approval for one paid run
 with this roster and these bounds. Revalidate model availability and the dated
 prices and check credentials locally before that invocation. The profile reserves
 a full phase before dispatch and retains estimates where usage is unknown.
+The live worker stops dispatching at the supervisor's wall deadline.
 Further paid attempts require their own approval. [Engine plan and acceptance criteria](REALTIME_ENGINE_PLAN.md)

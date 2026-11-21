@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import math
 import os
 import signal
 import subprocess
@@ -31,12 +32,16 @@ def _kill_and_reap(child) -> int:
 
 
 def supervise_command(argv: Sequence[str], *, timeout_seconds: float = 240.0,
-                      cleanup_seconds: float = 5.0, control_pipe: bool = False) -> SupervisionResult:
-    """Stop and reap this child on deadline or interruption. Live workers cancel on pipe EOF."""
+                      cleanup_seconds: float = 5.0, control_pipe: bool = False,
+                      outer_deadline: float | None = None) -> SupervisionResult:
+    """Stop and reap the child on interruption or at a deadline shared with the live worker."""
     if not argv or not 0 < timeout_seconds <= 3600 or not 0 < cleanup_seconds <= 5:
         raise ValueError('Invalid supervised command or deadline')
     kwargs = {'creationflags': subprocess.CREATE_NEW_PROCESS_GROUP} if os.name == 'nt' else {'start_new_session': True}
-    deadline = time.monotonic() + timeout_seconds
+    latest_deadline = time.monotonic() + timeout_seconds
+    deadline = latest_deadline if outer_deadline is None else outer_deadline
+    if not math.isfinite(deadline) or deadline > latest_deadline:
+        raise ValueError('Invalid shared deadline')
     child = subprocess.Popen(list(argv), stdin=subprocess.PIPE if control_pipe else None, **kwargs)
     try:
         try:
