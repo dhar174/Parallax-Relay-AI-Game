@@ -19,20 +19,31 @@ class SettingsTests(unittest.TestCase):
         self.assertEqual((settings.max_windows, settings.window_ticks, settings.tick_rate, settings.action_points), (4, 120, 60, 8))
         self.assertEqual(settings.max_commands, 4)
         self.assertEqual((settings.max_calls, settings.max_attempts, settings.timeout_seconds, settings.wall_seconds), (36, 1, 20, 240))
+        self.assertEqual((settings.communication_rounds, settings.clock_mode), (2, 'freeze'))
         self.assertEqual((settings.max_output_tokens, settings.image_token_reserve, settings.max_estimated_cost_usd), (4096, 8192, 1))
         self.assertEqual(profile.players['FLUX'].model, 'gemini-3.5-flash-lite')
         self.assertNotIn('api_key_env', json.dumps(description))
         self.assertTrue(description['prices_require_revalidation'])
 
-    def test_invalid_values_and_offline_profiles(self):
+    def test_invalid_values_and_unknown_profile(self):
         for values in ({'max_calls': 0}, {'wall_seconds': float('nan')}, {'max_attempts': True}, {'clock_mode': 'x'}):
             with self.subTest(values=values), self.assertRaises(ValidationError):
                 Settings(**values)
-        self.assertEqual(Settings.offline('manual').phase_timeout_seconds, 120)
-        self.assertEqual(Settings.offline('reactive').phase_timeout_seconds, 5)
-        self.assertIsNone(Settings.offline('test').max_estimated_cost_usd)
         with self.assertRaises(ConfigError):
             load_profile('../not-a-profile')
+
+    def test_offline_timing_defaults_by_mode(self):
+        for mode, expected in (
+            ('reactive', (1, 10.0)),
+            ('manual', (2, 120.0)),
+            ('baseline', (2, 5.0)),
+            ('test', (2, 5.0)),
+        ):
+            with self.subTest(mode=mode):
+                settings = Settings.offline(mode)
+                self.assertEqual((settings.communication_rounds, settings.phase_timeout_seconds), expected)
+                self.assertEqual(settings.clock_mode, 'freeze')
+                self.assertIsNone(settings.max_estimated_cost_usd)
 
     def test_live_factory_requires_local_credentials_and_separate_clients(self):
         profile = load_profile('dev-bridge-live-v1')
