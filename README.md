@@ -75,8 +75,9 @@ power the bridge, jump onto the far bank, and attempt extraction.
 python -m parallax_relay.realtime --offline reactive --spectate
 ```
 
-The [real-time walkthrough](docs/REALTIME_DEMO.md) covers manual commands, the
-failed jump exercise, the paced baseline and local recording verification.
+The reactive demo uses one discussion round, a ten-second phase timeout, and
+frozen physics during discussion and commitment. The [real-time walkthrough](docs/REALTIME_DEMO.md)
+covers timing overrides, manual commands, missed jumps, and recording verification.
 
 ## How the turn-based baseline works
 

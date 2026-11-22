@@ -42,6 +42,8 @@ class Settings(BaseModel):
     def offline(cls, mode: Literal['reactive', 'manual', 'baseline', 'test'] = 'reactive') -> 'Settings':
         if mode not in {'reactive', 'manual', 'baseline', 'test'}:
             raise ValueError('Unknown offline mode')
+        if mode == 'reactive':
+            return cls(phase_timeout_seconds=10.0, communication_rounds=1, max_estimated_cost_usd=None)
         return cls(phase_timeout_seconds=120.0 if mode == 'manual' else 5.0,
                    wall_seconds=3600.0 if mode == 'manual' else 240.0,
                    max_estimated_cost_usd=None)

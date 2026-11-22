@@ -16,9 +16,11 @@ python -m parallax_relay.realtime --offline reactive --spectate
 
 Open the printed `http://127.0.0.1:<port>/` URL and select **Start match**.
 The scene is labeled **Raised Span**. The reactive offline controller chooses
-commands from each robot's sampled observations and public dialogue. This fixture
-exercises the scheduler and puzzle. Real-time model cooperation requires separate
-evaluation.
+commands from each robot's sampled observations and public dialogue. By default,
+each window has one discussion round (broadcast, then commit), a ten-second
+timeout per phase, and frozen physics while the robots discuss and commit. This
+fixture exercises the scheduler and puzzle. Real-time model cooperation requires
+separate evaluation.
 
 The **Relay team** cards show readiness during each discussion phase. The stage
 shows positions and speech bubbles as the simulation runs. **Public dialogue**
@@ -107,13 +109,27 @@ and the desired quick-play rhythm remain open playtest questions.
 
 ## Compare offline timing
 
-Recorded examples in the manual walkthrough use the default freeze clock. To
-compare it with continued gravity and contacts during discussion, add
-`--clock continue` to an offline physics launch. Each role still uses one
-sample per window and all plans start on a shared tick. Use
-`--communication-rounds 1` to run broadcast and commit. The default of two adds
-negotiation between them. Use `--window-ticks`, `--windows`, and
-`--action-points` to vary the physics limits. Set `--phase-timeout` in seconds.
+Use a twenty-second phase timeout to give slower broadcasts time to land when
+evaluating public dialogue. In the FLUX recovery playtest, the historical
+delay trace timed out FLUX's broadcasts at ten seconds and delivered all of
+them at twenty. Both cutoffs produced the same recovery. [Offline timing and recovery results](verification/2026-11-22-raised-span-timing.md)
+
+To compare the two cutoffs with the historical delay trace, launch the HTTP
+fixture with one round and frozen physics. Repeat with `--phase-timeout 20`.
+
+```bash
+python -m parallax_relay.realtime --offline test --spectate --latency historical --communication-rounds 1 --clock freeze --phase-timeout 10
+```
+
+Add `--phase-timeout 20` to the reactive launch to give each phase the same
+headroom without injecting the historical delays. Use `--communication-rounds 2`
+to add a negotiation phase. The manual editor and HTTP fixture default to two
+rounds, with phase timeouts of 120 and five seconds respectively.
+
+Add `--clock continue` to an offline physics launch to compare continued gravity
+and contacts during discussion. Each role still uses one sample per window and
+all plans start on a shared tick. Use `--window-ticks`, `--windows`, and
+`--action-points` to vary the physics limits.
 
 ## Verify a physics recording
 
