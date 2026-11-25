@@ -15,6 +15,24 @@ const finite = Number.isFinite;
 const BUBBLE_INSET = 6;
 const BUBBLE_GAP = 5;
 const WORDS_PER_MINUTE = 160;
+const ROOM = {left: -.95, right: 12.95, bottom: -2.25, top: 3.5};
+
+function cameraCenter(value, span, min, max) {
+  return span >= max - min ? (min + max) / 2 : clamp(value, min + span / 2, max - span / 2);
+}
+
+function cameraFrame(width, height, tile, x, y) {
+  const cx = cameraCenter(x, width / tile, ROOM.left, ROOM.right);
+  const cy = cameraCenter(y, height / tile, ROOM.bottom, ROOM.top);
+  return {tile, originX: width / 2 - cx * tile, originY: height / 2 + cy * tile};
+}
+
+function containsRobot(frame, width, height, x, y) {
+  const footX = frame.originX + x * frame.tile;
+  const footY = frame.originY - y * frame.tile;
+  return footX >= frame.tile * .44 && footX <= width - frame.tile * .44 &&
+    footY >= frame.tile * .84 && footY <= height;
+}
 
 function make(tag, className, parent) {
   const node = document.createElement(tag);
@@ -66,7 +84,9 @@ export class Scene {
   constructor() {
     this.stage = document.querySelector('#stage');
     this.stageShell = document.querySelector('#stage-shell');
+    this.stageViewport = document.querySelector('#stage-viewport');
     this.scroll = document.querySelector('#stage-scroll');
+    this.zoom = document.querySelector('#zoom');
     this.bubbleLayer = document.querySelector('#bubbles');
     this.canvas = document.querySelector('#scenery');
     this.context = this.canvas.getContext('2d');
@@ -87,6 +107,13 @@ export class Scene {
     this.frame = 0;
     this.lastPaint = 0;
     this.historical = false;
+    this.presentation = '';
+    this.followRole = null;
+    this.followCenter = null;
+    this.projectedFrame = null;
+    this.cameraAnimation = 0;
+    this.manualEnlarged = false;
+    this.manualPan = 0;
     for (const key of Object.keys(STATIC_CROPS)) this.load(key, '/art/' + key + '.png');
     for (const role of ROLES) {
       const slug = role.toLowerCase();
@@ -124,17 +151,48 @@ export class Scene {
       this.stageShell.dataset.speechSize = event.target.value;
       this.paint(true);
     });
-    const zoom = document.querySelector('#zoom');
-    const scroll = this.scroll;
-    scroll.addEventListener('scroll', () => this.paint(true), {passive: true});
-    zoom.addEventListener('click', () => {
-      const enlarged = scroll.classList.toggle('enlarged');
-      zoom.setAttribute('aria-pressed', String(enlarged));
-      zoom.textContent = enlarged ? 'Room overview' : 'Enlarge room';
-      scroll.setAttribute('aria-label', enlarged ? 'Enlarged room. Use arrow keys to pan.' : 'Room overview');
-      if (!enlarged) scroll.scrollLeft = 0;
+    this.scroll.addEventListener('scroll', () => this.paint(true), {passive: true});
+    this.zoom.addEventListener('click', () => {
+      this.manualEnlarged = !this.manualEnlarged;
+      this.manualPan = 0;
+      this.syncPan();
       this.paint(true);
     });
+    document.querySelector('#stage-camera').addEventListener('change', event => {
+      const role = event.target.value;
+      this.setFraming(this.presentation, ROLES.includes(role) ? role : null);
+    });
+  }
+
+  usesManualPan() {
+    return !this.presentation && !this.followRole;
+  }
+
+  syncPan() {
+    const manual = this.usesManualPan();
+    const enlarged = manual && this.manualEnlarged;
+    this.zoom.hidden = !manual;
+    this.zoom.setAttribute('aria-pressed', String(enlarged));
+    this.zoom.textContent = enlarged ? 'Room overview' : 'Enlarge room';
+    this.scroll.classList.toggle('enlarged', enlarged);
+    this.scroll.setAttribute('aria-label', enlarged ? 'Enlarged room. Use arrow keys to pan.' :
+      this.followRole ? `Following ${this.followRole}` : 'Room overview');
+    this.scroll.scrollLeft = enlarged ? this.manualPan : 0;
+  }
+
+  setFraming(presentation, followRole) {
+    if (this.usesManualPan()) this.manualPan = this.scroll.scrollLeft;
+    this.presentation = presentation;
+    this.followRole = followRole;
+    this.followCenter = null;
+    if (presentation) this.stageShell.dataset.presentation = presentation;
+    else delete this.stageShell.dataset.presentation;
+    this.syncPan();
+    this.paint(true);
+  }
+
+  setPresentation(mode) {
+    this.setFraming(mode, this.followRole);
   }
 
   load(key, path, frames) {
@@ -149,6 +207,10 @@ export class Scene {
 
   reset() {
     this.world = null;
+    this.followCenter = null;
+    this.projectedFrame = null;
+    cancelAnimationFrame(this.cameraAnimation);
+    this.cameraAnimation = 0;
     this.speech.clear();
     this.releaseSpeech();
     this.cues.clear();
@@ -264,12 +326,66 @@ export class Scene {
 
   camera() {
     const width = this.stage.clientWidth, height = this.stage.clientHeight;
-    if (!width || !height) return null;
-    const tile = width / 13.9;
+    if (!width || !height) {
+      this.projectedFrame = null;
+      return null;
+    }
+    if (this.usesManualPan()) {
+      this.projectedFrame = null;
+      const tile = width / 13.9;
+      return this.projection(width, height, {tile, originX: width / 2 - 6 * tile, originY: height * .775});
+    }
+
+    const overviewTile = Math.min(width / (ROOM.right - ROOM.left), height / (ROOM.top - ROOM.bottom));
+    const overview = cameraFrame(width, height, overviewTile, 6, (ROOM.bottom + ROOM.top) / 2);
+    const previous = this.projectedFrame;
+    const resized = previous?.width !== width || previous?.height !== height;
+    if (resized) this.followCenter = null;
+    const robot = this.world?.robots[this.followRole];
+    let target = overview, start = previous;
+    if (robot) {
+      const tile = Math.max(overviewTile, Math.min(width / (width < height ? 5 : 6.5), height / 3.5));
+      const x = robot.x / 256, y = robot.y / 256;
+      const headCenter = y + .42;
+      const horizontal = width / tile * .12, vertical = height / tile * .18;
+      const cx = clamp(this.followCenter?.x ?? x, x - horizontal, x + horizontal);
+      const cy = clamp(this.followCenter?.y ?? headCenter, headCenter - vertical, headCenter + vertical);
+      this.followCenter = {
+        x: cameraCenter(cx, width / tile, ROOM.left, ROOM.right),
+        y: cameraCenter(cy, height / tile, ROOM.bottom, ROOM.top),
+      };
+      target = cameraFrame(width, height, tile, this.followCenter.x, this.followCenter.y);
+      // Reveal a distant target or respawn before easing back into close framing.
+      if (previous && !resized && !containsRobot(previous, width, height, x, y)) start = overview;
+    }
+
+    const now = performance.now();
+    let frame = target;
+    if (start && !resized && !this.reduced.matches && !document.hidden) {
+      const weight = 1 - Math.exp(-clamp(now - previous.time, 0, 40) / 115);
+      const blend = key => start[key] + (target[key] - start[key]) * weight;
+      const next = {tile: blend('tile'), originX: blend('originX'), originY: blend('originY')};
+      const remaining = Math.max(Math.abs(next.originX - target.originX), Math.abs(next.originY - target.originY),
+        14 * Math.abs(next.tile - target.tile));
+      if (remaining > .5) {
+        frame = next;
+        if (!this.cameraAnimation) {
+          this.cameraAnimation = requestAnimationFrame(() => {
+            this.cameraAnimation = 0;
+            this.paint(true);
+          });
+        }
+      }
+    }
+    this.projectedFrame = {...frame, width, height, time: now};
+    return this.projection(width, height, frame);
+  }
+
+  projection(width, height, {tile, originX, originY}) {
     return {
-      width, height, tile, deck: height * .775,
-      x: x => width / 2 + (x / 256 - 6) * tile,
-      y: y => height * .775 - y / 256 * tile,
+      width, height, tile,
+      x: x => originX + x / 256 * tile,
+      y: y => originY - y / 256 * tile,
     };
   }
 
@@ -366,25 +482,61 @@ export class Scene {
     return {role, x: footX, y: footY - size * .87};
   }
 
+  syncSpeechDock() {
+    // A separate reading area gives speakers stable positions outside the camera crop.
+    const docked = Boolean(this.world && !this.usesManualPan() && Object.values(this.actors).some(actor => actor.speech));
+    if (docked) {
+      for (const actor of Object.values(this.actors)) {
+        const hidden = !actor.speech;
+        if (actor.bubble.hidden !== hidden) actor.bubble.hidden = hidden;
+      }
+    }
+    if (docked === this.stageViewport.hasAttribute('data-speech-docked')) return;
+    this.stageViewport.toggleAttribute('data-speech-docked', docked);
+    this.bubbleFitKey = null;
+    if (docked) {
+      this.bubbleLayer.removeAttribute('data-compact');
+      this.bubbleLayer.removeAttribute('aria-hidden');
+      this.bubbleLayer.setAttribute('role', 'region');
+      this.bubbleLayer.setAttribute('aria-label', 'Current public speech');
+      this.bubbleLayer.tabIndex = 0;
+    } else {
+      if (document.activeElement === this.bubbleLayer) document.querySelector('#stage-camera').focus({preventScroll: true});
+      this.bubbleLayer.setAttribute('aria-hidden', 'true');
+      for (const attribute of ['role', 'aria-label', 'tabindex']) this.bubbleLayer.removeAttribute(attribute);
+    }
+  }
+
   placeBubbles(worldHeads, height) {
     const view = {width: this.scroll.clientWidth, height};
     const pan = this.scroll.scrollLeft;
+    const docked = this.stageViewport.hasAttribute('data-speech-docked');
     const heads = worldHeads.map(head => {
       const x = head.x - pan;
-      const side = x < 0 ? 'left' : x > view.width ? 'right' : '';
+      const side = x < 0 ? 'left' : x > view.width ? 'right' :
+        head.y < 0 ? 'above' : head.y > height ? 'below' : '';
       const actor = this.actors[head.role];
-      actor.bubble.hidden = Boolean(side && !actor.speech);
+      actor.bubble.hidden = !actor.speech && Boolean(docked || side);
       actor.leader.hidden = true;
-      if (side) actor.bubble.dataset.offscreen = side;
+      if (side && !docked) actor.bubble.dataset.offscreen = side;
       else delete actor.bubble.dataset.offscreen;
       return {...head, x, side, actor};
     });
 
-    // Keep placement priority in role order as speaking robots cross on screen.
     const speakers = heads.filter(head => head.actor.speech);
+    if (!docked) this.placeOverlayBubbles(heads, speakers, view);
+    const layout = speakers.map(({actor}) => [actor.message.clientWidth, actor.message.clientHeight].join('/')).join(',');
+    if (layout !== this.speechLayout) {
+      this.speechLayout = layout;
+      this.updateSpeechScroll();
+    }
+  }
+
+  placeOverlayBubbles(heads, speakers, view) {
+    // Keep placement priority in role order as speaking robots cross on screen.
     const measure = ({actor: {bubble}}) => ({width: bubble.offsetWidth, height: bubble.offsetHeight});
     const messageIds = ROLES.map(role => this.actors[role].speech?.seq);
-    const fitKey = [view.width, height, this.stageShell.dataset.speechSize, ...messageIds].join('/');
+    const fitKey = [view.width, view.height, this.stageShell.dataset.speechSize, ...messageIds].join('/');
     if (fitKey !== this.bubbleFitKey) {
       // Re-evaluate on text/size changes, not on world frames. Toggling the clip
       // while a robot moves can clamp away the currently displayed last line.
@@ -392,7 +544,7 @@ export class Scene {
       this.bubbleLayer.removeAttribute('data-compact');
       const gutter = BUBBLE_INSET * 2 + BUBBLE_GAP * (speakers.length - 1);
       const stackHeight = speakers.reduce((sum, head) => sum + measure(head).height, gutter);
-      if (stackHeight > height) this.bubbleLayer.setAttribute('data-compact', '');
+      if (stackHeight > view.height) this.bubbleLayer.setAttribute('data-compact', '');
     }
     const boxes = [];
     if (!this.bubbleLayer.hasAttribute('data-compact')) {
@@ -425,11 +577,6 @@ export class Scene {
       if (box) { boxes.push(box); this.drawBubble(head, box); }
       else head.actor.bubble.hidden = true;
     }
-    const layout = speakers.map(({actor}) => [actor.message.clientWidth, actor.message.clientHeight].join('/')).join(',');
-    if (layout !== this.speechLayout) {
-      this.speechLayout = layout;
-      this.updateSpeechScroll();
-    }
   }
 
   drawBubble(head, box) {
@@ -449,6 +596,7 @@ export class Scene {
 
   paint(scenery = false) {
     if (this.batching) return;
+    this.syncSpeechDock();
     const view = this.camera();
     if (!view) {
       // Switching to a sensor feed removes the stage from layout. Force speech
@@ -456,6 +604,7 @@ export class Scene {
       this.speechLayout = null;
       return;
     }
+    scenery ||= !this.usesManualPan();
     if (scenery) this.drawScenery(view);
     if (!this.world) return;
     const now = this.connected ? performance.now() : this.lastPaint;

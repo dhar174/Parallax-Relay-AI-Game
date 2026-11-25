@@ -1,5 +1,6 @@
 import {Scene, ROLES, COLORS} from './scene.js';
 import {Manual} from './manual.js';
+import {StagePresentation} from './presentation.js';
 
 const byId = id => document.getElementById(id);
 const modeLabels = {
@@ -9,6 +10,7 @@ const modeLabels = {
 const roleNames = {SPECTRA: 'Optical', PYRA: 'Thermal', FLUX: 'Circuit'};
 const phaseNames = {broadcast: 'Broadcast', negotiate: 'Negotiate', commit: 'Commit'};
 const scene = new Scene();
+new StagePresentation(scene);
 const manual = new Manual(post);
 const feeds = new Map();
 const groups = new Map();
@@ -147,9 +149,10 @@ function clearFeed() {
 async function showFeed() {
   const role = byId('sensor-select').value;
   const spectator = role === 'SPECTATOR';
-  byId('stage-shell').hidden = !spectator;
+  byId('stage-viewport').hidden = byId('stage-controls').hidden = !spectator;
   byId('room-guide').hidden = !spectator;
-  byId('sensor-view').hidden = spectator; byId('zoom').hidden = !spectator;
+  byId('sensor-view').hidden = spectator;
+  scene.zoom.hidden = !spectator || !scene.usesManualPan();
   if (spectator) {
     if (feedKey || imageURL) clearFeed();
     scene.paint(true);

@@ -37,8 +37,8 @@ async function server(t, mode) {
   });
 }
 
-async function pageFor(t, origin, viewport, reducedMotion = 'no-preference') {
-  const context = await browser.newContext({viewport, reducedMotion, serviceWorkers: 'block'});
+async function pageFor(t, origin, viewport, reducedMotion = 'no-preference', device = {}) {
+  const context = await browser.newContext({viewport, reducedMotion, serviceWorkers: 'block', ...device});
   const errors = [], external = [];
   await context.route('**/*', route => {
     if (new URL(route.request().url()).origin === new URL(origin).origin) return route.continue();
@@ -108,8 +108,16 @@ test('reactive spectator waits for Start and runs multiple real windows', {timeo
   await page.waitForTimeout(500);
   assert.equal(await page.locator('#tick').textContent(), initial, 'No simulation before Start');
   await screenshot(page, 'reactive-before-start');
+  const runningID = await page.locator('#run-id').textContent();
   await page.locator('#start').click();
+  await page.getByRole('button', {name: 'Fullscreen', exact: true}).click();
+  await page.waitForFunction(() => document.fullscreenElement?.id === 'stage-shell');
+  await page.getByLabel('Camera', {exact: true}).selectOption('SPECTRA');
   await page.waitForFunction(() => Number(document.querySelector('#window').textContent.match(/\d+/)?.[0] || 0) >= 2, null, {timeout: 60000});
+  assert.equal(await page.locator('#run-id').textContent(), runningID);
+  await page.getByLabel('Camera', {exact: true}).selectOption('room');
+  await page.getByRole('button', {name: 'Exit to dashboard'}).click();
+  await page.getByRole('button', {name: 'Fullscreen', exact: true}).waitFor();
   assert.ok(await page.locator('#transcript [data-seq]').count() > 0, 'Public dialogue is visible');
   assert.ok(await page.locator('#consequences [data-seq]').count() > 0, 'Real consequences are visible');
   await screenshot(page, 'reactive-window-2');
@@ -347,8 +355,9 @@ async function bubbleScroll(page) {
 
 async function assertBubblesFit(page) {
   const {viewport, boxes, overflow} = await page.evaluate(() => {
-    const viewport = document.querySelector('#stage-scroll').getBoundingClientRect().toJSON();
-    viewport.bottom = viewport.top + document.querySelector('#stage').clientHeight;
+    const dock = document.querySelector('#stage-viewport[data-speech-docked] #bubbles');
+    const viewport = (dock || document.querySelector('#stage-scroll')).getBoundingClientRect().toJSON();
+    if (!dock) viewport.bottom = viewport.top + document.querySelector('#stage').clientHeight;
     const boxes = [...document.querySelectorAll('.bubble:not([hidden])')].map(node => node.getBoundingClientRect().toJSON());
     return {viewport, boxes, overflow: document.documentElement.scrollWidth - innerWidth};
   });
@@ -360,6 +369,71 @@ async function assertBubblesFit(page) {
     assert.ok(boxes.slice(0, i).every(other => box.right <= other.left || box.left >= other.right ||
       box.bottom <= other.top || box.top >= other.bottom), `Bubble ${i} does not overlap another`);
   }
+}
+
+for (const native of [true, false]) {
+  test(`${native ? 'native' : 'fallback'} presentation controls fit at doubled text size`, {timeout:45000}, async t => {
+    const origin = await server(t, 'manual');
+    const page = await pageFor(t, origin, {width: 320, height: 568}, 'reduce');
+    await loadSpeechFixture(page, {world: presentationFixture()});
+    await page.evaluate(native => {
+      document.documentElement.style.fontSize = '32px';
+      if (!native) document.querySelector('#stage-shell').requestFullscreen = undefined;
+    }, native);
+    const toggle = page.locator('#stage-fullscreen');
+    assert.ok(await toggle.evaluate(button => button.getBoundingClientRect().right <=
+      button.closest('.scene-panel').getBoundingClientRect().right), 'Dashboard launcher fits in its panel');
+    await toggle.click();
+    await page.locator(`#stage-shell[data-presentation="${native ? 'native' : 'game-only'}"]`).waitFor();
+    await assertPresentationControlsFit(page);
+    await page.getByRole('button', {name: 'Exit to dashboard'}).click();
+    await page.getByRole('button', {name: 'Fullscreen', exact: true}).waitFor();
+  });
+}
+
+async function assertPresentationControlsFit(page) {
+  const clipped = await page.locator('#stage-controls :is(button, select)').evaluateAll(controls => controls
+    .filter(control => {
+      const rect = control.getBoundingClientRect();
+      return rect.left < -1 || rect.right > document.documentElement.clientWidth + 1 ||
+        rect.top < -1 || rect.bottom > document.documentElement.clientHeight + 1;
+    }).map(control => control.id));
+  assert.deepEqual(clipped, [], 'All stage controls stay reachable');
+}
+
+for (const scenario of ['robot', 'short', 'movement']) {
+  test(`crowded follow speech stays usable during ${scenario}`, {timeout:45000}, async t => {
+    const origin = await server(t, 'manual');
+    const width = scenario === 'movement' ? 780 : 568;
+    const height = scenario === 'short' ? 200 : 320;
+    const x = scenario === 'movement' ? 320 : 1536;
+    const page = await pageFor(t, origin, {width, height}, 'reduce');
+    const world = {...speechWorld([x, 768, 1024]), bridge_powered: true};
+    const journal = await loadSpeechFixture(page, {world});
+    await page.locator('#stage-shell').evaluate(el => {el.requestFullscreen = undefined;});
+    await page.locator('#stage-fullscreen').click();
+    await page.getByLabel('Camera', {exact: true}).selectOption('SPECTRA');
+    if (scenario !== 'movement') await page.getByLabel('Text size', {exact: true}).selectOption('largest');
+    await waitForFollowScale(page, 'SPECTRA');
+    if (scenario === 'movement') {
+      const rows = () => page.locator('.bubble.speaking').evaluateAll(nodes => nodes.map(node => node.offsetTop));
+      const before = await rows();
+      await publishPose(page, journal, {...world, robots: {...world.robots,
+        SPECTRA: {...world.robots.SPECTRA, x: x + 16}}}, 2);
+      assert.deepEqual(await rows(), before, 'A single physics tick keeps each speaker in the same row');
+    }
+    await assertBubblesFit(page);
+    assert.ok(await page.evaluate(() => {
+      const robot = document.querySelector('[data-robot="SPECTRA"] .robot-art').getBoundingClientRect();
+      return [...document.querySelectorAll('.bubble.speaking')].every(node => {
+        const bubble = node.getBoundingClientRect();
+        return bubble.right <= robot.left || bubble.left >= robot.right ||
+          bubble.bottom <= robot.top || bubble.top >= robot.bottom;
+      });
+    }), 'All speech stays clear of the followed robot');
+    await page.getByRole('button', {name: 'Read speech'}).click();
+    assert.equal(await page.getByRole('region', {name: 'Complete message'}).textContent(), longSpeech.FLUX);
+  });
 }
 
 test('long released speech is visible and intact on a narrow stage', {timeout:45000}, async t => {
@@ -488,5 +562,171 @@ for (const compact of [true, false]) {
     await page.waitForFunction(() => document.querySelector('[data-robot="SPECTRA"]').dataset.x === '780');
     assert.deepEqual(await rowPositions(), before, 'Every speaker stays in the same row');
     await assertBubblesFit(page);
+  });
+}
+
+function presentationFixture() {
+  const world = speechWorld([128, 1024, 3000]);
+  world.robots.FLUX.y = 128;
+  return world;
+}
+
+async function framing(page, role) {
+  return page.locator(`[data-robot="${role}"] .robot-art`).evaluate(art => {
+    const stage = document.querySelector('#stage').getBoundingClientRect();
+    const actor = art.getBoundingClientRect();
+    return {width: actor.width, x: actor.left - stage.left, y: actor.top - stage.top,
+      right: stage.right - actor.right, bottom: stage.bottom - actor.bottom};
+  });
+}
+
+function assertInFrame(frame) {
+  assert.ok(frame.width > 0 && [frame.x, frame.y, frame.right, frame.bottom].every(value => value >= -1),
+    `Robot is fully framed: ${JSON.stringify(frame)}`);
+}
+
+async function waitForFollowScale(page, role) {
+  // ResizeObserver applies the new projection after the viewport's CSS size changes.
+  await page.waitForFunction(role => {
+    const stage = document.querySelector('#stage');
+    const width = stage.clientWidth, height = stage.clientHeight;
+    const tilesAcross = width < height ? 5 : 6.5;
+    const expectedWidth = Math.min(width / tilesAcross, height / 3.5) * 8 / 9;
+    const art = document.querySelector(`[data-robot="${role}"] .robot-art`);
+    return Math.abs(art.getBoundingClientRect().width - expectedWidth) < 1;
+  }, role);
+}
+
+async function publishPose(page, journal, world, tick) {
+  journal.push({kind: 'state', world: {...world, tick}});
+  await page.waitForFunction(tick => document.querySelector('#stage').dataset.tick === String(tick), tick);
+}
+
+test('native fullscreen shares camera and dialogue without resetting the match', {timeout:45000}, async t => {
+  const origin = await server(t, 'manual');
+  const page = await pageFor(t, origin, {width: 1280, height: 800});
+  const journal = await loadSpeechFixture(page, {world: presentationFixture()});
+  const camera = page.getByLabel('Camera', {exact: true});
+  const enter = page.getByRole('button', {name: 'Fullscreen', exact: true});
+  const exit = page.getByRole('button', {name: 'Exit to dashboard'});
+  assert.equal(await camera.inputValue(), 'room');
+  await page.getByRole('button', {name: 'Enlarge room'}).click();
+  const pan = await page.locator('#stage-scroll').evaluate(node => {node.scrollLeft = 190; return node.scrollLeft;});
+  assert.ok(pan > 0);
+  const runID = await page.locator('#run-id').textContent();
+  await enter.focus();
+  await page.keyboard.press('Enter');
+  await page.waitForFunction(() => document.fullscreenElement?.id === 'stage-shell');
+  assert.equal(await page.locator('#stage-shell').getAttribute('data-presentation'), 'native');
+  assert.equal(await camera.inputValue(), 'room');
+  assert.ok(await page.locator('#start').evaluate(node => Boolean(node.closest('[inert]'))));
+  const room = await framing(page, 'SPECTRA');
+  for (const role of speechRoles) assertInFrame(await framing(page, role));
+  await assertBubblesFit(page);
+  await page.screenshot({path: join(output, 'fullscreen-whole-room.png')});
+
+  for (const role of speechRoles) {
+    await camera.selectOption(role);
+    await waitForFollowScale(page, role);
+    const followed = await framing(page, role);
+    assert.ok(followed.width > room.width * 1.4);
+    assertInFrame(followed);
+  }
+  await page.screenshot({path: join(output, 'fullscreen-follow.png')});
+  const jumping = presentationFixture();
+  Object.assign(jumping.robots.FLUX, {x: 2880, y: 320, grounded: false, pose: 'ascent'});
+  await publishPose(page, journal, jumping, 2);
+  assertInFrame(await framing(page, 'FLUX'));
+  const respawn = presentationFixture();
+  Object.assign(respawn.robots.FLUX, {x: 128, y: 0, pose: 'idle'});
+  await publishPose(page, journal, respawn, 3);
+  assertInFrame(await framing(page, 'FLUX'));
+
+  const read = page.getByRole('button', {name: 'Read speech'});
+  await read.click();
+  const dialog = page.getByRole('dialog', {name: 'Public speech'});
+  assert.ok(await dialog.isVisible());
+  assert.equal(await dialog.getByRole('region', {name: 'Complete message'}).textContent(), longSpeech.FLUX);
+  journal.push({kind: 'dialogue', role: 'PYRA', text: 'Ready for the next jump.', window: 2, phase: 'broadcast'});
+  await page.waitForFunction(() => document.querySelectorAll('#transcript article').length === 4);
+  assert.equal(await dialog.getByRole('region', {name: 'Complete message'}).textContent(), longSpeech.FLUX);
+  assert.ok(await dialog.evaluate(node => document.fullscreenElement?.contains(node)));
+  assert.equal(await page.locator('#run-id').textContent(), runID);
+  await dialog.getByRole('button', {name: 'Close'}).click();
+  await camera.selectOption('room');
+  await exit.click();
+  await page.waitForFunction(() => !document.fullscreenElement && !document.querySelector('#stage-shell').dataset.presentation);
+  assert.equal(await page.locator('#stage-scroll').evaluate(node => node.scrollLeft), pan);
+  assert.ok(await enter.evaluate(node => node === document.activeElement));
+
+  await camera.selectOption('PYRA');
+  await enter.click();
+  await page.waitForFunction(() => document.fullscreenElement?.id === 'stage-shell');
+  assert.equal(await camera.inputValue(), 'PYRA');
+  await page.evaluate(() => document.exitFullscreen());
+  await enter.waitFor();
+  assert.equal(await camera.inputValue(), 'PYRA');
+  assert.ok(await enter.evaluate(node => node === document.activeElement));
+  assert.equal(await page.locator('#start').evaluate(node => Boolean(node.closest('[inert]'))), false);
+});
+
+for (const unavailable of [true, false]) {
+  const reason = unavailable ? 'unavailable' : 'denied';
+  test(`game-only fallback when native fullscreen is ${reason}`, {timeout:45000}, async t => {
+    const origin = await server(t, 'manual');
+    const width = unavailable ? 320 : 390;
+    const page = await pageFor(t, origin, {width, height: 780}, 'reduce', {hasTouch: true, isMobile: true});
+    const journal = await loadSpeechFixture(page, {world: presentationFixture()});
+    await page.evaluate(unavailable => {
+      if (unavailable) document.querySelector('#stage-shell').requestFullscreen = undefined;
+      else document.querySelector('#stage-shell').requestFullscreen = () => Promise.reject(new Error('Denied by test'));
+    }, unavailable);
+    const enter = page.getByRole('button', {name: 'Fullscreen', exact: true});
+    await page.evaluate(() => window.scrollTo(0, 160));
+    await enter.scrollIntoViewIfNeeded();
+    const scrollY = await page.evaluate(() => window.scrollY);
+    assert.ok(scrollY > 0, 'Exercise restoration of a scrolled dashboard');
+    await enter.tap();
+    await page.getByText('Game-only view', {exact: true}).waitFor();
+    assert.equal(await page.evaluate(() => document.fullscreenElement), null);
+    assert.ok(await page.locator('#sensor-select').evaluate(node => Boolean(node.closest('[inert]'))));
+    const camera = page.getByLabel('Camera', {exact: true});
+    const whole = await framing(page, 'SPECTRA');
+    await camera.selectOption('SPECTRA');
+    const followed = await framing(page, 'SPECTRA');
+    assert.ok(followed.width > whole.width * 2, 'Portrait follow zoom admits the surrounding terrain');
+    assertInFrame(followed);
+    const landing = presentationFixture();
+    Object.assign(landing.robots.SPECTRA, {x: 2656, y: 128, pose: 'landing'});
+    await publishPose(page, journal, landing, 2);
+    assertInFrame(await framing(page, 'SPECTRA'));
+    await assertBubblesFit(page);
+    assert.ok(await page.evaluate(() => {
+      const actor = document.querySelector('[data-robot="SPECTRA"] .robot-art').getBoundingClientRect();
+      return [...document.querySelectorAll('.bubble.speaking')].every(node => {
+        const bubble = node.getBoundingClientRect();
+        return bubble.right <= actor.left || bubble.left >= actor.right ||
+          bubble.bottom <= actor.top || bubble.top >= actor.bottom;
+      });
+    }), 'The followed robot stays visible below the bubbles');
+    if (unavailable) await page.screenshot({path: join(output, 'game-only-320.png')});
+
+    await page.getByRole('button', {name: 'Read speech'}).tap();
+    const dialog = page.getByRole('dialog', {name: 'Public speech'});
+    assert.ok(await dialog.isVisible());
+    await page.keyboard.press('Escape');
+    await dialog.waitFor({state: 'hidden'});
+    assert.equal(await page.locator('#stage-shell').getAttribute('data-presentation'), 'game-only');
+    await page.setViewportSize({width: 780, height: 320});
+    await page.waitForFunction(() => document.querySelector('#stage-shell').clientWidth === 780);
+    await waitForFollowScale(page, 'SPECTRA');
+    assertInFrame(await framing(page, 'SPECTRA'));
+    await assertBubblesFit(page);
+    await page.setViewportSize({width, height: 780});
+    await page.keyboard.press('Escape');
+    await enter.waitFor();
+    assert.equal(await page.evaluate(() => window.scrollY), scrollY);
+    assert.ok(await enter.evaluate(node => node === document.activeElement));
+    assert.equal(await camera.inputValue(), 'SPECTRA');
   });
 }
