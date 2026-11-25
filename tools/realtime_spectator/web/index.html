@@ -28,7 +28,8 @@
             <select id="sensor-select" aria-label="Choose view">
               <option value="SPECTATOR">Spectator view</option>
               <option value="SPECTRA">SPECTRA · Optical feed</option>
-              <option value="PYRA">PYRA · Thermal feed</option>
+              <option id="thermal-bloom-option" value="PYRA_BLOOM" hidden disabled>PYRA · Thermal Bloom</option>
+              <option value="PYRA">PYRA · Original thermal feed</option>
               <option id="circuit-relief-option" value="FLUX_RELIEF" hidden disabled>FLUX · Circuit Relief</option>
               <option value="FLUX">FLUX · Original circuit feed</option>
             </select>

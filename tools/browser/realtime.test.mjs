@@ -130,27 +130,34 @@ test('reactive spectator waits for Start and runs multiple real windows', {timeo
   await page.locator('#result:visible').waitFor({timeout: 30000});
   const journal = await events(page);
   assert.ok(journal.some(event => event.kind === 'consequence' && event.event_kind === 'completed'), 'Actual team checkpoint');
-  const lastFlux = journal.findLast(event => event.kind === 'observation' && event.role === 'FLUX');
   const picker = page.locator('#sensor-select');
   const sensorImage = page.locator('#sensor-image:visible');
   await page.setViewportSize({width: 390, height: 800});
-  await picker.selectOption('FLUX_RELIEF');
-  await sensorImage.waitFor();
-  assert.match(await sensorImage.getAttribute('alt'), new RegExp('Circuit Relief illustration for window ' + lastFlux.window));
-  assert.match(await page.locator('#sensor-caption').textContent(), new RegExp('Sampled at tick ' + lastFlux.tick));
-  const reliefSrc = await sensorImage.getAttribute('src');
-  const size = await sensorImage.evaluate(async image => {
-    await image.decode();
-    return {native: [image.naturalWidth, image.naturalHeight], right: image.getBoundingClientRect().right,
-      viewport: document.documentElement.clientWidth};
-  });
-  assert.deepEqual(size.native, [850, 295]);
-  assert.ok(size.right <= size.viewport, 'The sensor image fits the mobile viewport');
-  await screenshot(page, 'flux-circuit-relief-mobile');
-  await picker.selectOption('FLUX');
-  await sensorImage.waitFor();
-  assert.match(await sensorImage.getAttribute('alt'), new RegExp('original sensor observation for window ' + lastFlux.window));
-  assert.notEqual(await sensorImage.getAttribute('src'), reliefSrc);
+  for (const [role, view, title, capture] of [
+    ['FLUX', 'FLUX_RELIEF', 'Circuit Relief', 'flux-circuit-relief-mobile'],
+    ['PYRA', 'PYRA_BLOOM', 'Thermal Bloom', 'pyra-thermal-bloom-mobile'],
+  ]) {
+    const sample = journal.findLast(event => event.kind === 'observation' && event.role === role);
+    await picker.selectOption(view);
+    await sensorImage.waitFor();
+    const description = await sensorImage.getAttribute('alt');
+    assert.match(description, new RegExp(title + ' illustration for window ' + sample.window));
+    if (role === 'PYRA') assert.match(description, /Thermal reading 3 at motor column 4/);
+    assert.match(await page.locator('#sensor-caption').textContent(), new RegExp('Sampled at tick ' + sample.tick));
+    const illustratedSrc = await sensorImage.getAttribute('src');
+    const size = await sensorImage.evaluate(async image => {
+      await image.decode();
+      return {native: [image.naturalWidth, image.naturalHeight], right: image.getBoundingClientRect().right,
+        viewport: document.documentElement.clientWidth};
+    });
+    assert.deepEqual(size.native, [850, 295]);
+    assert.ok(size.right <= size.viewport, 'The sensor image fits the mobile viewport');
+    await screenshot(page, capture);
+    await picker.selectOption(role);
+    await sensorImage.waitFor();
+    assert.match(await sensorImage.getAttribute('alt'), new RegExp('original sensor observation for window ' + sample.window));
+    assert.notEqual(await sensorImage.getAttribute('src'), illustratedSrc);
+  }
   await page.setViewportSize({width: 1280, height: 800});
   await page.locator('#sensor-select').selectOption('SPECTATOR');
   await screenshot(page, 'reactive-complete');
@@ -306,6 +313,7 @@ test('baseline launcher waits for Start and publishes a real fixture resolution'
   const page = await pageFor(t, origin, {width:1280, height:800});
   await page.locator('#connection').filter({hasText: /^Connected$/}).waitFor();
   assert.ok(await page.locator('#circuit-relief-option').evaluate(option => option.hidden && option.disabled));
+  assert.ok(await page.locator('#thermal-bloom-option').evaluate(option => option.hidden && option.disabled));
   const before = await events(page);
   await page.waitForTimeout(500);
   assert.equal((await events(page)).filter(event => event.kind === 'window_started').length, 0);

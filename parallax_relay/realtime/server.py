@@ -27,6 +27,7 @@ MEDIA_TYPES = {'.html': 'text/html; charset=utf-8', '.js': 'text/javascript',
                '.css': 'text/css', '.png': 'image/png', '.json': 'application/json'}
 PUBLIC_STATUS_FIELDS = ('mode', 'status', 'run_id', 'window_ticks', 'action_points')
 OFFLINE_MODES = {'reactive', 'manual', 'baseline', 'test'}
+_ILLUSTRATED_FEEDS = {'FLUX': 'circuit-relief', 'PYRA': 'thermal-bloom'}
 
 
 class SpectatorSession(Protocol):
@@ -189,8 +190,8 @@ class SpectatorHandler(BaseHTTPRequestHandler):
                     after = int(match[1])
                 self._json(200, self.server.session.events(after))
                 return
-            match = re.fullmatch(r'/api/feed/([A-Z]+)/([0-9]{1,16})(/circuit-relief)?', self.path)
-            if match and match[1] in ROLES and (not match[3] or match[1] == 'FLUX'):
+            match = re.fullmatch(r'/api/feed/([A-Z]+)/([0-9]{1,16})(?:/([a-z-]+))?', self.path)
+            if match and match[1] in ROLES and (not match[3] or match[3] == _ILLUSTRATED_FEEDS.get(match[1])):
                 session = self.server.session
                 run_ids = self.headers.get_all('X-Relay-Run-ID', [])
                 if len(run_ids) != 1 or not run_ids[0]:
@@ -202,8 +203,8 @@ class SpectatorHandler(BaseHTTPRequestHandler):
                     return
                 role, window = match[1], int(match[2])
                 if match[3]:
-                    illustrate = getattr(session, 'illustrated_flux_feed', None)
-                    png = illustrate(window) if illustrate else None
+                    illustrate = getattr(session, 'illustrated_feed', None)
+                    png = illustrate(role, window) if illustrate else None
                 else:
                     png = session.feed(role, window)
                 if png is not None:

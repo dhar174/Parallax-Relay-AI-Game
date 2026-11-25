@@ -35,8 +35,10 @@ consequences. Use **Choose view** to inspect the optical, thermal, or circuit PN
 sampled at the start of the current window. In Raised Span, **FLUX · Circuit
 Relief** illustrates the sampled power route and energy cell against blurred
 scenery. The S, P, and F contact marks show each robot's column. Teammates'
-heights are schematic. **FLUX · Original circuit feed** shows the exact PNG
-used by the FLUX player. Select **Spectator view** to watch the whole room.
+heights are schematic. **PYRA · Thermal Bloom** shows the motor's heat as a
+halo and a numbered, segmented meter. Both shrink as the motor cools. The
+**Original circuit feed** and **Original thermal feed** options show exactly
+the PNGs used by FLUX and PYRA. Select **Spectator view** to watch the whole room.
 Open **Released plans** to check the programs and their shared
 start tick.
 

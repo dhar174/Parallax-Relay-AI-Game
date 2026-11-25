@@ -76,15 +76,23 @@ function setReady(role, disposition) {
   ready.title = words(disposition);
 }
 
+const illustrationViews = new Map([
+  ['FLUX_RELIEF', {role: 'FLUX', path: '/circuit-relief', name: 'Circuit Relief illustration'}],
+  ['PYRA_BLOOM', {role: 'PYRA', path: '/thermal-bloom', name: 'Thermal Bloom illustration'}],
+]);
+
 function configure(data) {
   if (typeof data.mode === 'string') mode = data.mode;
   scene.baseline = mode === 'baseline';
-  const relief = byId('circuit-relief-option');
-  relief.hidden = relief.disabled = scene.baseline;
   const picker = byId('sensor-select');
-  if (scene.baseline && picker.value === relief.value) {
-    picker.value = 'FLUX';
-    void showFeed();
+  for (const option of picker.options) {
+    const illustration = illustrationViews.get(option.value);
+    if (!illustration) continue;
+    option.hidden = option.disabled = scene.baseline;
+    if (scene.baseline && picker.value === option.value) {
+      picker.value = illustration.role;
+      void showFeed();
+    }
   }
   setText('terrain-description', scene.baseline ? 'A flat lane from columns 0 to 12. Powering the bridge connects columns 5–7.' :
     'A gap separates the banks at columns 5–7. Powering the bridge extends its deck at height zero. The far bank starts at column 7.5, half a tile higher.');
@@ -155,8 +163,8 @@ function clearFeed() {
 
 async function showFeed() {
   const view = byId('sensor-select').value;
-  const illustrated = view === 'FLUX_RELIEF';
-  const role = illustrated ? 'FLUX' : view;
+  const illustration = illustrationViews.get(view);
+  const role = illustration?.role ?? view;
   const spectator = view === 'SPECTATOR';
   byId('stage-viewport').hidden = byId('stage-controls').hidden = !spectator;
   byId('room-guide').hidden = !spectator;
@@ -173,11 +181,11 @@ async function showFeed() {
   clearFeed(); feedKey = key;
   const generation = feedGeneration;
   if (!sample) { setText('sensor-caption', 'Waiting for a sampled ' + role + ' observation.'); return; }
-  const feedName = illustrated ? 'Circuit Relief illustration' : roleNames[role] + ' sensor';
+  const feedName = illustration?.name ?? roleNames[role] + ' sensor';
   const label = role + ' · ' + feedName + ' · Window ' + sample.window + ' · Sampled at tick ' + sample.tick;
   setText('sensor-caption', 'Loading ' + label);
   try {
-    const response = await request('/api/feed/' + role + '/' + sample.window + (illustrated ? '/circuit-relief' : ''),
+    const response = await request('/api/feed/' + role + '/' + sample.window + (illustration?.path ?? ''),
       {headers: {'X-Relay-Run-ID': runID}});
     const description = response.headers.get('X-Relay-Sensor-Description');
     const blob = await response.blob();
@@ -190,7 +198,7 @@ async function showFeed() {
       setText('sensor-caption', label);
     };
     img.onerror = () => { if (generation === feedGeneration) setText('sensor-caption', label + ' · Image unavailable.'); };
-    const imageType = illustrated ? 'Circuit Relief illustration' : 'original sensor observation';
+    const imageType = illustration?.name ?? 'original sensor observation';
     img.alt = role + ' ' + imageType + ' for window ' + sample.window + (description ? '. ' + description : '');
     img.src = url;
   } catch {

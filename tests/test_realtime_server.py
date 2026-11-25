@@ -280,20 +280,25 @@ class SpectatorTransportTests(unittest.TestCase):
             code, _, body = self.exchange('GET', path, new_headers)
             self.assertEqual((code, body), (200, current.getvalue()))
 
-    def test_circuit_relief_requires_an_authorized_flux_window(self):
-        path = '/api/feed/FLUX/1/circuit-relief'
+    def test_illustrated_feeds_require_an_authorized_window_for_their_role(self):
         png = BytesIO()
         Image.new('RGB', (4, 3), 'blue').save(png, format='PNG')
-        self.session.illustrated_flux_feed = {1: png.getvalue()}.get
+        available = {('FLUX', 1): png.getvalue(), ('PYRA', 1): png.getvalue()}
+        self.session.illustrated_feed = lambda role, window: available.get((role, window))
         run_header = ('X-Relay-Run-ID', self.journal.run_id)
-        self.assertEqual(self.exchange('GET', path, self.host)[0], 403)
-        self.assertEqual(self.exchange('GET', path, [*self.auth, ('X-Relay-Run-ID', 'stale')])[0], 409)
         self.assertEqual(self.get('/api/feed/PYRA/1/circuit-relief')[0], 404)
-        self.assertEqual(self.get('/api/feed/FLUX/2/circuit-relief')[0], 404)
-        with patch.object(self.server, 'new_session', return_value=self.session):
-            self.assertEqual(self.get(path)[0], 400)
-            code, headers, payload = self.exchange('GET', path, [*self.auth, run_header])
-        self.assertEqual((code, headers['Content-Type'], payload), (200, 'image/png', png.getvalue()))
+        self.assertEqual(self.get('/api/feed/FLUX/1/thermal-bloom')[0], 404)
+        self.assertEqual(self.get('/api/feed/SPECTRA/1/thermal-bloom')[0], 404)
+        for role, variant in (('FLUX', 'circuit-relief'), ('PYRA', 'thermal-bloom')):
+            with self.subTest(role=role):
+                path = f'/api/feed/{role}/1/{variant}'
+                self.assertEqual(self.exchange('GET', path, self.host)[0], 403)
+                self.assertEqual(self.exchange('GET', path, [*self.auth, ('X-Relay-Run-ID', 'stale')])[0], 409)
+                self.assertEqual(self.get(f'/api/feed/{role}/2/{variant}')[0], 404)
+                with patch.object(self.server, 'new_session', return_value=self.session):
+                    self.assertEqual(self.get(path)[0], 400)
+                    code, headers, payload = self.exchange('GET', path, [*self.auth, run_header])
+                self.assertEqual((code, headers['Content-Type'], payload), (200, 'image/png', png.getvalue()))
 
     def test_plan_shape_and_controller_admission_result(self):
         for invalid in ({}, [], manual_plan(extra='field'), manual_plan(role='ECHO'),

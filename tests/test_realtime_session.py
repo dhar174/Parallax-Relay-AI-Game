@@ -13,8 +13,9 @@ from parallax_relay.realtime import session as driver
 from parallax_relay.realtime.coordination import CoordinationStop
 from parallax_relay.realtime.flux_view import render_circuit_relief
 from parallax_relay.realtime.journal import replay
-from parallax_relay.realtime.observations import observe, sample_flux_circuit
-from parallax_relay.realtime.physics import DRIVE
+from parallax_relay.realtime.observations import observe, sample_flux_circuit, sample_pyra_thermal
+from parallax_relay.realtime.physics import DRIVE, step
+from parallax_relay.realtime.pyra_view import render_thermal_bloom
 from parallax_relay.realtime.settings import Settings, load_profile
 
 
@@ -45,9 +46,28 @@ class RealtimeSessionTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(session.feed('FLUX', 1), first.image_png)
         self.assertEqual(session.feed('FLUX', 2), second.image_png)
-        self.assertEqual(session.illustrated_flux_feed(1), render_circuit_relief(sample))
-        self.assertNotEqual(session.illustrated_flux_feed(1), session.illustrated_flux_feed(2))
-        self.assertIsNone(session.illustrated_flux_feed(3))
+        self.assertEqual(session.illustrated_feed('FLUX', 1), render_circuit_relief(sample))
+        self.assertNotEqual(session.illustrated_feed('FLUX', 1), session.illustrated_feed('FLUX', 2))
+        self.assertIsNone(session.illustrated_feed('FLUX', 3))
+
+    def test_thermal_feed_samples_heat_before_and_after_venting(self):
+        session = self.session()
+        self.addCleanup(session.close)
+        samples = {}
+        for window, heat in ((1, 4), (2, 1)):
+            observation = observe(session.world, 'PYRA', window, session.settings)
+            sample = sample_pyra_thermal(session.world)
+            self.assertEqual(sample.heat, heat)
+            session.store_feed('PYRA', window, observation.image_png)
+            samples[window] = (observation.image_png, render_thermal_bloom(sample), heat)
+            commands = {role: [{'kind': 'VENT'}] if role == 'PYRA' else [] for role in ROLES}
+            self.assertTrue(any(event['kind'] == 'vented' for event in step(session.world, commands, 0)))
+        for window, (original, illustrated, heat) in samples.items():
+            self.assertEqual(session.feed('PYRA', window), original)
+            self.assertEqual(session.illustrated_feed('PYRA', window), illustrated)
+            self.assertIn(f'Thermal reading {heat}', session.feed_description('PYRA', window))
+        self.assertIsNone(session.illustrated_feed('PYRA', 3))
+        self.assertIsNone(session.illustrated_feed('FLUX', 1))
 
     def test_live_session_requires_matching_named_limits_before_opening_its_run(self):
         profile = load_profile('dev-bridge-live-v1')

@@ -3,8 +3,6 @@ from collections import defaultdict
 from dataclasses import dataclass
 from functools import lru_cache
 from io import BytesIO
-from itertools import product
-from pathlib import Path
 import random
 
 from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageOps
@@ -12,9 +10,9 @@ from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageOps
 from ..protocol import ROLES
 from ..render import DX, H, W, px
 from . import physics
+from .sensor_art import place_tags, robot_mask
 
 
-_SHEETS = Path(__file__).resolve().parents[2] / 'tools/realtime_spectator/art/animations/sheets'
 _LEFT = 207
 _FAR = _LEFT - physics.BANK_HEIGHT * DX // physics.TILE
 _START, _END = (round(px(x / physics.TILE)) for x in (physics.GAP_LEFT, physics.GAP_RIGHT))
@@ -25,7 +23,6 @@ _SOURCE_Y, _PATH_Y, _CELL_Y = _LEFT - 17, _LEFT + 12, _FAR - 35
 _MINT, _CORE = '#8dffe0', '#f0fff8'
 _RIM, _INK = '#8eaabf', '#d3e1eb'
 _TAG_SIZE = (12, 9)
-_TAG_SHIFTS = tuple(product((0, -22, 22), (0, -28, 28, -56, 56, -84, 84, -112, 112)))
 _GROUP_OFFSETS = {1: (0,), 2: (-14, 14), 3: (-28, 0, 28)}
 _RELAY_OFFSETS = {1: (30,), 2: (-30, 30), 3: (-59, -31, 31)}
 
@@ -71,15 +68,6 @@ def _scenery(powered: bool) -> Image.Image:
     return world
 
 
-@lru_cache(maxsize=len(ROLES))
-def _robot_mask(role: str) -> Image.Image:
-    with Image.open(_SHEETS / f'{role.lower()}-idle.png') as sheet:
-        mask = sheet.crop((0, 0, 256, 256)).convert('RGBA').getchannel('A')
-    mask = mask.crop(mask.getbbox())
-    mask.thumbnail((33, 37), Image.Resampling.LANCZOS)
-    return mask
-
-
 def _robot_feet(sample: CircuitSample):
     for role, column in zip(ROLES, sample.columns):
         x = px(column)
@@ -92,7 +80,7 @@ def _robot_feet(sample: CircuitSample):
 
 def _draw_bodies(image: Image.Image, feet):
     for role, x, y in feet:
-        mask = _robot_mask(role)
+        mask = robot_mask(role, (33, 37))
         silhouette = Image.new('L', (W, H))
         silhouette.paste(mask, (round(x - mask.width / 2), round(y - mask.height)))
         blurred = silhouette.filter(ImageFilter.GaussianBlur(2.5))
@@ -115,24 +103,12 @@ def _signature_positions(feet, sample: CircuitSample):
     if not sample.cell_recovered:
         occupied.append((_CELL - 8, _CELL_Y - 16, _CELL + 8, _CELL_Y + 13))
 
-    half_width, half_height = _TAG_SIZE
+    preferred = []
     for (x, y), roles in groups.items():
         offsets = _RELAY_OFFSETS if (x, y) == (_ROOT, _LEFT) else _GROUP_OFFSETS
         for role, offset in zip(roles, offsets[len(roles)]):
-            preferred_y = min(H - half_height - 2, max(half_height + 1, y - 12))
-            # If the circuit blocks its entire row, try a neighboring row.
-            for dy, dx in _TAG_SHIFTS:
-                mark_x, mark_y = x + offset + dx, preferred_y + dy
-                left, right = mark_x - half_width, mark_x + half_width
-                top, bottom = mark_y - half_height, mark_y + half_height
-                if left < 1 or right >= W - 1 or top < 1 or bottom >= H - 1:
-                    continue
-                if any(left <= r + 2 and right >= l - 2 and top <= b and bottom >= t
-                       for l, t, r, b in occupied):
-                    continue
-                occupied.append((left, top, right, bottom))
-                yield role, (x, y), (mark_x, mark_y)
-                break
+            preferred.append((role, (x, y), (x + offset, y - 12)))
+    return place_tags(preferred, occupied, _TAG_SIZE)
 
 
 def _draw_signatures(image: Image.Image, positions):

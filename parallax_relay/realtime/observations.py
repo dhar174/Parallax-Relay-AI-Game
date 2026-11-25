@@ -8,6 +8,7 @@ from ..rooms import get_room
 from ..state import Robot as SchematicRobot, WorldState
 from . import physics
 from .flux_view import CircuitSample
+from .pyra_view import ThermalSample
 from .wire import ACTION_COST, MAX_COMMANDS, MAX_RUN_TICKS, RUN_TICKS_PER_POINT
 
 
@@ -69,6 +70,12 @@ def sample_flux_circuit(world: physics.World) -> CircuitSample:
     """Freeze the same columns, circuit state and own height available to FLUX."""
     return CircuitSample(_schematic_columns(world), world.robots['FLUX'].y,
                          world.bridge_powered, world.cell_collected)
+
+
+def sample_pyra_thermal(world: physics.World) -> ThermalSample:
+    """Freeze the columns, motor heat, own height and bridge state visible to PYRA."""
+    return ThermalSample(_schematic_columns(world), world.heat, world.robots['PYRA'].y,
+                         world.bridge_powered)
 
 
 def _image(world: physics.World, role: str, window: int) -> bytes:
