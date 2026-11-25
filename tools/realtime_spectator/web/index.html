@@ -31,23 +31,45 @@
           </label>
           <div class="scene-actions"><a href="#dialogue-heading" class="jump-link">Dialogue <span aria-hidden="true">↓</span></a><button id="zoom" type="button" aria-pressed="false">Enlarge room</button></div>
         </div>
-        <div id="stage-scroll" class="stage-scroll" tabindex="0" aria-label="Room overview">
-          <div id="stage" class="stage" role="group" aria-label="Illustrated spectator room" aria-describedby="scene-description">
-            <canvas id="scenery" aria-hidden="true"></canvas>
-            <div id="actors" aria-hidden="true"></div>
+        <div id="stage-shell">
+          <div id="stage-viewport">
+            <div id="stage-scroll" class="stage-scroll" tabindex="0" aria-label="Room overview">
+              <div id="stage" class="stage" role="group" aria-label="Illustrated spectator room" aria-describedby="scene-description">
+                <canvas id="scenery" aria-hidden="true"></canvas>
+                <div id="actors" aria-hidden="true"></div>
+                <span id="await-scene">Waiting for the first world sample</span>
+              </div>
+            </div>
             <div id="bubbles" aria-hidden="true"></div>
-            <span id="await-scene">Waiting for the first world sample</span>
           </div>
+          <div class="speech-tools" role="group" aria-label="Stage speech controls">
+            <button id="read-speech" type="button" aria-haspopup="dialog" disabled>Read speech</button>
+            <button id="speech-pause" type="button">Pause scrolling</button>
+            <div class="speech-size-control">
+              <label for="speech-size">Text size</label>
+              <select id="speech-size">
+                <option value="normal">Normal</option><option value="large">Large</option><option value="largest">Largest</option>
+              </select>
+            </div>
+          </div>
+          <dialog id="speech-reader" aria-labelledby="speech-reader-title">
+            <div class="speech-reader-head">
+              <h3 id="speech-reader-title">Public speech</h3>
+              <form method="dialog"><button autofocus>Close</button></form>
+            </div>
+            <p id="speech-reader-label" aria-live="polite"></p>
+            <div id="speech-reader-text" tabindex="0" role="region" aria-label="Complete message" dir="auto"></div>
+            <div class="speech-reader-nav">
+              <button id="speech-previous" type="button">Previous</button>
+              <button id="speech-next" type="button">Next</button>
+            </div>
+          </dialog>
         </div>
         <p id="scene-description" class="visually-hidden">The room has not sent a world sample yet.</p>
         <div id="sensor-view" hidden>
           <img id="sensor-image" alt="" hidden>
           <p id="sensor-caption">Waiting for an observation.</p>
         </div>
-        <section id="mobile-dialogue" aria-label="Latest public speech">
-          <div><strong>Latest public speech</strong><a href="#dialogue-heading">Full transcript ↓</a></div>
-          <p id="latest-speech">Waiting for the first public message.</p>
-        </section>
         <div class="readout" aria-label="Match status">
           <div><span class="label">Phase</span><strong id="phase">Ready to start</strong></div>
           <div><span class="label">Window</span><strong id="window">—</strong></div>
