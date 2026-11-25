@@ -79,6 +79,13 @@ function setReady(role, disposition) {
 function configure(data) {
   if (typeof data.mode === 'string') mode = data.mode;
   scene.baseline = mode === 'baseline';
+  const relief = byId('circuit-relief-option');
+  relief.hidden = relief.disabled = scene.baseline;
+  const picker = byId('sensor-select');
+  if (scene.baseline && picker.value === relief.value) {
+    picker.value = 'FLUX';
+    void showFeed();
+  }
   setText('terrain-description', scene.baseline ? 'A flat lane from columns 0 to 12. Powering the bridge connects columns 5–7.' :
     'A gap separates the banks at columns 5–7. Powering the bridge extends its deck at height zero. The far bank starts at column 7.5, half a tile higher.');
   setText('goal-description', scene.baseline ? 'Unlock the exit and bring all three robots to extraction.' :
@@ -147,8 +154,10 @@ function clearFeed() {
 }
 
 async function showFeed() {
-  const role = byId('sensor-select').value;
-  const spectator = role === 'SPECTATOR';
+  const view = byId('sensor-select').value;
+  const illustrated = view === 'FLUX_RELIEF';
+  const role = illustrated ? 'FLUX' : view;
+  const spectator = view === 'SPECTATOR';
   byId('stage-viewport').hidden = byId('stage-controls').hidden = !spectator;
   byId('room-guide').hidden = !spectator;
   byId('sensor-view').hidden = spectator;
@@ -159,15 +168,16 @@ async function showFeed() {
     return;
   }
   const sample = feeds.get(role);
-  const key = runID + '/' + role + '/' + (sample?.window ?? '');
+  const key = runID + '/' + view + '/' + (sample?.window ?? '');
   if (key === feedKey) return;
   clearFeed(); feedKey = key;
   const generation = feedGeneration;
   if (!sample) { setText('sensor-caption', 'Waiting for a sampled ' + role + ' observation.'); return; }
-  const label = role + ' · ' + roleNames[role] + ' sensor · Window ' + sample.window + ' · Sampled at tick ' + sample.tick;
+  const feedName = illustrated ? 'Circuit Relief illustration' : roleNames[role] + ' sensor';
+  const label = role + ' · ' + feedName + ' · Window ' + sample.window + ' · Sampled at tick ' + sample.tick;
   setText('sensor-caption', 'Loading ' + label);
   try {
-    const response = await request('/api/feed/' + role + '/' + sample.window,
+    const response = await request('/api/feed/' + role + '/' + sample.window + (illustrated ? '/circuit-relief' : ''),
       {headers: {'X-Relay-Run-ID': runID}});
     const description = response.headers.get('X-Relay-Sensor-Description');
     const blob = await response.blob();
@@ -180,7 +190,8 @@ async function showFeed() {
       setText('sensor-caption', label);
     };
     img.onerror = () => { if (generation === feedGeneration) setText('sensor-caption', label + ' · Image unavailable.'); };
-    img.alt = role + ' original sensor observation for window ' + sample.window + (description ? '. ' + description : '');
+    const imageType = illustrated ? 'Circuit Relief illustration' : 'original sensor observation';
+    img.alt = role + ' ' + imageType + ' for window ' + sample.window + (description ? '. ' + description : '');
     img.src = url;
   } catch {
     if (generation === feedGeneration) setText('sensor-caption', label + ' · Image unavailable.');

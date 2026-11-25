@@ -280,6 +280,21 @@ class SpectatorTransportTests(unittest.TestCase):
             code, _, body = self.exchange('GET', path, new_headers)
             self.assertEqual((code, body), (200, current.getvalue()))
 
+    def test_circuit_relief_requires_an_authorized_flux_window(self):
+        path = '/api/feed/FLUX/1/circuit-relief'
+        png = BytesIO()
+        Image.new('RGB', (4, 3), 'blue').save(png, format='PNG')
+        self.session.illustrated_flux_feed = {1: png.getvalue()}.get
+        run_header = ('X-Relay-Run-ID', self.journal.run_id)
+        self.assertEqual(self.exchange('GET', path, self.host)[0], 403)
+        self.assertEqual(self.exchange('GET', path, [*self.auth, ('X-Relay-Run-ID', 'stale')])[0], 409)
+        self.assertEqual(self.get('/api/feed/PYRA/1/circuit-relief')[0], 404)
+        self.assertEqual(self.get('/api/feed/FLUX/2/circuit-relief')[0], 404)
+        with patch.object(self.server, 'new_session', return_value=self.session):
+            self.assertEqual(self.get(path)[0], 400)
+            code, headers, payload = self.exchange('GET', path, [*self.auth, run_header])
+        self.assertEqual((code, headers['Content-Type'], payload), (200, 'image/png', png.getvalue()))
+
     def test_plan_shape_and_controller_admission_result(self):
         for invalid in ({}, [], manual_plan(extra='field'), manual_plan(role='ECHO'),
                         manual_plan(window=True), manual_plan(request_id=None), manual_plan(actions={})):

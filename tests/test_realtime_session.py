@@ -11,8 +11,9 @@ from uuid import uuid4
 from parallax_relay.protocol import ROLES
 from parallax_relay.realtime import session as driver
 from parallax_relay.realtime.coordination import CoordinationStop
+from parallax_relay.realtime.flux_view import render_circuit_relief
 from parallax_relay.realtime.journal import replay
-from parallax_relay.realtime.observations import observe
+from parallax_relay.realtime.observations import observe, sample_flux_circuit
 from parallax_relay.realtime.physics import DRIVE
 from parallax_relay.realtime.settings import Settings, load_profile
 
@@ -30,6 +31,23 @@ class RealtimeSessionTests(unittest.IsolatedAsyncioTestCase):
     def session(self, **settings):
         config = Settings.offline().model_copy(update=settings)
         return driver.Session(self.out, 'reactive', config, paced=False)
+
+    def test_circuit_relief_uses_the_requested_window_without_changing_the_original_feed(self):
+        session = self.session()
+        self.addCleanup(session.close)
+        first = observe(session.world, 'FLUX', 1, session.settings)
+        sample = sample_flux_circuit(session.world)
+        session.store_feed('FLUX', 1, first.image_png)
+
+        session.world.bridge_powered = True
+        second = observe(session.world, 'FLUX', 2, session.settings)
+        session.store_feed('FLUX', 2, second.image_png)
+
+        self.assertEqual(session.feed('FLUX', 1), first.image_png)
+        self.assertEqual(session.feed('FLUX', 2), second.image_png)
+        self.assertEqual(session.illustrated_flux_feed(1), render_circuit_relief(sample))
+        self.assertNotEqual(session.illustrated_flux_feed(1), session.illustrated_flux_feed(2))
+        self.assertIsNone(session.illustrated_flux_feed(3))
 
     def test_live_session_requires_matching_named_limits_before_opening_its_run(self):
         profile = load_profile('dev-bridge-live-v1')

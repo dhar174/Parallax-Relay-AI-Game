@@ -14,9 +14,10 @@ from ..protocol import ROLES
 from ..provenance import collect_environment, collect_source
 from ..rooms import get_room
 from .coordination import Coordinator, CoordinationStop, FULL_PHASES, REDUCED_PHASES
+from .flux_view import render_circuit_relief
 from .journal import Journal
 from .manual import ManualAgent, ManualControls
-from .observations import observe
+from .observations import observe, sample_flux_circuit
 from .physics import initial_world, step
 from .players import ReactiveAgent
 from .settings import make_live_agents
@@ -57,6 +58,7 @@ class Session:
         self._budget = None
         self._controls = ManualControls(settings, self.emit)
         self._sample_descriptions = {}
+        self._flux_samples = {}
         self._latest_view = None
         self._feedback = {role: deque(maxlen=6) for role in ROLES}
         if mode != 'baseline':
@@ -113,6 +115,8 @@ class Session:
 
     def store_feed(self, role, window, png):
         self.journal.store_feed(role, window, png)
+        if role == 'FLUX' and self.mode != 'baseline':
+            self._flux_samples[window] = sample_flux_circuit(self.world)
         view = self._latest_view if self.mode == 'baseline' else self.world.snapshot()
         room = get_room('split_span')
         if role == 'PYRA':
@@ -134,6 +138,10 @@ class Session:
 
     def feed(self, role, window):
         return self.journal.feed(role, window)
+
+    def illustrated_flux_feed(self, window):
+        sample = self._flux_samples.get(window)
+        return render_circuit_relief(sample) if sample is not None else None
 
     def status(self):
         return {'mode': self.mode, 'status': 'ended' if self._done.is_set() else

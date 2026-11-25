@@ -7,6 +7,7 @@ from ..render import render_png
 from ..rooms import get_room
 from ..state import Robot as SchematicRobot, WorldState
 from . import physics
+from .flux_view import CircuitSample
 from .wire import ACTION_COST, MAX_COMMANDS, MAX_RUN_TICKS, RUN_TICKS_PER_POINT
 
 
@@ -60,10 +61,20 @@ def _column(x: int) -> int:
     return max(0, min(_SCHEMATIC.width - 1, nearest))
 
 
+def _schematic_columns(world: physics.World):
+    return tuple(_column(world.robots[name].x) for name in ROLES)
+
+
+def sample_flux_circuit(world: physics.World) -> CircuitSample:
+    """Freeze the same columns, circuit state and own height available to FLUX."""
+    return CircuitSample(_schematic_columns(world), world.robots['FLUX'].y,
+                         world.bridge_powered, world.cell_collected)
+
+
 def _image(world: physics.World, role: str, window: int) -> bytes:
     # The same public silhouettes appear on every schematic. Only the requested
     # sensor receives its own heat or item state; exact kinematics belong below.
-    robots = {name: SchematicRobot(name, _column(world.robots[name].x)) for name in ROLES}
+    robots = {name: SchematicRobot(name, column) for name, column in zip(ROLES, _schematic_columns(world))}
     schematic = WorldState(
         turn=window, robots=robots, room=_SCHEMATIC,
         bridge_extended=world.bridge_powered, exit_unlocked=world.exit_unlocked,

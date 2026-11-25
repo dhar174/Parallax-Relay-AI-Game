@@ -189,8 +189,8 @@ class SpectatorHandler(BaseHTTPRequestHandler):
                     after = int(match[1])
                 self._json(200, self.server.session.events(after))
                 return
-            match = re.fullmatch(r'/api/feed/([A-Z]+)/([0-9]{1,16})', self.path)
-            if match and match[1] in ROLES:
+            match = re.fullmatch(r'/api/feed/([A-Z]+)/([0-9]{1,16})(/circuit-relief)?', self.path)
+            if match and match[1] in ROLES and (not match[3] or match[1] == 'FLUX'):
                 session = self.server.session
                 run_ids = self.headers.get_all('X-Relay-Run-ID', [])
                 if len(run_ids) != 1 or not run_ids[0]:
@@ -200,10 +200,15 @@ class SpectatorHandler(BaseHTTPRequestHandler):
                 elif run_ids[0] != session.status()['run_id']:
                     self._error(409, 'The match has changed. Try again on the current match.')
                     return
-                png = session.feed(match[1], int(match[2]))
+                role, window = match[1], int(match[2])
+                if match[3]:
+                    illustrate = getattr(session, 'illustrated_flux_feed', None)
+                    png = illustrate(window) if illustrate else None
+                else:
+                    png = session.feed(role, window)
                 if png is not None:
                     describe = getattr(session, 'feed_description', None)
-                    caption = describe(match[1], int(match[2])) if describe else ''
+                    caption = describe(role, window) if describe else ''
                     self._send(200, png, 'image/png', description=caption)
                     return
             self._error(404, 'Not found.')

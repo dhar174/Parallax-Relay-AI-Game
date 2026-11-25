@@ -32,8 +32,12 @@ earlier or newly released messages. The match keeps running while you read.
 
 **Public dialogue** and **Room events** show the discussion and physical
 consequences. Use **Choose view** to inspect the optical, thermal, or circuit PNG
-sampled at the start of the current window. Select **Spectator view** to watch
-the whole room. Open **Released plans** to check the programs and their shared
+sampled at the start of the current window. In Raised Span, **FLUX · Circuit
+Relief** illustrates the sampled power route and energy cell against blurred
+scenery. The S, P, and F contact marks show each robot's column. Teammates'
+heights are schematic. **FLUX · Original circuit feed** shows the exact PNG
+used by the FLUX player. Select **Spectator view** to watch the whole room.
+Open **Released plans** to check the programs and their shared
 start tick.
 
 Select **Restart Match** during or after an offline match to return the room
