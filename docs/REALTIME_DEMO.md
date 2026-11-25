@@ -59,6 +59,11 @@ nearby terrain. You can change cameras from either view. Your selection follows
 you back to the dashboard, where **Whole room** also offers **Enlarge room** and
 manual panning. The match keeps running through all of these changes.
 
+In game-only and follow views, current speech has a fixed reading area above
+the stage. The area can scroll on especially short screens, and **Read speech**
+opens each complete message. The camera and speech controls wrap as needed when
+you enlarge text.
+
 ## Walk through a manual crossing
 
 ```bash

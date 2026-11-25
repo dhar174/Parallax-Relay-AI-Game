@@ -78,10 +78,11 @@ button:focus-visible, select:focus-visible, input:focus-visible, a:focus-visible
 .bubble[data-offscreen="below"] .bubble-speaker::before { content: '↓ '; }
 .leader { height: 1px; transform-origin: left center; background: var(--role-color); }
 .speech-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 7px; padding: 5px 8px; border-top: 1px solid #b7ae9e; }
-.speech-tools button, .speech-tools select { min-height: 34px; padding: 3px 6px; font-size: .78rem; white-space: nowrap; }
-.camera-control { display: flex; align-items: center; gap: 7px; }
+.speech-tools button, .speech-tools select { min-height: 34px; max-inline-size: 100%; padding: 3px 6px; font-size: .78rem; }
+.speech-tools button { white-space: normal; overflow-wrap: anywhere; }
+.camera-control { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; min-inline-size: 0; max-inline-size: 100%; }
 #stage-mode-note { margin: 0; font-size: .75rem; color: var(--muted); }
-.speech-size-control { margin-inline-start: auto; display: flex; align-items: center; gap: 5px; font-size: .78rem; }
+.speech-size-control { margin-inline-start: auto; display: flex; flex-wrap: wrap; align-items: center; gap: 5px; font-size: .78rem; min-inline-size: 0; max-inline-size: 100%; }
 #speech-reader { width: min(34rem, calc(100% - 24px)); max-height: calc(100% - 24px); padding: 14px; color: var(--ink); background: #fffdf7; border: 1px solid #777365; border-radius: 8px; }
 #speech-reader::backdrop { background: #26251f66; }
 .speech-reader-head, .speech-reader-nav { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
@@ -182,6 +183,29 @@ footer { justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-top: 
 @media (max-width: 360px) { .speech-size-control { margin-inline-start: 0; } }
 @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
 
+#stage-viewport[data-speech-docked] { display: flex; flex-direction: column; min-block-size: 0; }
+#stage-viewport[data-speech-docked] #bubbles {
+  position: relative;
+  inset: auto;
+  order: -1;
+  flex: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr));
+  gap: 5px;
+  max-block-size: 34dvh;
+  padding: 6px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  pointer-events: auto;
+  background: var(--paper);
+}
+#stage-viewport[data-speech-docked] .bubble { position: static; inline-size: auto; min-inline-size: 0; max-inline-size: none; }
+#stage-viewport[data-speech-docked] .bubble-speaker { white-space: normal; overflow-wrap: anywhere; }
+@media (max-height: 350px) {
+  #stage-viewport[data-speech-docked] #bubbles { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  #stage-viewport[data-speech-docked] .bubble-message { max-block-size: 1lh; }
+}
+
 body.stage-presenting { overflow: hidden; }
 #stage-shell[data-presentation] {
   position: fixed;
@@ -192,11 +216,13 @@ body.stage-presenting { overflow: hidden; }
   block-size: 100dvh;
   display: grid;
   grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr);
   padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
   background: var(--paper);
 }
 #stage-shell[data-presentation] .stage-scroll { height: 100%; overflow: hidden; }
+#stage-shell[data-presentation] [data-speech-docked] .stage-scroll { flex: 1; min-block-size: 0; }
 #stage-shell[data-presentation] .stage { width: 100%; height: 100%; }
-#stage-shell[data-presentation] .speech-tools { padding: 6px 10px; }
+#stage-shell[data-presentation] .speech-tools { padding: 6px 10px; max-block-size: 48dvh; overflow: auto; }
 #stage-shell[data-presentation] .speech-tools button,
 #stage-shell[data-presentation] .speech-tools select { min-height: 36px; }

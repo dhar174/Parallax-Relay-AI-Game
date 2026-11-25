@@ -24,3 +24,13 @@ are outside this verification record.
 
 The test suite writes `fullscreen-whole-room.png`, `fullscreen-follow.png`, and
 `game-only-320.png` under `tools/browser/test-results/realtime/`.
+
+## PR #63 review follow-up
+
+Five Chromium regressions reproduced the review findings on the original PR
+head. They check the dashboard launcher and both presentation modes at 320 px
+with simulated doubled root text, the followed robot's visibility at 568 × 320,
+all three speech previews at 568 × 200, and stable speech positions across a
+one-tick movement at 780 × 320. The updated presentation wraps the controls and
+gives speech a separate bounded reading area. Ordinary dashboard overview keeps
+the anchored speech bubbles.

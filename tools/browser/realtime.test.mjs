@@ -355,8 +355,9 @@ async function bubbleScroll(page) {
 
 async function assertBubblesFit(page) {
   const {viewport, boxes, overflow} = await page.evaluate(() => {
-    const viewport = document.querySelector('#stage-scroll').getBoundingClientRect().toJSON();
-    viewport.bottom = viewport.top + document.querySelector('#stage').clientHeight;
+    const dock = document.querySelector('#stage-viewport[data-speech-docked] #bubbles');
+    const viewport = (dock || document.querySelector('#stage-scroll')).getBoundingClientRect().toJSON();
+    if (!dock) viewport.bottom = viewport.top + document.querySelector('#stage').clientHeight;
     const boxes = [...document.querySelectorAll('.bubble:not([hidden])')].map(node => node.getBoundingClientRect().toJSON());
     return {viewport, boxes, overflow: document.documentElement.scrollWidth - innerWidth};
   });
@@ -368,6 +369,71 @@ async function assertBubblesFit(page) {
     assert.ok(boxes.slice(0, i).every(other => box.right <= other.left || box.left >= other.right ||
       box.bottom <= other.top || box.top >= other.bottom), `Bubble ${i} does not overlap another`);
   }
+}
+
+for (const native of [true, false]) {
+  test(`${native ? 'native' : 'fallback'} presentation controls fit at doubled text size`, {timeout:45000}, async t => {
+    const origin = await server(t, 'manual');
+    const page = await pageFor(t, origin, {width: 320, height: 568}, 'reduce');
+    await loadSpeechFixture(page, {world: presentationFixture()});
+    await page.evaluate(native => {
+      document.documentElement.style.fontSize = '32px';
+      if (!native) document.querySelector('#stage-shell').requestFullscreen = undefined;
+    }, native);
+    const toggle = page.locator('#stage-fullscreen');
+    assert.ok(await toggle.evaluate(button => button.getBoundingClientRect().right <=
+      button.closest('.scene-panel').getBoundingClientRect().right), 'Dashboard launcher fits in its panel');
+    await toggle.click();
+    await page.locator(`#stage-shell[data-presentation="${native ? 'native' : 'game-only'}"]`).waitFor();
+    await assertPresentationControlsFit(page);
+    await page.getByRole('button', {name: 'Exit to dashboard'}).click();
+    await page.getByRole('button', {name: 'Fullscreen', exact: true}).waitFor();
+  });
+}
+
+async function assertPresentationControlsFit(page) {
+  const clipped = await page.locator('#stage-controls :is(button, select)').evaluateAll(controls => controls
+    .filter(control => {
+      const rect = control.getBoundingClientRect();
+      return rect.left < -1 || rect.right > document.documentElement.clientWidth + 1 ||
+        rect.top < -1 || rect.bottom > document.documentElement.clientHeight + 1;
+    }).map(control => control.id));
+  assert.deepEqual(clipped, [], 'All stage controls stay reachable');
+}
+
+for (const scenario of ['robot', 'short', 'movement']) {
+  test(`crowded follow speech stays usable during ${scenario}`, {timeout:45000}, async t => {
+    const origin = await server(t, 'manual');
+    const width = scenario === 'movement' ? 780 : 568;
+    const height = scenario === 'short' ? 200 : 320;
+    const x = scenario === 'movement' ? 320 : 1536;
+    const page = await pageFor(t, origin, {width, height}, 'reduce');
+    const world = {...speechWorld([x, 768, 1024]), bridge_powered: true};
+    const journal = await loadSpeechFixture(page, {world});
+    await page.locator('#stage-shell').evaluate(el => {el.requestFullscreen = undefined;});
+    await page.locator('#stage-fullscreen').click();
+    await page.getByLabel('Camera', {exact: true}).selectOption('SPECTRA');
+    if (scenario !== 'movement') await page.getByLabel('Text size', {exact: true}).selectOption('largest');
+    await waitForFollowScale(page, 'SPECTRA');
+    if (scenario === 'movement') {
+      const rows = () => page.locator('.bubble.speaking').evaluateAll(nodes => nodes.map(node => node.offsetTop));
+      const before = await rows();
+      await publishPose(page, journal, {...world, robots: {...world.robots,
+        SPECTRA: {...world.robots.SPECTRA, x: x + 16}}}, 2);
+      assert.deepEqual(await rows(), before, 'A single physics tick keeps each speaker in the same row');
+    }
+    await assertBubblesFit(page);
+    assert.ok(await page.evaluate(() => {
+      const robot = document.querySelector('[data-robot="SPECTRA"] .robot-art').getBoundingClientRect();
+      return [...document.querySelectorAll('.bubble.speaking')].every(node => {
+        const bubble = node.getBoundingClientRect();
+        return bubble.right <= robot.left || bubble.left >= robot.right ||
+          bubble.bottom <= robot.top || bubble.top >= robot.bottom;
+      });
+    }), 'All speech stays clear of the followed robot');
+    await page.getByRole('button', {name: 'Read speech'}).click();
+    assert.equal(await page.getByRole('region', {name: 'Complete message'}).textContent(), longSpeech.FLUX);
+  });
 }
 
 test('long released speech is visible and intact on a narrow stage', {timeout:45000}, async t => {

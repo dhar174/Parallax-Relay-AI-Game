@@ -84,6 +84,7 @@ export class Scene {
   constructor() {
     this.stage = document.querySelector('#stage');
     this.stageShell = document.querySelector('#stage-shell');
+    this.stageViewport = document.querySelector('#stage-viewport');
     this.scroll = document.querySelector('#stage-scroll');
     this.zoom = document.querySelector('#zoom');
     this.bubbleLayer = document.querySelector('#bubbles');
@@ -478,33 +479,64 @@ export class Scene {
         art.backgroundPosition = (size / 2 - px * scale) + 'px ' + (size * 239 / 256 - py * scale) + 'px';
       }
     }
-    const top = footY - size * 239 / 256;
-    return {role, x: footX, y: footY - size * .87,
-      bounds: {left: footX - size / 2, right: footX + size / 2, top, bottom: top + size}};
+    return {role, x: footX, y: footY - size * .87};
+  }
+
+  syncSpeechDock() {
+    // A separate reading area gives speakers stable positions outside the camera crop.
+    const docked = Boolean(this.world && !this.usesManualPan() && Object.values(this.actors).some(actor => actor.speech));
+    if (docked) {
+      for (const actor of Object.values(this.actors)) {
+        const hidden = !actor.speech;
+        if (actor.bubble.hidden !== hidden) actor.bubble.hidden = hidden;
+      }
+    }
+    if (docked === this.stageViewport.hasAttribute('data-speech-docked')) return;
+    this.stageViewport.toggleAttribute('data-speech-docked', docked);
+    this.bubbleFitKey = null;
+    if (docked) {
+      this.bubbleLayer.removeAttribute('data-compact');
+      this.bubbleLayer.removeAttribute('aria-hidden');
+      this.bubbleLayer.setAttribute('role', 'region');
+      this.bubbleLayer.setAttribute('aria-label', 'Current public speech');
+      this.bubbleLayer.tabIndex = 0;
+    } else {
+      if (document.activeElement === this.bubbleLayer) document.querySelector('#stage-camera').focus({preventScroll: true});
+      this.bubbleLayer.setAttribute('aria-hidden', 'true');
+      for (const attribute of ['role', 'aria-label', 'tabindex']) this.bubbleLayer.removeAttribute(attribute);
+    }
   }
 
   placeBubbles(worldHeads, height) {
     const view = {width: this.scroll.clientWidth, height};
     const pan = this.scroll.scrollLeft;
+    const docked = this.stageViewport.hasAttribute('data-speech-docked');
     const heads = worldHeads.map(head => {
       const x = head.x - pan;
       const side = x < 0 ? 'left' : x > view.width ? 'right' :
         head.y < 0 ? 'above' : head.y > height ? 'below' : '';
       const actor = this.actors[head.role];
-      actor.bubble.hidden = Boolean(side && !actor.speech);
+      actor.bubble.hidden = !actor.speech && Boolean(docked || side);
       actor.leader.hidden = true;
-      if (side) actor.bubble.dataset.offscreen = side;
+      if (side && !docked) actor.bubble.dataset.offscreen = side;
       else delete actor.bubble.dataset.offscreen;
       return {...head, x, side, actor};
     });
 
-    // Keep placement priority in role order as speaking robots cross on screen.
     const speakers = heads.filter(head => head.actor.speech);
-    const subject = heads.find(head => head.role === this.followRole && !head.side)?.bounds;
-    const reserved = subject ? [{...subject, left: subject.left - pan, right: subject.right - pan}] : [];
+    if (!docked) this.placeOverlayBubbles(heads, speakers, view);
+    const layout = speakers.map(({actor}) => [actor.message.clientWidth, actor.message.clientHeight].join('/')).join(',');
+    if (layout !== this.speechLayout) {
+      this.speechLayout = layout;
+      this.updateSpeechScroll();
+    }
+  }
+
+  placeOverlayBubbles(heads, speakers, view) {
+    // Keep placement priority in role order as speaking robots cross on screen.
     const measure = ({actor: {bubble}}) => ({width: bubble.offsetWidth, height: bubble.offsetHeight});
     const messageIds = ROLES.map(role => this.actors[role].speech?.seq);
-    const fitKey = [view.width, height, this.stageShell.dataset.speechSize, ...messageIds].join('/');
+    const fitKey = [view.width, view.height, this.stageShell.dataset.speechSize, ...messageIds].join('/');
     if (fitKey !== this.bubbleFitKey) {
       // Re-evaluate on text/size changes, not on world frames. Toggling the clip
       // while a robot moves can clamp away the currently displayed last line.
@@ -512,13 +544,13 @@ export class Scene {
       this.bubbleLayer.removeAttribute('data-compact');
       const gutter = BUBBLE_INSET * 2 + BUBBLE_GAP * (speakers.length - 1);
       const stackHeight = speakers.reduce((sum, head) => sum + measure(head).height, gutter);
-      if (stackHeight > height) this.bubbleLayer.setAttribute('data-compact', '');
+      if (stackHeight > view.height) this.bubbleLayer.setAttribute('data-compact', '');
     }
     const boxes = [];
     if (!this.bubbleLayer.hasAttribute('data-compact')) {
       for (const head of speakers) {
         const size = measure(head);
-        const box = bubbleBox(head, size.width, size.height, view, [...reserved, ...boxes]);
+        const box = bubbleBox(head, size.width, size.height, view, boxes);
         if (!box) break;
         boxes.push(box);
       }
@@ -541,14 +573,9 @@ export class Scene {
     const labels = heads.filter(head => !head.actor.speech && !head.side).sort((a, b) => a.x - b.x);
     for (const head of labels) {
       const size = measure(head);
-      const box = bubbleBox(head, size.width, size.height, view, [...reserved, ...boxes]);
+      const box = bubbleBox(head, size.width, size.height, view, boxes);
       if (box) { boxes.push(box); this.drawBubble(head, box); }
       else head.actor.bubble.hidden = true;
-    }
-    const layout = speakers.map(({actor}) => [actor.message.clientWidth, actor.message.clientHeight].join('/')).join(',');
-    if (layout !== this.speechLayout) {
-      this.speechLayout = layout;
-      this.updateSpeechScroll();
     }
   }
 
@@ -569,6 +596,7 @@ export class Scene {
 
   paint(scenery = false) {
     if (this.batching) return;
+    this.syncSpeechDock();
     const view = this.camera();
     if (!view) {
       // Switching to a sensor feed removes the stage from layout. Force speech
