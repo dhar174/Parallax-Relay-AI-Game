@@ -92,8 +92,13 @@ button:focus-visible, select:focus-visible, input:focus-visible, a:focus-visible
 .speech-reader-nav button[aria-disabled="true"] { opacity: .55; cursor: default; }
 #await-scene { position: absolute; top: 12px; left: 14px; padding: 5px 8px; border-radius: 4px; background: #fff7e4; color: #463b2a; font-size: .78rem; }
 #sensor-view { min-height: 170px; margin: 0; padding: 14px; background: #f0ecdf; text-align: center; }
-#sensor-image { max-width: 100%; height: auto; vertical-align: middle; }
+#sensor-scroll { overflow-x: auto; scrollbar-color: #8f836a #ece4d4; }
+#sensor-image { display: block; max-width: 100%; height: auto; margin-inline: auto; }
+#sensor-scroll.enlarged #sensor-image { max-width: none; }
 #sensor-caption { margin: 10px 0 0; color: #3c3c32; font-size: .86rem; overflow-wrap: anywhere; }
+#sensor-details { max-width: 65ch; margin: 7px auto 0; color: #3c3c32; line-height: 1.5; }
+#sensor-zoom { margin-top: 9px; }
+#sensor-zoom[aria-pressed="true"] { background: #f1e9d9; }
 .readout { display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr 1fr; border-top: 1px solid #b7ae9e; }
 .readout > div { min-width: 0; padding: 8px 14px; border-left: 1px solid #ddd7c8; }
 .readout > div:first-child { border-left: 0; }

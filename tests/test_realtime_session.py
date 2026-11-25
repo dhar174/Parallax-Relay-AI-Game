@@ -1,4 +1,5 @@
 import asyncio
+from io import BytesIO
 import json
 from pathlib import Path
 import tempfile
@@ -8,12 +9,16 @@ import unittest
 from unittest.mock import patch
 from uuid import uuid4
 
+from PIL import Image, ImageChops
+
 from parallax_relay.protocol import ROLES
 from parallax_relay.realtime import session as driver
 from parallax_relay.realtime.coordination import CoordinationStop
+from parallax_relay.realtime.flux_view import render_circuit_relief
 from parallax_relay.realtime.journal import replay
-from parallax_relay.realtime.observations import observe
-from parallax_relay.realtime.physics import DRIVE
+from parallax_relay.realtime.observations import observe, sample_flux_circuit, sample_pyra_thermal
+from parallax_relay.realtime.physics import DRIVE, step
+from parallax_relay.realtime.pyra_view import render_thermal_bloom
 from parallax_relay.realtime.settings import Settings, load_profile
 
 
@@ -30,6 +35,74 @@ class RealtimeSessionTests(unittest.IsolatedAsyncioTestCase):
     def session(self, **settings):
         config = Settings.offline().model_copy(update=settings)
         return driver.Session(self.out, 'reactive', config, paced=False)
+
+    def test_circuit_relief_uses_the_requested_window_without_changing_the_original_feed(self):
+        session = self.session()
+        self.addCleanup(session.close)
+        first = observe(session.world, 'FLUX', 1, session.settings)
+        sample = sample_flux_circuit(session.world)
+        session.store_feed('FLUX', 1, first.image_png)
+
+        session.world.bridge_powered = True
+        second = observe(session.world, 'FLUX', 2, session.settings)
+        session.store_feed('FLUX', 2, second.image_png)
+
+        self.assertEqual(session.feed('FLUX', 1), first.image_png)
+        self.assertEqual(session.feed('FLUX', 2), second.image_png)
+        self.assertEqual(session.illustrated_feed('FLUX', 1), render_circuit_relief(sample))
+        self.assertNotEqual(session.illustrated_feed('FLUX', 1), session.illustrated_feed('FLUX', 2))
+        self.assertIsNone(session.illustrated_feed('FLUX', 3))
+
+    def test_thermal_feed_samples_heat_before_and_after_venting(self):
+        session = self.session()
+        self.addCleanup(session.close)
+        samples = {}
+        for window, heat in ((1, 4), (2, 1)):
+            observation = observe(session.world, 'PYRA', window, session.settings)
+            sample = sample_pyra_thermal(session.world)
+            self.assertEqual(sample.heat, heat)
+            session.store_feed('PYRA', window, observation.image_png)
+            samples[window] = (observation.image_png, render_thermal_bloom(sample), heat)
+            commands = {role: [{'kind': 'VENT'}] if role == 'PYRA' else [] for role in ROLES}
+            self.assertTrue(any(event['kind'] == 'vented' for event in step(session.world, commands, 0)))
+        for window, (original, illustrated, heat) in samples.items():
+            self.assertEqual(session.feed('PYRA', window), original)
+            self.assertEqual(session.illustrated_feed('PYRA', window), illustrated)
+            self.assertIn(f'Thermal reading {heat}', session.feed_description('PYRA', window))
+        self.assertIsNone(session.illustrated_feed('PYRA', 3))
+        self.assertIsNone(session.illustrated_feed('FLUX', 1))
+
+    def test_both_illustrations_use_the_sampled_public_exit_and_own_height(self):
+        session = self.session()
+        self.addCleanup(session.close)
+        session.world.bridge_powered = True
+        for role in ('FLUX', 'PYRA'):
+            with self.subTest(role=role):
+                for window, recovered, height in ((1, False, 0), (2, True, 0), (3, True, 128)):
+                    session.world.shard_collected = recovered
+                    session.world.robots[role].y = height
+                    png = observe(session.world, role, window, session.settings).image_png
+                    session.store_feed(role, window, png)
+                session.world.shard_collected = False
+                session.world.robots[role].y = -30
+
+                before = session.illustrated_feed_description(role, 1)
+                after = session.illustrated_feed_description(role, 2)
+                airborne = session.illustrated_feed_description(role, 3)
+                self.assertIn('Exit locked.', before)
+                self.assertIn('Exit unlocked.', after)
+                self.assertIn(f'{role} height 0 tiles', after)
+                self.assertIn(f'{role} height 0.5 tiles', airborne)
+                for other in set(ROLES) - {role}:
+                    self.assertNotIn(f'{other} height', airborne)
+                self.assertNotIn('height', session.feed_description(role, 3))
+                with Image.open(BytesIO(session.illustrated_feed(role, 1))) as locked, \
+                     Image.open(BytesIO(session.illustrated_feed(role, 2))) as unlocked:
+                    box = ImageChops.difference(locked, unlocked).getbbox()
+                    self.assertIsNotNone(box)
+                    self.assertTrue(760 <= box[0] < box[2] <= 785 and 120 <= box[1] < box[3] <= 150)
+                    self.assertGreater(unlocked.crop(box).convert('L').getextrema()[1],
+                                       locked.crop(box).convert('L').getextrema()[1] + 35)
 
     def test_live_session_requires_matching_named_limits_before_opening_its_run(self):
         profile = load_profile('dev-bridge-live-v1')

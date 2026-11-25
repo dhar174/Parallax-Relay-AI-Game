@@ -130,6 +130,54 @@ test('reactive spectator waits for Start and runs multiple real windows', {timeo
   await page.locator('#result:visible').waitFor({timeout: 30000});
   const journal = await events(page);
   assert.ok(journal.some(event => event.kind === 'consequence' && event.event_kind === 'completed'), 'Actual team checkpoint');
+  const picker = page.locator('#sensor-select');
+  const sensorImage = page.locator('#sensor-image:visible');
+  await page.setViewportSize({width: 390, height: 800});
+  for (const [role, view, title, capture] of [
+    ['FLUX', 'FLUX_RELIEF', 'Circuit Relief', 'flux-circuit-relief-mobile'],
+    ['PYRA', 'PYRA_BLOOM', 'Thermal Bloom', 'pyra-thermal-bloom-mobile'],
+  ]) {
+    const sample = journal.findLast(event => event.kind === 'observation' && event.role === role);
+    await picker.selectOption(view);
+    await sensorImage.waitFor();
+    const description = await sensorImage.getAttribute('alt');
+    assert.match(description, new RegExp(title + ' illustration for window ' + sample.window));
+    if (role === 'PYRA') assert.match(description, /Thermal reading 3 at motor column 4/);
+    assert.match(description, new RegExp(role + ' height -?\\d+(?:\\.\\d+)? tiles'));
+    assert.match(description, /Exit (locked|unlocked)\./);
+    assert.match(await page.locator('#sensor-caption').textContent(), new RegExp('Sampled at tick ' + sample.tick));
+    const illustratedSrc = await sensorImage.getAttribute('src');
+    const size = await sensorImage.evaluate(async image => {
+      await image.decode();
+      return {native: [image.naturalWidth, image.naturalHeight], right: image.getBoundingClientRect().right,
+        viewport: document.documentElement.clientWidth};
+    });
+    assert.deepEqual(size.native, [850, 295]);
+    assert.ok(size.right <= size.viewport, 'The sensor image fits the mobile viewport');
+    await screenshot(page, capture);
+    const details = page.locator('#sensor-details:visible');
+    assert.match(await details.textContent(), /SPECTRA at column \d+, PYRA at column \d+, FLUX at column \d+/);
+    assert.ok(await details.evaluate(node => parseFloat(getComputedStyle(node).fontSize) >= 16));
+    const zoom = page.getByRole('button', {name: 'Enlarge image'});
+    await zoom.click();
+    assert.equal(await zoom.getAttribute('aria-pressed'), 'true');
+    assert.equal(await sensorImage.evaluate(image => Math.round(image.getBoundingClientRect().width)), 850);
+    const scroll = page.locator('#sensor-scroll');
+    assert.equal(await scroll.getAttribute('tabindex'), '0');
+    await scroll.focus();
+    await page.keyboard.press('ArrowRight');
+    await page.waitForFunction(() => document.getElementById('sensor-scroll').scrollLeft > 0);
+    assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+    await zoom.click();
+    assert.equal(await zoom.getAttribute('aria-pressed'), 'false');
+    assert.equal(await scroll.evaluate(node => node.scrollLeft), 0);
+    await picker.selectOption(role);
+    await sensorImage.waitFor();
+    assert.match(await sensorImage.getAttribute('alt'), new RegExp('original sensor observation for window ' + sample.window));
+    assert.notEqual(await sensorImage.getAttribute('src'), illustratedSrc);
+    assert.equal(await details.isVisible(), false);
+  }
+  await page.setViewportSize({width: 1280, height: 800});
   await page.locator('#sensor-select').selectOption('SPECTATOR');
   await screenshot(page, 'reactive-complete');
   const beforeReload = await page.locator('#transcript [data-seq]').evaluateAll(nodes => nodes.map(node => node.dataset.seq));
@@ -283,6 +331,8 @@ test('baseline launcher waits for Start and publishes a real fixture resolution'
   const origin = await server(t, 'baseline');
   const page = await pageFor(t, origin, {width:1280, height:800});
   await page.locator('#connection').filter({hasText: /^Connected$/}).waitFor();
+  assert.ok(await page.locator('#circuit-relief-option').evaluate(option => option.hidden && option.disabled));
+  assert.ok(await page.locator('#thermal-bloom-option').evaluate(option => option.hidden && option.disabled));
   const before = await events(page);
   await page.waitForTimeout(500);
   assert.equal((await events(page)).filter(event => event.kind === 'window_started').length, 0);

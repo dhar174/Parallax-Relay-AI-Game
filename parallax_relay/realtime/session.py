@@ -14,13 +14,21 @@ from ..protocol import ROLES
 from ..provenance import collect_environment, collect_source
 from ..rooms import get_room
 from .coordination import Coordinator, CoordinationStop, FULL_PHASES, REDUCED_PHASES
+from .flux_view import render_circuit_relief
 from .journal import Journal
 from .manual import ManualAgent, ManualControls
-from .observations import observe
-from .physics import initial_world, step
+from .observations import observe, sample_flux_circuit, sample_pyra_thermal
+from .physics import TILE, initial_world, step
 from .players import ReactiveAgent
+from .pyra_view import render_thermal_bloom
 from .settings import make_live_agents
 from .wire import contract_identity
+
+
+_ILLUSTRATIONS = {
+    'FLUX': (sample_flux_circuit, render_circuit_relief),
+    'PYRA': (sample_pyra_thermal, render_thermal_bloom),
+}
 
 
 class Session:
@@ -57,6 +65,7 @@ class Session:
         self._budget = None
         self._controls = ManualControls(settings, self.emit)
         self._sample_descriptions = {}
+        self._illustrated_samples = {}
         self._latest_view = None
         self._feedback = {role: deque(maxlen=6) for role in ROLES}
         if mode != 'baseline':
@@ -113,6 +122,9 @@ class Session:
 
     def store_feed(self, role, window, png):
         self.journal.store_feed(role, window, png)
+        if role in _ILLUSTRATIONS and self.mode != 'baseline':
+            project, _ = _ILLUSTRATIONS[role]
+            self._illustrated_samples[role, window] = project(self.world)
         view = self._latest_view if self.mode == 'baseline' else self.world.snapshot()
         room = get_room('split_span')
         if role == 'PYRA':
@@ -124,16 +136,32 @@ class Session:
             shard = 'recovered' if view['shard_collected'] else f'at column {room.shard}'
             details = f"Optical console at column {room.bridges[0].motor}. Memory shard {shard}."
         deck = 'extended' if view['bridge_powered'] else 'retracted'
-        positions = ', '.join(f"{name} at {min(12, max(0, (robot['x'] + 128) // 256))}"
+        positions = ', '.join(f"{name} at column {min(12, max(0, (robot['x'] + TILE // 2) // TILE))}"
                               for name, robot in view['robots'].items())
-        self._sample_descriptions[role, window] = (
-            f'{role} horizontal sensor, window {window}. {positions}. Bridge {deck}. {details}')
+        self._sample_descriptions[role, window] = f'{positions}. Bridge {deck}. {details}'
 
     def feed_description(self, role, window):
-        return self._sample_descriptions.get((role, window), '')
+        description = self._sample_descriptions.get((role, window))
+        return f'{role} horizontal sensor, window {window}. {description}' if description else ''
+
+    def illustrated_feed_description(self, role, window):
+        sample = self._illustrated_samples.get((role, window))
+        description = self._sample_descriptions.get((role, window))
+        if sample is None or description is None:
+            return ''
+        exit_state = 'unlocked' if sample.exit_unlocked else 'locked'
+        height = f'{sample.own_height / TILE:.8f}'.rstrip('0').rstrip('.')
+        return f'{description} Exit {exit_state}. {role} height {height} tiles relative to the deck.'
 
     def feed(self, role, window):
         return self.journal.feed(role, window)
+
+    def illustrated_feed(self, role, window):
+        sample = self._illustrated_samples.get((role, window))
+        if sample is None:
+            return None
+        _, render = _ILLUSTRATIONS[role]
+        return render(sample)
 
     def status(self):
         return {'mode': self.mode, 'status': 'ended' if self._done.is_set() else

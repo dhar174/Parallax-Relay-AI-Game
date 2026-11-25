@@ -26,7 +26,12 @@
         <div class="scene-tools">
           <label class="feed-picker"><span class="visually-hidden">Choose view</span>
             <select id="sensor-select" aria-label="Choose view">
-              <option value="SPECTATOR">Spectator view</option><option value="SPECTRA">SPECTRA · Optical feed</option><option value="PYRA">PYRA · Thermal feed</option><option value="FLUX">FLUX · Circuit feed</option>
+              <option value="SPECTATOR">Spectator view</option>
+              <option value="SPECTRA">SPECTRA · Optical feed</option>
+              <option id="thermal-bloom-option" value="PYRA_BLOOM" hidden disabled>PYRA · Thermal Bloom</option>
+              <option value="PYRA">PYRA · Original thermal feed</option>
+              <option id="circuit-relief-option" value="FLUX_RELIEF" hidden disabled>FLUX · Circuit Relief</option>
+              <option value="FLUX">FLUX · Original circuit feed</option>
             </select>
           </label>
           <div class="scene-actions"><a href="#dialogue-heading" class="jump-link">Dialogue <span aria-hidden="true">↓</span></a><button id="zoom" type="button" aria-pressed="false">Enlarge room</button></div>
@@ -77,8 +82,12 @@
           <p id="announcements" class="visually-hidden" aria-live="polite" aria-atomic="true"></p>
         </div>
         <div id="sensor-view" hidden>
-          <img id="sensor-image" alt="" hidden>
+          <div id="sensor-scroll" role="region" aria-label="Sensor image">
+            <img id="sensor-image" alt="" hidden>
+          </div>
           <p id="sensor-caption">Waiting for an observation.</p>
+          <p id="sensor-details" aria-hidden="true" hidden></p>
+          <button id="sensor-zoom" type="button" aria-controls="sensor-scroll" aria-pressed="false" hidden>Enlarge image</button>
         </div>
         <div class="readout" aria-label="Match status">
           <div><span class="label">Phase</span><strong id="phase">Ready to start</strong></div>
