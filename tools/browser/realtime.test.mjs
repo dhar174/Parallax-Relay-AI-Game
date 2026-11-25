@@ -321,10 +321,10 @@ function speechWorld(positions) {
   return {tick: 1, robots: Object.fromEntries(speechRoles.map((role, i) => [role, {...robot, x: positions[i]}]))};
 }
 
-async function loadSpeechFixture(page) {
+async function loadSpeechFixture(page, positions = [768, 768, 768]) {
   const run = await page.evaluate(async () => (await (await fetch('/api/status')).json()).run_id);
   const journal = [
-    {kind: 'state', world: speechWorld([768, 768, 768])},
+    {kind: 'state', world: speechWorld(positions)},
     {kind: 'phase_open', window: 1, phase: 'broadcast'},
     ...speechRoles.map(role => ({kind: 'dialogue', role, text: longSpeech[role], window: 1, phase: 'broadcast'})),
   ];
@@ -463,4 +463,22 @@ test('reduced motion stops automatic bubble scrolling until the viewer resumes',
   await page.getByRole('button', {name: 'Resume scrolling'}).click();
   await page.clock.fastForward(6000);
   assert.ok((await bubbleScroll(page)).every(row => row.top > 0));
+});
+
+test('crowded speech bubbles keep their rows when speakers cross', {timeout:45000}, async t => {
+  const origin = await server(t, 'manual');
+  const page = await pageFor(t, origin, {width: 320, height: 780});
+  const journal = await loadSpeechFixture(page, [756, 768, 780]);
+  await page.locator('#bubbles[data-compact]').waitFor();
+  await page.clock.fastForward(6000);
+  assert.ok((await bubbleScroll(page)).every(row => row.top > 0 && row.top < row.end));
+
+  const rowPositions = () => page.locator('.bubble.speaking').evaluateAll(nodes =>
+    Object.fromEntries(nodes.map(node => [node.dataset.bubble, node.offsetTop])));
+  const before = await rowPositions();
+  // Reverse the robots' horizontal order with roughly two pixels of movement.
+  journal.push({kind: 'state', world: speechWorld([780, 768, 756])});
+  await page.waitForFunction(() => document.querySelector('[data-robot="SPECTRA"]').dataset.x === '780');
+  assert.deepEqual(await rowPositions(), before, 'Every speaker stays in the same row');
+  await assertBubblesFit(page);
 });

@@ -34,3 +34,11 @@ Git config value while restoring the environment. A standalone `git rev-parse`
 probe reproduced the error after the same environment reset. The passing rerun
 used `GIT_CONFIG_COUNT=0` in its test process. The six skips concern unavailable
 filesystem links.
+
+## Review follow-up
+
+The crossing regression reverses the horizontal order of three scrolling
+speakers at 320 px with two pixels of motion. On the initial PR head, SPECTRA and
+FLUX swapped rows at 6 px and 98 px. With stacked rows assigned in role order,
+all speakers kept their vertical positions and the bubbles stayed within the
+stage. All three focused speech checks passed in Chromium.

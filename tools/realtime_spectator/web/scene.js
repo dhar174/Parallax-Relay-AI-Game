@@ -378,9 +378,10 @@ export class Scene {
       if (side) actor.bubble.dataset.offscreen = side;
       else delete actor.bubble.dataset.offscreen;
       return {...head, x, side, actor};
-    }).sort((a, b) => a.x - b.x);
+    });
 
     const speakers = heads.filter(head => head.actor.speech);
+    const leftToRight = [...heads].sort((a, b) => a.x - b.x);
     const measure = ({actor: {bubble}}) => ({width: bubble.offsetWidth, height: bubble.offsetHeight});
     const messageIds = ROLES.map(role => this.actors[role].speech?.seq);
     const fitKey = [view.width, height, this.stageShell.dataset.speechSize, ...messageIds].join('/');
@@ -394,8 +395,9 @@ export class Scene {
       if (stackHeight > height) this.bubbleLayer.setAttribute('data-compact', '');
     }
     const boxes = [];
+    let placementOrder = leftToRight.filter(head => head.actor.speech);
     if (!this.bubbleLayer.hasAttribute('data-compact')) {
-      for (const head of speakers) {
+      for (const head of placementOrder) {
         const size = measure(head);
         const box = bubbleBox(head, size.width, size.height, view, boxes);
         if (!box) break;
@@ -403,11 +405,12 @@ export class Scene {
       }
     }
 
-    // Stack crowded bubbles from the top edge to leave the play area visible.
     if (boxes.length !== speakers.length) {
+      // Keep stacked rows in role order as the robots cross on screen.
+      placementOrder = speakers;
       boxes.length = 0;
       let top = BUBBLE_INSET;
-      for (const head of speakers) {
+      for (const head of placementOrder) {
         const size = measure(head);
         const left = clamp(head.x - size.width / 2, BUBBLE_INSET, view.width - size.width - BUBBLE_INSET);
         const bottom = top + size.height;
@@ -416,8 +419,8 @@ export class Scene {
       }
     }
 
-    speakers.forEach((head, index) => this.drawBubble(head, boxes[index]));
-    for (const head of heads) {
+    placementOrder.forEach((head, index) => this.drawBubble(head, boxes[index]));
+    for (const head of leftToRight) {
       if (head.actor.speech || head.side) continue;
       const size = measure(head);
       const box = bubbleBox(head, size.width, size.height, view, boxes);
