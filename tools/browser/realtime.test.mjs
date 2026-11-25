@@ -316,17 +316,17 @@ const longSpeech = {
     + 'I can check the spare energy cell on the way to the exit.\nSignal ' + 'X'.repeat(100) + ' ends here.',
 };
 
-function speechWorld(positions) {
-  const robot = {y: 0, vx: 0, vy: 0, grounded: true, facing: 1, pose: 'idle'};
+function speechWorld(positions, y = 0) {
+  const robot = {y, vx: 0, vy: 0, grounded: true, facing: 1, pose: 'idle'};
   return {tick: 1, robots: Object.fromEntries(speechRoles.map((role, i) => [role, {...robot, x: positions[i]}]))};
 }
 
-async function loadSpeechFixture(page, positions = [768, 768, 768]) {
+async function loadSpeechFixture(page, {world = speechWorld([768, 768, 768]), speech = longSpeech} = {}) {
   const run = await page.evaluate(async () => (await (await fetch('/api/status')).json()).run_id);
   const journal = [
-    {kind: 'state', world: speechWorld(positions)},
+    {kind: 'state', world},
     {kind: 'phase_open', window: 1, phase: 'broadcast'},
-    ...speechRoles.map(role => ({kind: 'dialogue', role, text: longSpeech[role], window: 1, phase: 'broadcast'})),
+    ...speechRoles.map(role => ({kind: 'dialogue', role, text: speech[role], window: 1, phase: 'broadcast'})),
   ];
   await page.route('**/api/events?after=*', route => {
     const after = Number(new URL(route.request().url()).searchParams.get('after'));
@@ -465,20 +465,28 @@ test('reduced motion stops automatic bubble scrolling until the viewer resumes',
   assert.ok((await bubbleScroll(page)).every(row => row.top > 0));
 });
 
-test('crowded speech bubbles keep their rows when speakers cross', {timeout:45000}, async t => {
-  const origin = await server(t, 'manual');
-  const page = await pageFor(t, origin, {width: 320, height: 780});
-  const journal = await loadSpeechFixture(page, [756, 768, 780]);
-  await page.locator('#bubbles[data-compact]').waitFor();
-  await page.clock.fastForward(6000);
-  assert.ok((await bubbleScroll(page)).every(row => row.top > 0 && row.top < row.end));
+for (const compact of [true, false]) {
+  const layout = compact ? 'compact' : 'regular';
+  test(`${layout} speech bubbles keep their rows when speakers cross`, {timeout:45000}, async t => {
+    const origin = await server(t, 'manual');
+    const page = await pageFor(t, origin, {width: 320, height: 780});
+    const speech = compact ? longSpeech : {...longSpeech, PYRA: 'The vent is ready.'};
+    // Put the regular case near the top edge so nearby placement uses different rows.
+    const elevation = compact ? 0 : 1280;
+    const journal = await loadSpeechFixture(page, {world: speechWorld([756, 768, 780], elevation), speech});
+    assert.equal(await page.locator('#bubbles[data-compact]').count(), Number(compact));
+    await page.clock.fastForward(6000);
+    const scrolling = (await bubbleScroll(page)).filter(row => row.end > 0);
+    assert.equal(scrolling.length, compact ? 3 : 2);
+    assert.ok(scrolling.every(row => row.top > 0 && row.top < row.end));
 
-  const rowPositions = () => page.locator('.bubble.speaking').evaluateAll(nodes =>
-    Object.fromEntries(nodes.map(node => [node.dataset.bubble, node.offsetTop])));
-  const before = await rowPositions();
-  // Reverse the robots' horizontal order with roughly two pixels of movement.
-  journal.push({kind: 'state', world: speechWorld([780, 768, 756])});
-  await page.waitForFunction(() => document.querySelector('[data-robot="SPECTRA"]').dataset.x === '780');
-  assert.deepEqual(await rowPositions(), before, 'Every speaker stays in the same row');
-  await assertBubblesFit(page);
-});
+    const rowPositions = () => page.locator('.bubble.speaking').evaluateAll(nodes =>
+      Object.fromEntries(nodes.map(node => [node.dataset.bubble, node.offsetTop])));
+    const before = await rowPositions();
+    // Reverse the robots' horizontal order with roughly two pixels of movement.
+    journal.push({kind: 'state', world: speechWorld([780, 768, 756], elevation)});
+    await page.waitForFunction(() => document.querySelector('[data-robot="SPECTRA"]').dataset.x === '780');
+    assert.deepEqual(await rowPositions(), before, 'Every speaker stays in the same row');
+    await assertBubblesFit(page);
+  });
+}

@@ -42,3 +42,9 @@ speakers at 320 px with two pixels of motion. On the initial PR head, SPECTRA an
 FLUX swapped rows at 6 px and 98 px. With stacked rows assigned in role order,
 all speakers kept their vertical positions and the bubbles stayed within the
 stage. All three focused speech checks passed in Chromium.
+
+The re-review found the regular layout could still swap rows. An additional
+320 px regression with two scrolling messages and one short message reproduced
+a 120 px swap near the top edge. Both placement paths now process speakers in
+role order. The compact and regular crossings passed alongside both existing
+speech checks in Chromium.
