@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#faf5eb">
   <link rel="icon" href="/favicon.ico">
   <link rel="stylesheet" href="/style.css">
@@ -42,7 +42,15 @@
             </div>
             <div id="bubbles" aria-hidden="true"></div>
           </div>
-          <div class="speech-tools" role="group" aria-label="Stage speech controls">
+          <div id="stage-controls" class="speech-tools" role="group" aria-label="Stage controls">
+            <div class="camera-control">
+              <label for="stage-camera" class="visually-hidden">Camera</label>
+              <select id="stage-camera">
+                <option value="room">Whole room</option><option value="SPECTRA">Follow SPECTRA</option>
+                <option value="PYRA">Follow PYRA</option><option value="FLUX">Follow FLUX</option>
+              </select>
+              <button id="stage-fullscreen" type="button">Fullscreen</button>
+            </div>
             <button id="read-speech" type="button" aria-haspopup="dialog" disabled>Read speech</button>
             <button id="speech-pause" type="button">Pause scrolling</button>
             <div class="speech-size-control">
@@ -51,6 +59,7 @@
                 <option value="normal">Normal</option><option value="large">Large</option><option value="largest">Largest</option>
               </select>
             </div>
+            <p id="stage-mode-note" role="status" hidden></p>
           </div>
           <dialog id="speech-reader" aria-labelledby="speech-reader-title">
             <div class="speech-reader-head">
@@ -64,8 +73,9 @@
               <button id="speech-next" type="button">Next</button>
             </div>
           </dialog>
+          <p id="scene-description" class="visually-hidden">The room has not sent a world sample yet.</p>
+          <p id="announcements" class="visually-hidden" aria-live="polite" aria-atomic="true"></p>
         </div>
-        <p id="scene-description" class="visually-hidden">The room has not sent a world sample yet.</p>
         <div id="sensor-view" hidden>
           <img id="sensor-image" alt="" hidden>
           <p id="sensor-caption">Waiting for an observation.</p>
@@ -99,7 +109,6 @@
     <div class="journal-grid">
       <section aria-labelledby="dialogue-heading"><div class="section-head"><h2 id="dialogue-heading" tabindex="-1">Public dialogue</h2><span id="dialogue-count"></span></div>
         <p id="dialogue-empty" class="empty">Released speech will appear here.</p><div id="transcript" class="journal"></div>
-        <p id="announcements" class="visually-hidden" aria-live="polite" aria-atomic="true"></p>
       </section>
       <section aria-labelledby="events-heading"><div class="section-head"><h2 id="events-heading">Room events</h2></div>
         <p id="events-empty" class="empty">Waiting for a change in the room.</p><ol id="consequences" class="journal"></ol>

@@ -14,7 +14,7 @@ from ..protocol import MAX_REPLY_CHARS, ROLES, _unique_object
 
 
 ASSET_ROOT = Path(__file__).resolve().parents[2] / 'tools' / 'realtime_spectator'
-WEB_FILES = {'index.html', 'app.js', 'manual.js', 'scene.js', 'style.css'}
+WEB_FILES = {'index.html', 'app.js', 'manual.js', 'presentation.js', 'scene.js', 'style.css'}
 ART_FILES = {
     'room-background.png', 'floor.png', 'bridge.png', 'motor-console.png',
     'memory-shard.png', 'energy-cell.png', 'exit-open.png', 'exit-closed.png',

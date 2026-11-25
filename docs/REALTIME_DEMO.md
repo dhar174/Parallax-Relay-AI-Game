@@ -45,6 +45,20 @@ to close the viewer. The offline modes use no provider credentials or calls.
 The verified walkthrough includes Chromium captures of readiness, the jump,
 extraction, and a failed manual crossing. [Screenshots and recording evidence](verification/2026-11-20-realtime-demo.md)
 
+### Watch in fullscreen
+
+In **Spectator view**, select **Fullscreen** below the stage. The game fills the
+display area and keeps the camera, speech, and **Exit to dashboard** controls
+visible. If your browser cannot enter native fullscreen, the same controls open
+in an in-page **Game-only view**. Use **Exit to dashboard** or Escape to return.
+Return to the dashboard for sensor feeds and manual match controls.
+
+**Whole room** frames both banks and the exit. Choose **Follow SPECTRA**,
+**Follow PYRA**, or **Follow FLUX** to see a closer view of that robot and the
+nearby terrain. You can change cameras from either view. Your selection follows
+you back to the dashboard, where **Whole room** also offers **Enlarge room** and
+manual panning. The match keeps running through all of these changes.
+
 ## Walk through a manual crossing
 
 ```bash

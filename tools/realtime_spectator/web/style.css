@@ -74,9 +74,13 @@ button:focus-visible, select:focus-visible, input:focus-visible, a:focus-visible
 .bubble:not(.speaking) { padding: 2px 5px; background: #fff6df; }
 .bubble[data-offscreen="left"] .bubble-speaker::before { content: '← '; }
 .bubble[data-offscreen="right"] .bubble-speaker::after { content: ' →'; }
+.bubble[data-offscreen="above"] .bubble-speaker::before { content: '↑ '; }
+.bubble[data-offscreen="below"] .bubble-speaker::before { content: '↓ '; }
 .leader { height: 1px; transform-origin: left center; background: var(--role-color); }
 .speech-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 7px; padding: 5px 8px; border-top: 1px solid #b7ae9e; }
 .speech-tools button, .speech-tools select { min-height: 34px; padding: 3px 6px; font-size: .78rem; white-space: nowrap; }
+.camera-control { display: flex; align-items: center; gap: 7px; }
+#stage-mode-note { margin: 0; font-size: .75rem; color: var(--muted); }
 .speech-size-control { margin-inline-start: auto; display: flex; align-items: center; gap: 5px; font-size: .78rem; }
 #speech-reader { width: min(34rem, calc(100% - 24px)); max-height: calc(100% - 24px); padding: 14px; color: var(--ink); background: #fffdf7; border: 1px solid #777365; border-radius: 8px; }
 #speech-reader::backdrop { background: #26251f66; }
@@ -177,3 +181,22 @@ footer { justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-top: 
 }
 @media (max-width: 360px) { .speech-size-control { margin-inline-start: 0; } }
 @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+
+body.stage-presenting { overflow: hidden; }
+#stage-shell[data-presentation] {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  inline-size: 100%;
+  block-size: 100%;
+  block-size: 100dvh;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  background: var(--paper);
+}
+#stage-shell[data-presentation] .stage-scroll { height: 100%; overflow: hidden; }
+#stage-shell[data-presentation] .stage { width: 100%; height: 100%; }
+#stage-shell[data-presentation] .speech-tools { padding: 6px 10px; }
+#stage-shell[data-presentation] .speech-tools button,
+#stage-shell[data-presentation] .speech-tools select { min-height: 36px; }
