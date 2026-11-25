@@ -12,6 +12,9 @@ const STATIC_CROPS = {
 const STATIC_FEET = {SPECTRA: [585, 1158, 1090], PYRA: [600, 1136, 967], FLUX: [591, 1150, 1101]};
 const clamp = (value, low, high) => Math.max(low, Math.min(value, high));
 const finite = Number.isFinite;
+const BUBBLE_INSET = 6;
+const BUBBLE_GAP = 5;
+const WORDS_PER_MINUTE = 160;
 
 function make(tag, className, parent) {
   const node = document.createElement(tag);
@@ -20,9 +23,51 @@ function make(tag, className, parent) {
   return node;
 }
 
+function readingDuration(text) {
+  const words = text.match(/\S+/gu) || [];
+  const units = words.reduce((total, word) => total + Math.ceil(Array.from(word).length / 16), 0);
+  return Math.max(2000, units * 60_000 / WORDS_PER_MINUTE);
+}
+
+// The same function can take elapsed time and duration from a future audio player.
+function advanceMessage(message, elapsedMs, durationMs) {
+  const remaining = message.scrollHeight - message.clientHeight;
+  if (remaining <= 0) return false;
+  const lineHeight = parseFloat(getComputedStyle(message).lineHeight);
+  const steps = Math.ceil(remaining / lineHeight);
+  const line = Math.floor(elapsedMs / durationMs * (steps + 1));
+  message.scrollTop = Math.min(remaining, line * lineHeight);
+  return line < steps;
+}
+
+function bubbleBox(head, width, height, view, placed) {
+  const min = BUBBLE_INSET;
+  const maxX = view.width - width - min, maxY = view.height - height - min;
+  const gap = BUBBLE_GAP;
+  const naturalX = clamp(head.x - width / 2, min, maxX);
+  const naturalY = clamp(head.y - height - 8, min, maxY);
+  const xs = [naturalX, min, maxX, ...placed.flatMap(box => [box.left - width - gap, box.right + gap])];
+  const ys = [naturalY, min, maxY, head.y + 10, ...placed.flatMap(box => [box.top - height - gap, box.bottom + gap])];
+  let best, bestCost = Infinity;
+  for (const x of xs) {
+    for (const y of ys) {
+      const left = clamp(x, min, maxX), top = clamp(y, min, maxY);
+      const right = left + width, bottom = top + height;
+      if (placed.some(box => left < box.right + gap && right > box.left - gap &&
+          top < box.bottom + gap && bottom > box.top - gap)) continue;
+      const cost = Math.abs(left - naturalX) + Math.abs(top - naturalY);
+      if (cost < bestCost) { bestCost = cost; best = {left, top, right, bottom}; }
+    }
+  }
+  return best;
+}
+
 export class Scene {
   constructor() {
     this.stage = document.querySelector('#stage');
+    this.stageShell = document.querySelector('#stage-shell');
+    this.scroll = document.querySelector('#stage-scroll');
+    this.bubbleLayer = document.querySelector('#bubbles');
     this.canvas = document.querySelector('#scenery');
     this.context = this.canvas.getContext('2d');
     this.actors = {};
@@ -32,6 +77,10 @@ export class Scene {
     this.connected = false;
     this.reduced = matchMedia('(prefers-reduced-motion: reduce)');
     this.speech = new Map();
+    this.speechTimer = 0;
+    this.speechPausedAt = null;
+    this.speechPausedTotal = 0;
+    this.pauseButton = document.querySelector('#speech-pause');
     this.positionText = new Map();
     this.cues = new Map();
     this.batching = false;
@@ -49,22 +98,35 @@ export class Scene {
       const mark = make('div', 'actor', document.querySelector('#actors'));
       mark.dataset.robot = role;
       const art = make('span', 'robot-art', mark);
-      const layer = document.querySelector('#bubbles');
-      const leader = make('span', 'leader', layer);
-      const bubble = make('div', 'bubble', layer);
+      const leader = make('span', 'leader', this.bubbleLayer);
+      leader.style.setProperty('--role-color', COLORS[role]);
+      const bubble = make('div', 'bubble', this.bubbleLayer);
       bubble.dataset.bubble = role;
       bubble.style.setProperty('--role-color', COLORS[role]);
       const speaker = make('b', 'bubble-speaker', bubble);
       speaker.textContent = role;
       const message = make('span', 'bubble-message', bubble);
+      message.dir = 'auto';
+      message.hidden = true;
       this.actors[role] = {mark, art, leader, bubble, message};
       mark.hidden = bubble.hidden = leader.hidden = true;
     }
     this.resize = new ResizeObserver(() => this.paint(true));
     this.resize.observe(this.stage);
-    this.reduced.addEventListener('change', () => this.paint(true));
+    this.resize.observe(this.scroll);
+    this.reduced.addEventListener('change', () => {
+      this.setSpeechPaused(this.reduced.matches);
+      this.paint(true);
+    });
+    this.setSpeechPaused(this.reduced.matches);
+    this.pauseButton.addEventListener('click', () => this.setSpeechPaused(this.speechPausedAt === null));
+    document.querySelector('#speech-size').addEventListener('change', event => {
+      this.stageShell.dataset.speechSize = event.target.value;
+      this.paint(true);
+    });
     const zoom = document.querySelector('#zoom');
-    const scroll = document.querySelector('#stage-scroll');
+    const scroll = this.scroll;
+    scroll.addEventListener('scroll', () => this.paint(true), {passive: true});
     zoom.addEventListener('click', () => {
       const enlarged = scroll.classList.toggle('enlarged');
       zoom.setAttribute('aria-pressed', String(enlarged));
@@ -88,6 +150,7 @@ export class Scene {
   reset() {
     this.world = null;
     this.speech.clear();
+    this.releaseSpeech();
     this.cues.clear();
     this.stage.removeAttribute('data-tick');
     document.querySelector('#await-scene').hidden = false;
@@ -142,22 +205,55 @@ export class Scene {
     else this.setWorld({...this.world, tick: event.tick, robots: {...this.world.robots, [role]: robot}});
   }
 
-  say(role, value, window, phase) {
+  say(role, value, seq) {
     if (ROLES.includes(role) && typeof value === 'string' && value.trim()) {
-      this.speech.set(role, {text: value, window, phase});
+      this.speech.set(role, {text: value, seq});
     }
   }
 
   releaseSpeech() {
+    const start = this.speechTime();
+    let changed = false;
     for (const role of ROLES) {
       const actor = this.actors[role];
-      const text = this.speech.get(role)?.text || '';
-      const chars = Array.from(text);
-      actor.message.textContent = chars.length > 90 ? chars.slice(0, 89).join('') + '…' : text;
-      actor.message.hidden = !text;
-      actor.bubble.classList.toggle('speaking', Boolean(text));
+      const speech = this.speech.get(role);
+      if (actor.speech?.seq === speech?.seq) continue;
+      changed = true;
+      actor.speech = speech && {...speech, start, duration: readingDuration(speech.text)};
+      actor.message.textContent = speech?.text ?? '';
+      actor.message.scrollTop = 0;
+      actor.message.hidden = !speech;
+      actor.bubble.classList.toggle('speaking', Boolean(speech));
     }
     this.paint(true);
+    if (changed) this.updateSpeechScroll();
+  }
+
+  speechTime() {
+    return (this.speechPausedAt ?? performance.now()) - this.speechPausedTotal;
+  }
+
+  setSpeechPaused(paused) {
+    if (paused) this.speechPausedAt ??= performance.now();
+    else if (this.speechPausedAt !== null) {
+      this.speechPausedTotal += performance.now() - this.speechPausedAt;
+      this.speechPausedAt = null;
+    }
+    this.pauseButton.textContent = paused ? 'Resume scrolling' : 'Pause scrolling';
+    this.updateSpeechScroll();
+  }
+
+  updateSpeechScroll() {
+    clearTimeout(this.speechTimer);
+    this.speechTimer = 0;
+    const now = this.speechTime();
+    let advancing = false;
+    for (const {speech, message} of Object.values(this.actors)) {
+      if (speech && advanceMessage(message, Math.max(0, now - speech.start), speech.duration)) advancing = true;
+    }
+    if (advancing && this.speechPausedAt === null) {
+      this.speechTimer = setTimeout(() => this.updateSpeechScroll(), 100);
+    }
   }
 
   setConnected(value) {
@@ -270,46 +366,102 @@ export class Scene {
     return {role, x: footX, y: footY - size * .87};
   }
 
-  placeBubbles(heads, view) {
-    const placed = [];
-    for (const head of [...heads].sort((a, b) => a.x - b.x)) {
-      const {bubble, leader} = this.actors[head.role];
-      bubble.hidden = false;
-      const width = bubble.offsetWidth, height = bubble.offsetHeight;
-      const natural = clamp(head.x - width / 2, 4, view.width - width - 4);
-      const options = [natural, ...placed.flatMap(box => [box.left - width - 5, box.right + 5])];
-      let best, bestCost = Infinity;
-      for (let row = 0; row <= heads.length; row++) {
-        const top = clamp(head.y - height - 8 - row * (height + 5), 3, view.height - height - 3);
-        for (const delta of options) {
-          const left = clamp(delta, 4, view.width - width - 4);
-          const right = left + width, bottom = top + height;
-          const overlaps = placed.some(b => left < b.right + 3 && right > b.left - 3 && top < b.bottom + 3 && bottom > b.top - 3);
-          const cost = (overlaps ? 1e6 : 0) + Math.abs(left - natural) + row * 44;
-          if (cost < bestCost) { bestCost = cost; best = {left, top, right, bottom}; }
-        }
-      }
-      placed.push(best);
-      bubble.style.left = best.left + 'px'; bubble.style.top = best.top + 'px';
-      const fromX = clamp(head.x, best.left + 4, best.right - 4), fromY = best.bottom;
-      const dx = head.x - fromX, dy = head.y - fromY;
-      leader.hidden = false;
-      leader.style.left = fromX + 'px'; leader.style.top = fromY + 'px';
-      leader.style.width = Math.hypot(dx, dy) + 'px';
-      leader.style.transform = 'rotate(' + Math.atan2(dy, dx) + 'rad)';
+  placeBubbles(worldHeads, height) {
+    const view = {width: this.scroll.clientWidth, height};
+    const pan = this.scroll.scrollLeft;
+    const heads = worldHeads.map(head => {
+      const x = head.x - pan;
+      const side = x < 0 ? 'left' : x > view.width ? 'right' : '';
+      const actor = this.actors[head.role];
+      actor.bubble.hidden = Boolean(side && !actor.speech);
+      actor.leader.hidden = true;
+      if (side) actor.bubble.dataset.offscreen = side;
+      else delete actor.bubble.dataset.offscreen;
+      return {...head, x, side, actor};
+    });
+
+    // Keep placement priority in role order as speaking robots cross on screen.
+    const speakers = heads.filter(head => head.actor.speech);
+    const measure = ({actor: {bubble}}) => ({width: bubble.offsetWidth, height: bubble.offsetHeight});
+    const messageIds = ROLES.map(role => this.actors[role].speech?.seq);
+    const fitKey = [view.width, height, this.stageShell.dataset.speechSize, ...messageIds].join('/');
+    if (fitKey !== this.bubbleFitKey) {
+      // Re-evaluate on text/size changes, not on world frames. Toggling the clip
+      // while a robot moves can clamp away the currently displayed last line.
+      this.bubbleFitKey = fitKey;
+      this.bubbleLayer.removeAttribute('data-compact');
+      const gutter = BUBBLE_INSET * 2 + BUBBLE_GAP * (speakers.length - 1);
+      const stackHeight = speakers.reduce((sum, head) => sum + measure(head).height, gutter);
+      if (stackHeight > height) this.bubbleLayer.setAttribute('data-compact', '');
     }
+    const boxes = [];
+    if (!this.bubbleLayer.hasAttribute('data-compact')) {
+      for (const head of speakers) {
+        const size = measure(head);
+        const box = bubbleBox(head, size.width, size.height, view, boxes);
+        if (!box) break;
+        boxes.push(box);
+      }
+    }
+
+    // Stack crowded bubbles from the top edge to leave the play area visible.
+    if (boxes.length !== speakers.length) {
+      boxes.length = 0;
+      let top = BUBBLE_INSET;
+      for (const head of speakers) {
+        const size = measure(head);
+        const left = clamp(head.x - size.width / 2, BUBBLE_INSET, view.width - size.width - BUBBLE_INSET);
+        const bottom = top + size.height;
+        boxes.push({left, top, right: left + size.width, bottom});
+        top = bottom + BUBBLE_GAP;
+      }
+    }
+
+    speakers.forEach((head, index) => this.drawBubble(head, boxes[index]));
+    const labels = heads.filter(head => !head.actor.speech && !head.side).sort((a, b) => a.x - b.x);
+    for (const head of labels) {
+      const size = measure(head);
+      const box = bubbleBox(head, size.width, size.height, view, boxes);
+      if (box) { boxes.push(box); this.drawBubble(head, box); }
+      else head.actor.bubble.hidden = true;
+    }
+    const layout = speakers.map(({actor}) => [actor.message.clientWidth, actor.message.clientHeight].join('/')).join(',');
+    if (layout !== this.speechLayout) {
+      this.speechLayout = layout;
+      this.updateSpeechScroll();
+    }
+  }
+
+  drawBubble(head, box) {
+    const {bubble, leader} = head.actor;
+    bubble.style.left = box.left + 'px';
+    bubble.style.top = box.top + 'px';
+    if (head.side) return;
+    const fromX = clamp(head.x, box.left + 4, box.right - 4);
+    const fromY = head.y < box.top ? box.top : box.bottom;
+    const dx = head.x - fromX, dy = head.y - fromY;
+    leader.hidden = false;
+    leader.style.left = fromX + 'px';
+    leader.style.top = fromY + 'px';
+    leader.style.width = Math.hypot(dx, dy) + 'px';
+    leader.style.transform = 'rotate(' + Math.atan2(dy, dx) + 'rad)';
   }
 
   paint(scenery = false) {
     if (this.batching) return;
     const view = this.camera();
-    if (!view) return;
+    if (!view) {
+      // Switching to a sensor feed removes the stage from layout. Force speech
+      // to catch up when the spectator returns to a same-sized stage.
+      this.speechLayout = null;
+      return;
+    }
     if (scenery) this.drawScenery(view);
     if (!this.world) return;
     const now = this.connected ? performance.now() : this.lastPaint;
     this.lastPaint = now;
     const heads = ROLES.map(role => this.sprite(role, this.world.robots[role], view, now));
-    if (scenery) this.placeBubbles(heads, view);
+    if (scenery) this.placeBubbles(heads, view.height);
     if (this.connected && !this.frame && !document.hidden && !this.historical && (!this.reduced.matches || this.cues.size)) {
       // World updates already paint walking and motion. Wake only at an idle-frame
       // change or the end of a short, recorded contact cue while the room is still.

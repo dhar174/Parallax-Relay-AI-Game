@@ -53,20 +53,38 @@ button:focus-visible, select:focus-visible, input:focus-visible, a:focus-visible
 .scene-actions { gap: 18px; }
 .scene-actions button { font-size: .79rem; min-height: 32px; padding: 3px 9px; }
 .jump-link { font-size: .81rem; color: #454537; text-underline-offset: 3px; }
+#stage-shell { --speech-size: 1rem; }
+#stage-shell[data-speech-size="large"] { --speech-size: 1.125rem; }
+#stage-shell[data-speech-size="largest"] { --speech-size: 1.25rem; }
+#stage-viewport { position: relative; isolation: isolate; }
 .stage-scroll { overflow-x: auto; overflow-y: hidden; scrollbar-color: #8f836a #ece4d4; }
 .stage { position: relative; isolation: isolate; width: 100%; height: clamp(240px, 27vw, 336px); overflow: hidden; background: #ecd2a9 url('/art/room-background.png') center 7% / cover no-repeat; }
 .stage-scroll.enlarged .stage { width: max(150%, 1024px); height: clamp(360px, 37vw, 525px); }
 #scenery { display: block; position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 #actors, #bubbles { position: absolute; inset: 0; pointer-events: none; }
+#bubbles { overflow: clip; }
 .actor, .bubble, .leader { position: absolute; }
 .actor { width: 0; height: 0; }
 .robot-art { position: absolute; display: block; background-repeat: no-repeat; transform-origin: 50% 93.359375%; }
-.bubble { --role-color: #36536b; z-index: 1; display: grid; gap: 3px; max-width: min(184px, 32%); padding: 4px 7px; border: 1px solid #705d44; border-left: 3px solid var(--role-color); border-radius: 5px; background: #fffff6; color: #27251d; line-height: 1.2; box-shadow: 0 1px 1px #32261538; }
-.bubble-speaker { font: 720 .65rem/1.15 var(--mono); letter-spacing: .025em; }
-.bubble-message { font-size: .77rem; line-height: 1.28; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.bubble { z-index: 1; display: grid; gap: 2px; inline-size: max-content; max-inline-size: min(21rem, 75%); padding: 4px 7px; border: 1px solid #705d44; border-left: 3px solid var(--role-color); border-radius: 5px; background: #fffff6; color: #27251d; box-shadow: 0 1px 1px #32261538; }
+.bubble-speaker { font: 720 .7rem/1.15 var(--mono); color: var(--role-color); letter-spacing: .025em; white-space: nowrap; }
+.bubble-message { min-inline-size: 0; max-block-size: 2lh; font-size: var(--speech-size); line-height: 1.25; white-space: pre-wrap; overflow-wrap: anywhere; overflow: hidden; }
+#bubbles[data-compact] .bubble-message { max-block-size: 1lh; }
+#bubbles[data-compact] .bubble.speaking { padding-block: 2px; }
 .bubble:not(.speaking) { padding: 2px 5px; background: #fff6df; }
-.bubble.speaking .bubble-speaker::after { content: ' “'; font-size: .9em; }
-.leader { height: 1px; transform-origin: left center; background: #64533a; }
+.bubble[data-offscreen="left"] .bubble-speaker::before { content: '← '; }
+.bubble[data-offscreen="right"] .bubble-speaker::after { content: ' →'; }
+.leader { height: 1px; transform-origin: left center; background: var(--role-color); }
+.speech-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 7px; padding: 5px 8px; border-top: 1px solid #b7ae9e; }
+.speech-tools button, .speech-tools select { min-height: 34px; padding: 3px 6px; font-size: .78rem; white-space: nowrap; }
+.speech-size-control { margin-inline-start: auto; display: flex; align-items: center; gap: 5px; font-size: .78rem; }
+#speech-reader { width: min(34rem, calc(100% - 24px)); max-height: calc(100% - 24px); padding: 14px; color: var(--ink); background: #fffdf7; border: 1px solid #777365; border-radius: 8px; }
+#speech-reader::backdrop { background: #26251f66; }
+.speech-reader-head, .speech-reader-nav { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.speech-reader-head h3 { margin: 0; }
+#speech-reader-label { margin: 8px 0 4px; font: 650 .78rem/1.4 var(--mono); color: var(--role-color, var(--ink)); }
+#speech-reader-text { overflow: auto; max-block-size: 40dvh; margin-block: 6px 12px; padding: 8px; border: 1px solid var(--line); font-size: var(--speech-size); line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+.speech-reader-nav button[aria-disabled="true"] { opacity: .55; cursor: default; }
 #await-scene { position: absolute; top: 12px; left: 14px; padding: 5px 8px; border-radius: 4px; background: #fff7e4; color: #463b2a; font-size: .78rem; }
 #sensor-view { min-height: 170px; margin: 0; padding: 14px; background: #f0ecdf; text-align: center; }
 #sensor-image { max-width: 100%; height: auto; vertical-align: middle; }
@@ -76,7 +94,6 @@ button:focus-visible, select:focus-visible, input:focus-visible, a:focus-visible
 .readout > div:first-child { border-left: 0; }
 .label { display: block; color: var(--muted); }
 .readout strong { display: block; margin-top: 2px; font-size: .92rem; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
-#mobile-dialogue { display: none; }
 #room-guide { width: fit-content; max-width: 100%; color: #46493d; font-size: .79rem; margin-top: 5px; }
 #room-guide summary { cursor: pointer; padding: 6px 0; }
 #room-guide dl { margin: 0 0 6px; display: grid; grid-template-columns: max-content minmax(0,1fr); gap: 3px 12px; }
@@ -140,15 +157,9 @@ footer { justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-top: 
   .scene-tools { padding: 5px; }
   .jump-link { display: none; }
   .stage { height: clamp(210px, 45vw, 268px); }
-  .stage-scroll:not(.enlarged) .bubble-message { display: none; }
-  .stage-scroll:not(.enlarged) .bubble { padding: 3px 4px; }
   .readout > div { padding: 6px 4px; }
   .readout .label { font-size: .63rem; }
   .readout strong { font-size: .76rem; }
-  #mobile-dialogue { display: block; padding: 7px 9px; background: #fffbf1; border-top: 1px solid #b7ae9e; }
-  #mobile-dialogue > div { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 5px 9px; align-items: baseline; font-size: .75rem; }
-  #mobile-dialogue a { color: #34536a; font-weight: 650; text-underline-offset: 2px; }
-  #latest-speech { margin: 4px 0 0; font-size: .82rem; line-height: 1.35; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
   .team { grid-template-columns: 1fr; }
   .role-card { padding: 5px 8px; gap: 8px; }
   .portrait { width: 32px; height: 32px; }
@@ -164,4 +175,5 @@ footer { justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-top: 
   #room-guide dl { grid-template-columns: 1fr; }
   #room-guide dd { margin-bottom: 4px; }
 }
+@media (max-width: 360px) { .speech-size-control { margin-inline-start: 0; } }
 @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }

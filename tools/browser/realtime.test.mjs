@@ -303,3 +303,190 @@ test('hostile public speech stays inert text', {timeout:45000}, async t => {
   assert.equal(await page.evaluate(() => window.__speechExecuted), undefined);
   await page.unrouteAll({behavior:'wait'});
 });
+
+const speechRoles = ['SPECTRA', 'PYRA', 'FLUX'];
+const longSpeech = {
+  SPECTRA: 'I can see the landing zone past the bridge. Hold your jump until all three of us reach the near edge. '
+    + 'I will cross first, check the raised bank, and call out when the path to the shard is clear.\n👩‍🚀 '
+    + 'Our meeting point is beside the exit. Wait for my signal before departing.',
+  PYRA: 'The motor is still too hot. I am moving to the console to vent it before FLUX reroutes power. '
+    + 'Keep clear of the gap while I cool the housing and check the thermal ring. '
+    + 'Once it drops, I will confirm we can extend the deck and cross together.',
+  FLUX: 'I see the bridge power circuit. I will wait for PYRA to confirm the vent before I reroute it. '
+    + 'I can check the spare energy cell on the way to the exit.\nSignal ' + 'X'.repeat(100) + ' ends here.',
+};
+
+function speechWorld(positions, y = 0) {
+  const robot = {y, vx: 0, vy: 0, grounded: true, facing: 1, pose: 'idle'};
+  return {tick: 1, robots: Object.fromEntries(speechRoles.map((role, i) => [role, {...robot, x: positions[i]}]))};
+}
+
+async function loadSpeechFixture(page, {world = speechWorld([768, 768, 768]), speech = longSpeech} = {}) {
+  const run = await page.evaluate(async () => (await (await fetch('/api/status')).json()).run_id);
+  const journal = [
+    {kind: 'state', world},
+    {kind: 'phase_open', window: 1, phase: 'broadcast'},
+    ...speechRoles.map(role => ({kind: 'dialogue', role, text: speech[role], window: 1, phase: 'broadcast'})),
+  ];
+  await page.route('**/api/events?after=*', route => {
+    const after = Number(new URL(route.request().url()).searchParams.get('after'));
+    const events = journal.slice(after).map((event, n) => ({...event, seq: after + n + 1, tick: 1}));
+    return route.fulfill({json: {events, cursor: journal.length, run_id: run, has_more: false}});
+  });
+  await page.clock.install();
+  await page.reload();
+  await page.waitForFunction(() => document.querySelectorAll('#transcript article').length === 3);
+  return journal;
+}
+
+async function bubbleScroll(page) {
+  return page.locator('.bubble.speaking .bubble-message').evaluateAll(nodes => nodes.map(node => ({
+    top: node.scrollTop, end: node.scrollHeight - node.clientHeight, font: parseFloat(getComputedStyle(node).fontSize),
+  })));
+}
+
+async function assertBubblesFit(page) {
+  const {viewport, boxes, overflow} = await page.evaluate(() => {
+    const viewport = document.querySelector('#stage-scroll').getBoundingClientRect().toJSON();
+    viewport.bottom = viewport.top + document.querySelector('#stage').clientHeight;
+    const boxes = [...document.querySelectorAll('.bubble:not([hidden])')].map(node => node.getBoundingClientRect().toJSON());
+    return {viewport, boxes, overflow: document.documentElement.scrollWidth - innerWidth};
+  });
+  assert.ok(overflow <= 1, 'Speech does not widen the page');
+  assert.ok(boxes.length >= 3);
+  for (const [i, box] of boxes.entries()) {
+    assert.ok(box.left >= viewport.left && box.right <= viewport.right &&
+      box.top >= viewport.top && box.bottom <= viewport.bottom, `Bubble ${i} is inside the stage`);
+    assert.ok(boxes.slice(0, i).every(other => box.right <= other.left || box.left >= other.right ||
+      box.bottom <= other.top || box.top >= other.bottom), `Bubble ${i} does not overlap another`);
+  }
+}
+
+test('long released speech is visible and intact on a narrow stage', {timeout:45000}, async t => {
+  const origin = await server(t, 'manual');
+  const page = await pageFor(t, origin, {width: 320, height: 780});
+  const journal = await loadSpeechFixture(page);
+  for (const role of speechRoles) {
+    const text = page.locator(`[data-bubble="${role}"] .bubble-message`);
+    assert.ok(await text.isVisible(), `${role}'s bubble should show speech at 320px`);
+    assert.equal(await text.textContent(), longSpeech[role]);
+  }
+  await assertBubblesFit(page);
+  assert.ok(await page.evaluate(() => {
+    const artTop = document.querySelector('.robot-art').getBoundingClientRect().top;
+    return [...document.querySelectorAll('.bubble.speaking')].every(node => node.getBoundingClientRect().bottom <= artTop);
+  }), 'Crowded bubbles leave the grounded robots visible');
+  await page.screenshot({path: join(output, 'speech-320.png')});
+  const initial = await bubbleScroll(page);
+  assert.ok(initial.every(row => row.top === 0 && row.end > 0 && row.font >= 16));
+  await page.clock.fastForward(6000);
+  const scrolled = await bubbleScroll(page);
+  assert.ok(scrolled.every(row => row.top > 0 && row.top < row.end), 'All three bubbles scroll concurrently');
+
+  const feed = page.getByLabel('Choose view');
+  await feed.selectOption('PYRA');
+  assert.equal(await page.locator('#stage').isVisible(), false);
+  await page.clock.fastForward(3000);
+  await feed.selectOption('SPECTATOR');
+  const returned = await bubbleScroll(page);
+  assert.ok(returned.every((row, i) => row.top > scrolled[i].top), 'Returning to the stage restores current reading progress');
+
+  await page.getByRole('button', {name: 'Pause scrolling'}).click();
+  const paused = await bubbleScroll(page);
+  journal.push({kind: 'state', world: speechWorld([0, 1536, 3072])});
+  await page.clock.fastForward(10_000);
+  await page.waitForFunction(() => document.querySelector('[data-robot="FLUX"]').dataset.x === '3072');
+  assert.deepEqual(await bubbleScroll(page), paused, 'Pose and journal updates do not reset speech or advance paused text');
+
+  await page.setViewportSize({width: 390, height: 844});
+  const textSize = page.getByLabel('Text size', {exact: true});
+  await textSize.selectOption('large');
+  assert.ok((await bubbleScroll(page)).every(row => row.font === 18));
+  await textSize.selectOption('largest');
+  assert.ok((await bubbleScroll(page)).every(row => row.font === 20));
+  await assertBubblesFit(page);
+  await page.getByRole('button', {name: 'Enlarge room'}).click();
+  await page.locator('#stage-scroll').evaluate(el => { el.scrollLeft = 400; });
+  await page.waitForFunction(() => document.querySelector('[data-bubble="SPECTRA"]').dataset.offscreen === 'left');
+  assert.equal(await page.locator('[data-bubble="FLUX"]').getAttribute('data-offscreen'), 'right');
+  await assertBubblesFit(page);
+
+  await page.getByRole('button', {name: 'Resume scrolling'}).click();
+  await page.clock.fastForward(60_000);
+  assert.ok((await bubbleScroll(page)).every(row => Math.abs(row.top - row.end) <= 1), 'Every bubble reaches its final line');
+
+  const read = page.getByRole('button', {name: 'Read speech'});
+  await read.focus();
+  await page.keyboard.press('Enter');
+  const dialog = page.getByRole('dialog', {name: 'Public speech'});
+  assert.ok(await dialog.isVisible());
+  const complete = dialog.getByRole('region', {name: 'Complete message'});
+  assert.equal(await complete.textContent(), longSpeech.FLUX);
+  assert.equal(await complete.evaluate(el => getComputedStyle(el).fontSize), '20px');
+  await page.screenshot({path: join(output, 'speech-reader-390.png')});
+  const nextText = '<img src=x onerror="window.__speechExecuted=1">';
+  journal.push({kind: 'phase_open', window: 2, phase: 'broadcast'});
+  await page.clock.fastForward(400);
+  await page.waitForFunction(() => document.querySelector('#window').textContent === '2');
+  assert.equal(await complete.textContent(), longSpeech.FLUX, 'Opening a phase does not replace a message being read');
+  assert.equal(await page.locator('[data-bubble="FLUX"] .bubble-message').textContent(), longSpeech.FLUX);
+  journal.push({kind: 'dialogue', role: 'SPECTRA', text: nextText, window: 2, phase: 'broadcast'});
+  await page.waitForFunction(() => document.querySelectorAll('#transcript article').length === 4);
+  assert.equal(await complete.textContent(), longSpeech.FLUX, 'New dialogue does not replace the open message');
+  await dialog.getByRole('button', {name: 'Previous'}).click();
+  assert.equal(await complete.textContent(), longSpeech.PYRA);
+  await dialog.getByRole('button', {name: 'Next'}).click();
+  await dialog.getByRole('button', {name: 'Next'}).click();
+  assert.equal(await complete.textContent(), nextText);
+  assert.equal(await dialog.locator('img').count(), 0);
+  await page.keyboard.press('Escape');
+  assert.equal(await dialog.isVisible(), false);
+  assert.ok(await read.evaluate(el => el === document.activeElement));
+
+  await page.setViewportSize({width: 1280, height: 800});
+  await page.getByRole('button', {name: 'Room overview'}).click();
+  await textSize.selectOption('normal');
+  assert.equal(await page.locator('[data-bubble="SPECTRA"] .bubble-message').textContent(), nextText);
+  assert.equal(await page.locator('#bubbles img').count(), 0);
+  assert.equal(await page.evaluate(() => window.__speechExecuted), undefined);
+  assert.deepEqual(await bubbleScroll(page), [{top: 0, end: 0, font: 16}], 'Entire short message fits at desktop size');
+  await assertBubblesFit(page);
+});
+
+test('reduced motion stops automatic bubble scrolling until the viewer resumes', {timeout:45000}, async t => {
+  const origin = await server(t, 'manual');
+  const page = await pageFor(t, origin, {width: 390, height: 844}, 'reduce');
+  await loadSpeechFixture(page);
+  assert.ok(await page.getByRole('button', {name: 'Resume scrolling'}).isVisible());
+  await page.clock.fastForward(6000);
+  assert.ok((await bubbleScroll(page)).every(row => row.top === 0 && row.end > 0));
+  await page.getByRole('button', {name: 'Resume scrolling'}).click();
+  await page.clock.fastForward(6000);
+  assert.ok((await bubbleScroll(page)).every(row => row.top > 0));
+});
+
+for (const compact of [true, false]) {
+  const layout = compact ? 'compact' : 'regular';
+  test(`${layout} speech bubbles keep their rows when speakers cross`, {timeout:45000}, async t => {
+    const origin = await server(t, 'manual');
+    const page = await pageFor(t, origin, {width: 320, height: 780});
+    const speech = compact ? longSpeech : {...longSpeech, PYRA: 'The vent is ready.'};
+    // Put the regular case near the top edge so nearby placement uses different rows.
+    const elevation = compact ? 0 : 1280;
+    const journal = await loadSpeechFixture(page, {world: speechWorld([756, 768, 780], elevation), speech});
+    assert.equal(await page.locator('#bubbles[data-compact]').count(), Number(compact));
+    await page.clock.fastForward(6000);
+    const scrolling = (await bubbleScroll(page)).filter(row => row.end > 0);
+    assert.equal(scrolling.length, compact ? 3 : 2);
+    assert.ok(scrolling.every(row => row.top > 0 && row.top < row.end));
+
+    const rowPositions = () => page.locator('.bubble.speaking').evaluateAll(nodes =>
+      Object.fromEntries(nodes.map(node => [node.dataset.bubble, node.offsetTop])));
+    const before = await rowPositions();
+    // Reverse the robots' horizontal order with roughly two pixels of movement.
+    journal.push({kind: 'state', world: speechWorld([780, 768, 756], elevation)});
+    await page.waitForFunction(() => document.querySelector('[data-robot="SPECTRA"]').dataset.x === '780');
+    assert.deepEqual(await rowPositions(), before, 'Every speaker stays in the same row');
+    await assertBubblesFit(page);
+  });
+}

@@ -23,11 +23,18 @@ fixture exercises the scheduler and puzzle. Real-time model cooperation requires
 separate evaluation.
 
 The **Relay team** cards show readiness during each discussion phase. The stage
-shows positions and speech bubbles as the simulation runs. **Public dialogue**
-and **Room events** show the discussion and physical consequences. Use **Choose
-view** to inspect the optical, thermal, or circuit PNG sampled at the start of
-the current window. Select **Spectator view** to watch the whole room. Open
-**Released plans** to check the programs and their shared start tick.
+shows positions and speech bubbles as the simulation runs. Long bubbles wrap
+and advance a line at a time, including when several robots speak together.
+Below the stage, use **Text size** or **Pause scrolling** to adjust the display.
+If your device prefers reduced motion, scrolling starts paused. **Read speech**
+opens the latest completed public message with **Previous** and **Next** for
+earlier or newly released messages. The match keeps running while you read.
+
+**Public dialogue** and **Room events** show the discussion and physical
+consequences. Use **Choose view** to inspect the optical, thermal, or circuit PNG
+sampled at the start of the current window. Select **Spectator view** to watch
+the whole room. Open **Released plans** to check the programs and their shared
+start tick.
 
 Select **Restart Match** during or after an offline match to return the room
 to tick zero. The server stays on the same URL. The room and manual drafts

@@ -12,6 +12,10 @@ const scene = new Scene();
 const manual = new Manual(post);
 const feeds = new Map();
 const groups = new Map();
+const speechHistory = [];
+const speechReader = byId('speech-reader');
+const readSpeech = byId('read-speech');
+let speechIndex = -1;
 const announced = new Set();
 const announcementQueue = [];
 const cards = new Map();
@@ -143,7 +147,7 @@ function clearFeed() {
 async function showFeed() {
   const role = byId('sensor-select').value;
   const spectator = role === 'SPECTATOR';
-  byId('stage-scroll').hidden = !spectator;
+  byId('stage-shell').hidden = !spectator;
   byId('room-guide').hidden = !spectator;
   byId('sensor-view').hidden = spectator; byId('zoom').hidden = !spectator;
   if (spectator) {
@@ -194,6 +198,32 @@ function announceGroup(group, historical) {
   pumpAnnouncements();
 }
 
+function updateSpeechNavigation() {
+  byId('speech-previous').setAttribute('aria-disabled', String(speechIndex <= 0));
+  byId('speech-next').setAttribute('aria-disabled', String(speechIndex >= speechHistory.length - 1));
+}
+
+function readMessage(index) {
+  const entry = speechHistory[index];
+  if (!entry) return;
+  speechIndex = index;
+  const label = byId('speech-reader-label');
+  label.style.setProperty('--role-color', COLORS[entry.role]);
+  label.textContent = entry.role + ' · ' + entry.title;
+  const text = byId('speech-reader-text');
+  text.textContent = entry.text;
+  text.scrollTop = 0;
+  updateSpeechNavigation();
+}
+
+readSpeech.addEventListener('click', () => {
+  if (!speechHistory.length) return;
+  readMessage(speechHistory.length - 1);
+  speechReader.showModal();
+});
+byId('speech-previous').addEventListener('click', () => readMessage(speechIndex - 1));
+byId('speech-next').addEventListener('click', () => readMessage(speechIndex + 1));
+
 function dialogue(event, historical) {
   if (!ROLES.includes(event.role) || typeof event.text !== 'string' || !event.text.trim()) return;
   const stage = phaseNames[event.phase] ? event.phase : phase;
@@ -216,13 +246,15 @@ function dialogue(event, historical) {
   speaker.style.setProperty('--role-color', COLORS[event.role]);
   label.append(document.createTextNode(' · Tick ' + event.tick + (event.source ? ' · ' + sourceLabel(event.source) : '')));
   make('p', row, event.text);
-  setText('latest-speech', event.role + ' · ' + event.text);
+  speechHistory.push({role: event.role, text: event.text, title: group.title});
+  readSpeech.disabled = false;
+  if (speechReader.open) updateSpeechNavigation();
   group.lines.push(event.role + '. ' + event.text);
   if (group.lines.length === ROLES.length) announceGroup(group, historical);
   setText('dialogue-count', ++dialogueTotal + (dialogueTotal === 1 ? ' message' : ' messages'));
   byId('dialogue-empty').hidden = true;
   if (speechGroup !== key) { scene.speech.clear(); speechGroup = key; }
-  scene.say(event.role, event.text, event.window, stage);
+  scene.say(event.role, event.text, event.seq);
 }
 
 function describeAction(action) {
@@ -273,9 +305,6 @@ function updateWorld(world) {
 
 function eventRow(event, historical) {
   if (['phase_open', 'window_started', 'checkpoint'].includes(event.kind) && Number.isSafeInteger(event.window) && event.window > 0) {
-    if (event.kind === 'phase_open' && speechGroup && !speechGroup.startsWith(event.window + '/')) {
-      scene.speech.clear(); speechGroup = '';
-    }
     windowNumber = event.window; setText('window', windowNumber);
   }
   if (Number.isSafeInteger(event.tick)) setText('tick', event.tick);
@@ -336,6 +365,9 @@ function resetPage() {
   cursor = 0; windowNumber = 0; phase = ''; dialogueTotal = 0; currentGroup = null; speechGroup = '';
   recordingFailed = false;
   groups.clear(); feeds.clear(); announced.clear(); announcementQueue.length = 0;
+  if (speechReader.open) speechReader.close();
+  speechHistory.length = 0; speechIndex = -1; readSpeech.disabled = true;
+  setText('speech-reader-label', ''); setText('speech-reader-text', '');
   clearTimeout(announcementTimer); announcementTimer = 0;
   clearFeed(); scene.reset(); manual.close(0, '', true);
   byId('transcript').replaceChildren(); byId('consequences').replaceChildren();
@@ -343,7 +375,6 @@ function resetPage() {
   byId('result').hidden = byId('released-plans').hidden = true;
   byId('released-plans').querySelector('ul').replaceChildren();
   setText('announcements', ''); setText('dialogue-count', ''); setText('phase', 'Ready to start');
-  setText('latest-speech', 'Waiting for the first public message.');
   setText('team-caption', 'Awaiting the match'); setText('window', '—'); setText('tick', '—');
   setText('bridge', '—'); setText('exit-state', '—');
   for (const role of ROLES) setReady(role, 'pending');
