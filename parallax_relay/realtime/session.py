@@ -18,7 +18,7 @@ from .flux_view import render_circuit_relief
 from .journal import Journal
 from .manual import ManualAgent, ManualControls
 from .observations import observe, sample_flux_circuit, sample_pyra_thermal
-from .physics import initial_world, step
+from .physics import TILE, initial_world, step
 from .players import ReactiveAgent
 from .pyra_view import render_thermal_bloom
 from .settings import make_live_agents
@@ -136,13 +136,22 @@ class Session:
             shard = 'recovered' if view['shard_collected'] else f'at column {room.shard}'
             details = f"Optical console at column {room.bridges[0].motor}. Memory shard {shard}."
         deck = 'extended' if view['bridge_powered'] else 'retracted'
-        positions = ', '.join(f"{name} at {min(12, max(0, (robot['x'] + 128) // 256))}"
+        positions = ', '.join(f"{name} at column {min(12, max(0, (robot['x'] + TILE // 2) // TILE))}"
                               for name, robot in view['robots'].items())
-        self._sample_descriptions[role, window] = (
-            f'{role} horizontal sensor, window {window}. {positions}. Bridge {deck}. {details}')
+        self._sample_descriptions[role, window] = f'{positions}. Bridge {deck}. {details}'
 
     def feed_description(self, role, window):
-        return self._sample_descriptions.get((role, window), '')
+        description = self._sample_descriptions.get((role, window))
+        return f'{role} horizontal sensor, window {window}. {description}' if description else ''
+
+    def illustrated_feed_description(self, role, window):
+        sample = self._illustrated_samples.get((role, window))
+        description = self._sample_descriptions.get((role, window))
+        if sample is None or description is None:
+            return ''
+        exit_state = 'unlocked' if sample.exit_unlocked else 'locked'
+        height = f'{sample.own_height / TILE:.8f}'.rstrip('0').rstrip('.')
+        return f'{description} Exit {exit_state}. {role} height {height} tiles relative to the deck.'
 
     def feed(self, role, window):
         return self.journal.feed(role, window)

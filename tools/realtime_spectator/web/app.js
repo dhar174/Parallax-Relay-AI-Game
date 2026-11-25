@@ -158,7 +158,18 @@ function clearFeed() {
   const img = byId('sensor-image');
   img.onload = img.onerror = null;
   img.removeAttribute('src'); img.alt = ''; img.hidden = true;
+  byId('sensor-details').hidden = true;
   if (imageURL) { URL.revokeObjectURL(imageURL); imageURL = ''; }
+}
+
+function resizeSensorImage(enlarged) {
+  const scroll = byId('sensor-scroll');
+  scroll.classList.toggle('enlarged', enlarged);
+  if (enlarged) scroll.tabIndex = 0;
+  else {
+    scroll.removeAttribute('tabindex');
+    scroll.scrollLeft = 0;
+  }
 }
 
 async function showFeed() {
@@ -169,6 +180,9 @@ async function showFeed() {
   byId('stage-viewport').hidden = byId('stage-controls').hidden = !spectator;
   byId('room-guide').hidden = !spectator;
   byId('sensor-view').hidden = spectator;
+  const zoom = byId('sensor-zoom');
+  zoom.hidden = !illustration;
+  resizeSensorImage(Boolean(illustration) && zoom.getAttribute('aria-pressed') === 'true');
   scene.zoom.hidden = !spectator || !scene.usesManualPan();
   if (spectator) {
     if (feedKey || imageURL) clearFeed();
@@ -176,8 +190,11 @@ async function showFeed() {
     return;
   }
   const sample = feeds.get(role);
-  const key = runID + '/' + view + '/' + (sample?.window ?? '');
+  const viewKey = runID + '/' + view + '/';
+  const key = viewKey + (sample?.window ?? '');
   if (key === feedKey) return;
+  const scroll = byId('sensor-scroll');
+  const previousPan = feedKey.startsWith(viewKey) ? scroll.scrollLeft : 0;
   clearFeed(); feedKey = key;
   const generation = feedGeneration;
   if (!sample) { setText('sensor-caption', 'Waiting for a sampled ' + role + ' observation.'); return; }
@@ -196,6 +213,11 @@ async function showFeed() {
       if (generation !== feedGeneration) return;
       img.hidden = false;
       setText('sensor-caption', label);
+      if (zoom.getAttribute('aria-pressed') === 'true' && illustration) scroll.scrollLeft = previousPan;
+      if (illustration && description) {
+        setText('sensor-details', description);
+        byId('sensor-details').hidden = false;
+      }
     };
     img.onerror = () => { if (generation === feedGeneration) setText('sensor-caption', label + ' · Image unavailable.'); };
     const imageType = illustration?.name ?? 'original sensor observation';
@@ -443,6 +465,12 @@ function applyPage(page, replay) {
 }
 
 byId('sensor-select').addEventListener('change', showFeed);
+byId('sensor-zoom').addEventListener('click', event => {
+  const button = event.currentTarget;
+  const enlarged = button.getAttribute('aria-pressed') !== 'true';
+  button.setAttribute('aria-pressed', String(enlarged));
+  resizeSensorImage(enlarged);
+});
 document.addEventListener('visibilitychange', () => { if (!document.hidden) scene.paint(true); });
 byId('start').addEventListener('click', async () => {
   if (byId('start').disabled) return;

@@ -143,6 +143,8 @@ test('reactive spectator waits for Start and runs multiple real windows', {timeo
     const description = await sensorImage.getAttribute('alt');
     assert.match(description, new RegExp(title + ' illustration for window ' + sample.window));
     if (role === 'PYRA') assert.match(description, /Thermal reading 3 at motor column 4/);
+    assert.match(description, new RegExp(role + ' height -?\\d+(?:\\.\\d+)? tiles'));
+    assert.match(description, /Exit (locked|unlocked)\./);
     assert.match(await page.locator('#sensor-caption').textContent(), new RegExp('Sampled at tick ' + sample.tick));
     const illustratedSrc = await sensorImage.getAttribute('src');
     const size = await sensorImage.evaluate(async image => {
@@ -153,10 +155,27 @@ test('reactive spectator waits for Start and runs multiple real windows', {timeo
     assert.deepEqual(size.native, [850, 295]);
     assert.ok(size.right <= size.viewport, 'The sensor image fits the mobile viewport');
     await screenshot(page, capture);
+    const details = page.locator('#sensor-details:visible');
+    assert.match(await details.textContent(), /SPECTRA at column \d+, PYRA at column \d+, FLUX at column \d+/);
+    assert.ok(await details.evaluate(node => parseFloat(getComputedStyle(node).fontSize) >= 16));
+    const zoom = page.getByRole('button', {name: 'Enlarge image'});
+    await zoom.click();
+    assert.equal(await zoom.getAttribute('aria-pressed'), 'true');
+    assert.equal(await sensorImage.evaluate(image => Math.round(image.getBoundingClientRect().width)), 850);
+    const scroll = page.locator('#sensor-scroll');
+    assert.equal(await scroll.getAttribute('tabindex'), '0');
+    await scroll.focus();
+    await page.keyboard.press('ArrowRight');
+    await page.waitForFunction(() => document.getElementById('sensor-scroll').scrollLeft > 0);
+    assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+    await zoom.click();
+    assert.equal(await zoom.getAttribute('aria-pressed'), 'false');
+    assert.equal(await scroll.evaluate(node => node.scrollLeft), 0);
     await picker.selectOption(role);
     await sensorImage.waitFor();
     assert.match(await sensorImage.getAttribute('alt'), new RegExp('original sensor observation for window ' + sample.window));
     assert.notEqual(await sensorImage.getAttribute('src'), illustratedSrc);
+    assert.equal(await details.isVisible(), false);
   }
   await page.setViewportSize({width: 1280, height: 800});
   await page.locator('#sensor-select').selectOption('SPECTATOR');

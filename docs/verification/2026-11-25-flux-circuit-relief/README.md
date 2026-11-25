@@ -32,3 +32,11 @@ The offline browser check opens both FLUX views for the same sample, decodes
 the illustration, and checks its layout at a 390-pixel viewport. Circuit Relief
 uses static chevrons. Model attention and gameplay effects require a separate
 evaluation. No provider calls were made.
+
+## PR #64 review follow-up
+
+The review revision adds a lamp for the sampled public exit state. Across the
+four reference scenes, the lamp is the only pixel change from the original
+implementation. The illustrated view also reports FLUX's sampled height and
+robot columns in text, and **Enlarge image** lets viewers read the artwork at
+its original size on narrow screens.

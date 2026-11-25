@@ -38,7 +38,11 @@ scenery. The S, P, and F contact marks show each robot's column. Teammates'
 heights are schematic. **PYRA · Thermal Bloom** shows the motor's heat as a
 halo and a numbered, segmented meter. Both shrink as the motor cools. The
 **Original circuit feed** and **Original thermal feed** options show exactly
-the PNGs used by FLUX and PYRA. Select **Spectator view** to watch the whole room.
+the PNGs used by FLUX and PYRA. The illustrated views show the exit lamp at the
+sampled window. The text below each illustration gives the robot columns, the
+selected robot's height from deck level, and the sensor reading. On a narrow
+screen, select **Enlarge image** and scroll horizontally to inspect the artwork
+at its original size. Select **Spectator view** to watch the whole room.
 Open **Released plans** to check the programs and their shared
 start tick.
 

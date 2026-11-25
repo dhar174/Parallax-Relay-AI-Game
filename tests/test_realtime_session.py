@@ -1,4 +1,5 @@
 import asyncio
+from io import BytesIO
 import json
 from pathlib import Path
 import tempfile
@@ -7,6 +8,8 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 from uuid import uuid4
+
+from PIL import Image, ImageChops
 
 from parallax_relay.protocol import ROLES
 from parallax_relay.realtime import session as driver
@@ -68,6 +71,38 @@ class RealtimeSessionTests(unittest.IsolatedAsyncioTestCase):
             self.assertIn(f'Thermal reading {heat}', session.feed_description('PYRA', window))
         self.assertIsNone(session.illustrated_feed('PYRA', 3))
         self.assertIsNone(session.illustrated_feed('FLUX', 1))
+
+    def test_both_illustrations_use_the_sampled_public_exit_and_own_height(self):
+        session = self.session()
+        self.addCleanup(session.close)
+        session.world.bridge_powered = True
+        for role in ('FLUX', 'PYRA'):
+            with self.subTest(role=role):
+                for window, recovered, height in ((1, False, 0), (2, True, 0), (3, True, 128)):
+                    session.world.shard_collected = recovered
+                    session.world.robots[role].y = height
+                    png = observe(session.world, role, window, session.settings).image_png
+                    session.store_feed(role, window, png)
+                session.world.shard_collected = False
+                session.world.robots[role].y = -30
+
+                before = session.illustrated_feed_description(role, 1)
+                after = session.illustrated_feed_description(role, 2)
+                airborne = session.illustrated_feed_description(role, 3)
+                self.assertIn('Exit locked.', before)
+                self.assertIn('Exit unlocked.', after)
+                self.assertIn(f'{role} height 0 tiles', after)
+                self.assertIn(f'{role} height 0.5 tiles', airborne)
+                for other in set(ROLES) - {role}:
+                    self.assertNotIn(f'{other} height', airborne)
+                self.assertNotIn('height', session.feed_description(role, 3))
+                with Image.open(BytesIO(session.illustrated_feed(role, 1))) as locked, \
+                     Image.open(BytesIO(session.illustrated_feed(role, 2))) as unlocked:
+                    box = ImageChops.difference(locked, unlocked).getbbox()
+                    self.assertIsNotNone(box)
+                    self.assertTrue(760 <= box[0] < box[2] <= 785 and 120 <= box[1] < box[3] <= 150)
+                    self.assertGreater(unlocked.crop(box).convert('L').getextrema()[1],
+                                       locked.crop(box).convert('L').getextrema()[1] + 35)
 
     def test_live_session_requires_matching_named_limits_before_opening_its_run(self):
         profile = load_profile('dev-bridge-live-v1')

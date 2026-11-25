@@ -11,7 +11,7 @@ from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageOps
 from ..protocol import ROLES
 from ..render import DX, H, W, px
 from . import physics
-from .sensor_art import place_tags, robot_mask
+from .sensor_art import draw_exit_lamp, exit_lamp_bounds, place_tags, robot_mask
 
 
 _LEFT = 211
@@ -30,8 +30,9 @@ _MOTOR_OFFSETS = {1: (-45,), 2: (-47, 44), 3: (-73, -46, 44)}
 class ThermalSample:
     columns: tuple[int, ...]
     heat: int
-    pyra_height: int
+    own_height: int
     powered: bool
+    exit_unlocked: bool
 
 
 @lru_cache(maxsize=2)
@@ -65,7 +66,7 @@ def _robot_feet(sample: ThermalSample):
     for role, column in zip(ROLES, sample.columns):
         x = px(column)
         if role == 'PYRA':
-            y = _LEFT - round(sample.pyra_height * DX / physics.TILE)
+            y = _LEFT - round(sample.own_height * DX / physics.TILE)
         else:
             y = _LEFT if x < _GAP_OUT else _FAR
         yield role, x, y
@@ -81,7 +82,8 @@ def _signature_positions(feet):
         for role, offset in zip(roles, offsets[len(roles)]):
             preferred.append((role, (x, y), (x + offset, mark_y)))
     # Keep the same label positions as the motor warms and cools.
-    blocked = [(_MOTOR - 53, _HOT_Y - 40, _MOTOR + 53, _HOT_Y + 21), (25, 19, 185, 100)]
+    blocked = [(_MOTOR - 53, _HOT_Y - 40, _MOTOR + 53, _HOT_Y + 21), (25, 19, 185, 100),
+               exit_lamp_bounds(_FAR)]
     return place_tags(preferred, blocked, _TAG_SIZE)
 
 
@@ -154,6 +156,7 @@ def render_thermal_bloom(sample: ThermalSample) -> bytes:
     _draw_contacts(image, tuple(_robot_feet(sample)))
     _draw_motor(image, sample.heat)
     _draw_meter(image, sample.heat)
+    draw_exit_lamp(image, _FAR, sample.exit_unlocked)
     buffer = BytesIO()
     image.save(buffer, format='PNG')
     return buffer.getvalue()

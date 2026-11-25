@@ -208,7 +208,8 @@ class SpectatorHandler(BaseHTTPRequestHandler):
                 else:
                     png = session.feed(role, window)
                 if png is not None:
-                    describe = getattr(session, 'feed_description', None)
+                    description_method = 'illustrated_feed_description' if match[3] else 'feed_description'
+                    describe = getattr(session, description_method, None)
                     caption = describe(role, window) if describe else ''
                     self._send(200, png, 'image/png', description=caption)
                     return

@@ -10,7 +10,7 @@ from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageOps
 from ..protocol import ROLES
 from ..render import DX, H, W, px
 from . import physics
-from .sensor_art import place_tags, robot_mask
+from .sensor_art import draw_exit_lamp, exit_lamp_bounds, place_tags, robot_mask
 
 
 _LEFT = 207
@@ -30,9 +30,10 @@ _RELAY_OFFSETS = {1: (30,), 2: (-30, 30), 3: (-59, -31, 31)}
 @dataclass(frozen=True)
 class CircuitSample:
     columns: tuple[int, ...]  # The same role order and snapped columns as the original PNG.
-    flux_height: int
+    own_height: int
     powered: bool
     cell_recovered: bool
+    exit_unlocked: bool
 
 
 @lru_cache(maxsize=2)
@@ -72,7 +73,7 @@ def _robot_feet(sample: CircuitSample):
     for role, column in zip(ROLES, sample.columns):
         x = px(column)
         if role == 'FLUX':
-            y = _LEFT - sample.flux_height * DX / physics.TILE
+            y = _LEFT - sample.own_height * DX / physics.TILE
         else:
             y = _LEFT if x < _END else _FAR
         yield role, x, y
@@ -94,7 +95,7 @@ def _signature_positions(feet, sample: CircuitSample):
     for role, x, y in feet:
         groups[x, round(y)].append(role)
     # Protect the bright equipment cues and leave a gap between badge contours.
-    occupied = [(_ROOT - 10, _SOURCE_Y - 10, _ROOT + 10, _SOURCE_Y + 10)]
+    occupied = [(_ROOT - 10, _SOURCE_Y - 10, _ROOT + 10, _SOURCE_Y + 10), exit_lamp_bounds(_FAR)]
     if sample.powered:
         occupied.extend([
             (_ROOT - 7, _PATH_Y - 7, _END + 7, _PATH_Y + 7),
@@ -176,6 +177,7 @@ def render_circuit_relief(sample: CircuitSample) -> bytes:
     _draw_bodies(image, feet)
     _draw_signatures(image, tuple(_signature_positions(feet, sample)))
     _draw_power(image, sample)
+    draw_exit_lamp(image, _FAR, sample.exit_unlocked)
     buffer = BytesIO()
     image.save(buffer, format='PNG')
     return buffer.getvalue()

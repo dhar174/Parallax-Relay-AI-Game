@@ -4,14 +4,31 @@ from functools import lru_cache
 from itertools import product
 from pathlib import Path
 
-from PIL import Image
+from PIL import Image, ImageDraw
 
 from ..protocol import ROLES
-from ..render import H, W
+from ..render import H, W, px
+from . import physics
 
 
 _SHEETS = Path(__file__).resolve().parents[2] / 'tools/realtime_spectator/art/animations/sheets'
 _TAG_SHIFTS = tuple(product((0, -22, 22), (0, -28, 28, -56, 56, -84, 84, -112, 112)))
+
+
+def exit_lamp_bounds(bank_y: int) -> tuple[int, int, int, int]:
+    x = px(physics.EXIT_X // physics.TILE)
+    return x - 10, bank_y - 53, x + 10, bank_y - 38
+
+
+def draw_exit_lamp(image: Image.Image, bank_y: int, unlocked: bool) -> None:
+    left, top, right, bottom = exit_lamp_bounds(bank_y)
+    draw = ImageDraw.Draw(image)
+    draw.rounded_rectangle((left, top, right, bottom), radius=4, fill='#202730', outline='#626e7b')
+    if unlocked:
+        draw.rectangle((left + 4, top + 4, right - 4, bottom - 4), fill='#78b7a4')
+    else:
+        y = (top + bottom) // 2
+        draw.line((left + 6, y, right - 6, y), fill='#626e7b', width=2)
 
 
 @lru_cache(maxsize=2 * len(ROLES))

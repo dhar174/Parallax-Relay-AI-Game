@@ -69,13 +69,13 @@ def _schematic_columns(world: physics.World):
 def sample_flux_circuit(world: physics.World) -> CircuitSample:
     """Freeze the same columns, circuit state and own height available to FLUX."""
     return CircuitSample(_schematic_columns(world), world.robots['FLUX'].y,
-                         world.bridge_powered, world.cell_collected)
+                         world.bridge_powered, world.cell_collected, world.exit_unlocked)
 
 
 def sample_pyra_thermal(world: physics.World) -> ThermalSample:
     """Freeze the columns, motor heat, own height and bridge state visible to PYRA."""
     return ThermalSample(_schematic_columns(world), world.heat, world.robots['PYRA'].y,
-                         world.bridge_powered)
+                         world.bridge_powered, world.exit_unlocked)
 
 
 def _image(world: physics.World, role: str, window: int) -> bytes:

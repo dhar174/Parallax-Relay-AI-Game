@@ -30,3 +30,11 @@ The browser test switches between the original and illustrated feeds for the
 same window at a 390-pixel viewport. The session test executes a legal vent
 and checks that both sampled windows retain their respective heat readings.
 These checks used offline development-room fixtures.
+
+## PR #64 review follow-up
+
+The review revision adds a lamp for the sampled public exit state. Across the
+four approved scenes, the lamp is the only pixel change. The illustrated view
+also reports the sampled heat, PYRA's height and the robot columns in text.
+**Enlarge image** lets viewers inspect the heat meter and badges at the
+original image size on narrow screens.

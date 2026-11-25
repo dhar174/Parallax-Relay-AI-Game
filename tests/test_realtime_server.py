@@ -285,6 +285,7 @@ class SpectatorTransportTests(unittest.TestCase):
         Image.new('RGB', (4, 3), 'blue').save(png, format='PNG')
         available = {('FLUX', 1): png.getvalue(), ('PYRA', 1): png.getvalue()}
         self.session.illustrated_feed = lambda role, window: available.get((role, window))
+        self.session.illustrated_feed_description = lambda role, window: f'{role} height 0.5 tiles.'
         run_header = ('X-Relay-Run-ID', self.journal.run_id)
         self.assertEqual(self.get('/api/feed/PYRA/1/circuit-relief')[0], 404)
         self.assertEqual(self.get('/api/feed/FLUX/1/thermal-bloom')[0], 404)
@@ -299,6 +300,7 @@ class SpectatorTransportTests(unittest.TestCase):
                     self.assertEqual(self.get(path)[0], 400)
                     code, headers, payload = self.exchange('GET', path, [*self.auth, run_header])
                 self.assertEqual((code, headers['Content-Type'], payload), (200, 'image/png', png.getvalue()))
+                self.assertEqual(headers['X-Relay-Sensor-Description'], f'{role} height 0.5 tiles.')
 
     def test_plan_shape_and_controller_admission_result(self):
         for invalid in ({}, [], manual_plan(extra='field'), manual_plan(role='ECHO'),
