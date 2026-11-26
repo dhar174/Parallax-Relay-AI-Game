@@ -19,6 +19,21 @@ implemented and tested offline, but live-unverified. See the
 The bundled victories use scripted players that already know the solution; they
 are not evidence of model reasoning or cooperation.
 
+## Raised Span screenshots
+
+**Spectator view.** SPECTRA, PYRA, and FLUX jump toward the far bank in the
+[offline physics demo](docs/verification/2026-11-20-realtime-demo.md).
+
+![The three robots jump above the powered bridge while speech bubbles show their jump timing.](docs/verification/realtime-room-2026-11-20/jump.png)
+
+**PYRA · Thermal Bloom.** The [illustrated spectator feed](docs/verification/2026-11-25-pyra-thermal-bloom/README.md) shows the motor at its heat limit before venting.
+
+![A bright halo surrounds the motor, and PYRA's heat meter shows four of four bars.](docs/verification/2026-11-25-pyra-thermal-bloom/threshold.png)
+
+**FLUX · Circuit Relief.** The [illustrated spectator feed](docs/verification/2026-11-25-flux-circuit-relief/README.md) traces power across the bridge and marks the energy cell.
+
+![A glowing cyan circuit with directional arrows spans the gap, and an energy cell is marked on the far bank.](docs/verification/2026-11-25-flux-circuit-relief/powered-crossing.png)
+
 ## Try it without API keys
 
 Use Python **3.12** for the usual development environment; the minimum is 3.11.
